@@ -4,6 +4,7 @@ from app.core.errors import register_error_handlers
 from app.core.middleware import RequestIdMiddleware
 from app.modules.auth.router import router as auth_router
 from app.modules.courses.router import router as courses_router
+from app.modules.enrollment.router import router as enrollment_router
 
 
 def create_app() -> FastAPI:
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     # routers
     app.include_router(auth_router)
     app.include_router(courses_router)
+    app.include_router(enrollment_router)
     return app
 
 
