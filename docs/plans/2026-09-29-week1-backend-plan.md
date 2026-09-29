@@ -2327,7 +2327,7 @@ git add . && git commit -m "feat(courses): sections, lessons, reorder and publis
 - Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_enrollment.py`
 - Test: `backend/tests/test_enrollment.py`
 
-- [ ] **Step 1: `app/modules/enrollment/models.py`**
+- [x] **Step 1: `app/modules/enrollment/models.py`**
 
 ```python
 import enum
@@ -2369,13 +2369,13 @@ class LessonProgress(Base):
                                                  onupdate=func.now())
 ```
 
-- [ ] **Step 2: Đăng ký model và sinh migration**
+- [x] **Step 2: Đăng ký model và sinh migration**
   - Thêm vào `app/models_registry.py`: `from app.modules.enrollment import models as enrollment_models  # noqa: F401`
 
 Run: `uv run alembic revision --autogenerate -m "enrollment"` rồi `uv run alembic upgrade head`
 Expected: tạo 2 bảng `enrollments` và `lesson_progress`
 
-- [ ] **Step 3: Viết test hỏng trước — `tests/test_enrollment.py`**
+- [x] **Step 3: Viết test hỏng trước — `tests/test_enrollment.py`**
 
 ```python
 from tests.helpers import API, create_course, make_published_course, make_student, make_teacher
@@ -2426,12 +2426,12 @@ async def test_my_courses_shows_progress(client):
     assert (item["total_lessons"], item["done_lessons"], item["progress_pct"]) == (1, 0, 0)
 ```
 
-- [ ] **Step 4: Chạy test**
+- [x] **Step 4: Chạy test**
 
 Run: `uv run pytest tests/test_enrollment.py -v`
 Expected: FAIL (404 vì chưa có route)
 
-- [ ] **Step 5: `app/modules/enrollment/schemas.py`**
+- [x] **Step 5: `app/modules/enrollment/schemas.py`**
 
 ```python
 import uuid
@@ -2456,7 +2456,7 @@ class MyCourseOut(BaseModel):
     progress_pct: int
 ```
 
-- [ ] **Step 6: `app/modules/enrollment/service.py`**
+- [x] **Step 6: `app/modules/enrollment/service.py`**
 
 ```python
 import uuid
@@ -2520,7 +2520,7 @@ async def my_courses(db: AsyncSession, user: User) -> list[MyCourseOut]:
     return result
 ```
 
-- [ ] **Step 7: `app/modules/enrollment/router.py`**
+- [x] **Step 7: `app/modules/enrollment/router.py`**
 
 ```python
 import uuid
@@ -2548,16 +2548,16 @@ async def my_courses(user: User = Depends(require_role(Role.student)), db: Async
     return await service.my_courses(db, user)
 ```
 
-- [ ] **Step 8: Gắn router vào `app/main.py`**
+- [x] **Step 8: Gắn router vào `app/main.py`**
   - Import: `from app.modules.enrollment.router import router as enrollment_router`
   - Dưới `# routers`: `app.include_router(enrollment_router)`
 
-- [ ] **Step 9: Chạy test**
+- [x] **Step 9: Chạy test**
 
 Run: `uv run pytest tests/test_enrollment.py -v`
 Expected: PASS cả 5 test
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add . && git commit -m "feat(enrollment): enroll in published courses, my courses with progress"
