@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     embed_timeout_s: float = 30.0
     vision_timeout_s: float = 120.0
+    vision_max_pages_per_doc: int = 60  # trần số trang gửi vision mỗi tài liệu (chi phí API)
 
 
 @lru_cache

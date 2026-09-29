@@ -5091,8 +5091,11 @@ git add backend/app/ai backend/app/core/config.py backend/tests/test_ai_provider
 
 ### Task 19: Trích xuất PDF (text trước, vision làm fallback)
 
+> Điều chỉnh (người dùng duyệt): gọi to_markdown với use_ocr=False, show_progress=False (không dùng Tesseract); trang có ≥ 1 công thức (layout mode bỏ mất nội dung công thức) cũng gửi vision; tối đa VISION_MAX_PAGES_PER_DOC (mặc định 60) trang vision mỗi tài liệu, vượt thì dùng text và đánh dấu vision_skipped.
+
 **Files:**
 - Create: `backend/app/ingestion/extract.py`, `backend/tests/pdfs.py`
+- Modify: `backend/app/core/config.py`, `backend/.env.example`, `backend/app/ingestion/chunker.py`
 - Test: `backend/tests/test_extract.py`
 
 - [ ] **Step 1: `tests/pdfs.py`**: tạo PDF thật trong bộ nhớ. Dùng chữ ASCII, vì font mặc định của PyMuPDF không có glyph tiếng Việt.
@@ -5117,9 +5120,12 @@ def make_pdf(pages: list[str]) -> bytes:
 - [ ] **Step 2: Viết test hỏng trước — `tests/test_extract.py`**
 
 ```python
+import pymupdf4llm
 import pytest
 
 from app.ai.vision import FakeVision
+from app.core.config import Settings
+from app.ingestion import extract
 from app.ingestion.extract import extract_pages, needs_vision
 from tests.pdfs import LONG_TEXT, make_pdf
 
@@ -5131,6 +5137,11 @@ def test_needs_vision_rules():
     assert not needs_vision(LONG_TEXT)
 
 
+def test_needs_vision_any_formula():
+    assert not needs_vision(LONG_TEXT, formula_count=0)
+    assert needs_vision(LONG_TEXT, formula_count=1)
+
+
 async def test_text_page_uses_text_blank_page_falls_back_to_vision():
     vision = FakeVision()
     pages = await extract_pages(make_pdf([LONG_TEXT, ""]), vision)
@@ -5138,6 +5149,7 @@ async def test_text_page_uses_text_blank_page_falls_back_to_vision():
     assert "Binary search" in pages[0].markdown
     assert pages[1].markdown == vision.text
     assert vision.calls == 1
+    assert not any(p.vision_skipped for p in pages)
 
 
 async def test_vision_receives_png(monkeypatch):
@@ -5155,12 +5167,74 @@ async def test_vision_receives_png(monkeypatch):
 async def test_corrupt_pdf_raises():
     with pytest.raises(Exception):
         await extract_pages(b"not a pdf", FakeVision())
+
+
+async def test_to_markdown_called_without_ocr_and_formula_page_goes_to_vision(monkeypatch):
+    seen = {}
+
+    def fake_to_markdown(doc, **kwargs):
+        seen.update(kwargs)
+        return [
+            {"text": LONG_TEXT, "page_boxes": [{"class": "text"}]},
+            {"text": LONG_TEXT, "page_boxes": [{"class": "text"}, {"class": "formula"}]},
+        ]
+
+    monkeypatch.setattr(pymupdf4llm, "to_markdown", fake_to_markdown)
+    vision = FakeVision()
+    pages = await extract_pages(make_pdf([LONG_TEXT, LONG_TEXT]), vision)
+    assert seen["use_ocr"] is False and seen["page_chunks"] is True and seen["show_progress"] is False
+    assert [(p.page_no, p.method) for p in pages] == [(1, "text"), (2, "vision")]
+    assert vision.calls == 1
+
+
+async def test_vision_cap_falls_back_to_text_and_flags_pages():
+    vision = FakeVision()
+    pages = await extract_pages(make_pdf(["", "", "", ""]), vision, max_vision_pages=2)
+    assert [(p.page_no, p.method, p.vision_skipped) for p in pages] == [
+        (1, "vision", False), (2, "vision", False), (3, "text", True), (4, "text", True)]
+    assert vision.calls == 2
+
+
+async def test_vision_cap_zero_never_calls_vision():
+    vision = FakeVision()
+    pages = await extract_pages(make_pdf(["", LONG_TEXT]), vision, max_vision_pages=0)
+    assert [(p.method, p.vision_skipped) for p in pages] == [("text", True), ("text", False)]
+    assert vision.calls == 0
+
+
+async def test_vision_cap_defaults_to_setting(monkeypatch):
+    assert Settings.model_fields["vision_max_pages_per_doc"].default == 60
+    monkeypatch.setattr(extract, "get_settings", lambda: Settings(vision_max_pages_per_doc=1))
+    vision = FakeVision()
+    pages = await extract_pages(make_pdf(["", ""]), vision)
+    assert [(p.method, p.vision_skipped) for p in pages] == [("vision", False), ("text", True)]
+    assert vision.calls == 1
 ```
 
 - [ ] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_extract.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ingestion.extract'`
+
+- [ ] **Step 4a: Trần số trang vision** — thêm setting, biến môi trường và cờ trên `PageText`.
+
+`app/core/config.py` (trong `Settings`, sau `vision_timeout_s`):
+
+```python
+    vision_max_pages_per_doc: int = 60  # trần số trang gửi vision mỗi tài liệu (chi phí API)
+```
+
+`backend/.env.example` (sau `VISION_PROVIDER=fake`):
+
+```
+VISION_MAX_PAGES_PER_DOC=60
+```
+
+`app/ingestion/chunker.py` (trường cuối của `PageText`, giữ nguyên thứ tự các trường cũ):
+
+```python
+    vision_skipped: bool = False  # cần vision nhưng đã chạm trần VISION_MAX_PAGES_PER_DOC → dùng text
+```
 
 - [ ] **Step 4: `app/ingestion/extract.py`**
 
@@ -5172,26 +5246,32 @@ import pymupdf
 import pymupdf4llm
 
 from app.ai.vision import VisionExtractor
+from app.core.config import get_settings
 from app.ingestion.chunker import PageText
 
 MIN_TEXT_CHARS = 50
+MIN_FORMULAS_FOR_VISION = 1  # layout mode bỏ mất nội dung công thức khỏi markdown → trang có công thức phải nhờ vision
 MAX_PAGES = 300
 _MARKUP_RE = re.compile(r"[#*_`>\-|\s]")
 
 
-def needs_vision(markdown: str) -> bool:
-    """Trang gần như không có chữ (scan/ảnh) hoặc chữ bị vỡ font → nhờ vision đọc lại."""
+def needs_vision(markdown: str, formula_count: int = 0) -> bool:
+    """Trang gần như không có chữ (scan/ảnh), chữ bị vỡ font hoặc có công thức → nhờ vision đọc lại."""
     visible = _MARKUP_RE.sub("", markdown)
-    return len(visible) < MIN_TEXT_CHARS or markdown.count("�") > 5
+    return len(visible) < MIN_TEXT_CHARS or markdown.count("�") > 5 or formula_count >= MIN_FORMULAS_FOR_VISION
 
 
-def _extract_text_pages(pdf_bytes: bytes) -> list[tuple[int, str]]:
+def _extract_text_pages(pdf_bytes: bytes) -> list[tuple[int, str, int]]:
     doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     try:
         if doc.page_count > MAX_PAGES:
             raise ValueError(f"PDF quá dài (tối đa {MAX_PAGES} trang)")
-        parts = pymupdf4llm.to_markdown(doc, page_chunks=True)
-        return [(i + 1, part["text"]) for i, part in enumerate(parts)]
+        # use_ocr=False: không dùng OCR của pymupdf4llm (Tesseract/RapidOCR); trang scan đi qua vision
+        parts = pymupdf4llm.to_markdown(doc, page_chunks=True, use_ocr=False, show_progress=False)
+        return [
+            (i + 1, part["text"], sum(1 for b in part.get("page_boxes") or [] if b.get("class") == "formula"))
+            for i, part in enumerate(parts)
+        ]
     finally:
         doc.close()
 
@@ -5204,23 +5284,32 @@ def _render_png(pdf_bytes: bytes, page_no: int, dpi: int = 150) -> bytes:
         doc.close()
 
 
-async def extract_pages(pdf_bytes: bytes, vision: VisionExtractor) -> list[PageText]:
+async def extract_pages(pdf_bytes: bytes, vision: VisionExtractor,
+                        max_vision_pages: int | None = None) -> list[PageText]:
+    """Trích từng trang. Tối đa max_vision_pages trang gửi vision (mặc định VISION_MAX_PAGES_PER_DOC),
+    xét theo thứ tự trang; vượt trần thì dùng text và đánh dấu vision_skipped=True."""
+    if max_vision_pages is None:
+        max_vision_pages = get_settings().vision_max_pages_per_doc
     # PyMuPDF là code đồng bộ, nặng CPU → chạy trong thread để không chặn event loop của worker
     raw = await asyncio.to_thread(_extract_text_pages, pdf_bytes)
     pages: list[PageText] = []
-    for page_no, markdown in raw:
-        if needs_vision(markdown):
+    vision_used = 0
+    for page_no, markdown, formula_count in raw:
+        if not needs_vision(markdown, formula_count):
+            pages.append(PageText(page_no, markdown.strip(), "text"))
+        elif vision_used >= max_vision_pages:
+            pages.append(PageText(page_no, markdown.strip(), "text", vision_skipped=True))
+        else:
+            vision_used += 1
             png = await asyncio.to_thread(_render_png, pdf_bytes, page_no)
             pages.append(PageText(page_no, (await vision.page_to_markdown(png)).strip(), "vision"))
-        else:
-            pages.append(PageText(page_no, markdown.strip(), "text"))
     return pages
 ```
 
 - [ ] **Step 5: Chạy test**
 
 Run: `uv run pytest tests/test_extract.py -v`
-Expected: PASS cả 4 test
+Expected: PASS cả 9 test
 
 - [ ] **Step 6: Commit**
 
