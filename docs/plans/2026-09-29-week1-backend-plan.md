@@ -761,7 +761,7 @@ git add . && git commit -m "feat(core): unified error format and request id midd
 - Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_users.py`
 - Test: `backend/tests/test_security.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_security.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_security.py`**
 
 ```python
 import uuid
@@ -809,12 +809,12 @@ def test_refresh_token_is_random_and_hashable():
     assert hash_refresh_token(raw1) == h1 and len(h1) == 64
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_security.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.core.security'`
 
-- [ ] **Step 3: `app/core/security.py`**
+- [x] **Step 3: `app/core/security.py`**
 
 ```python
 import hashlib
@@ -869,12 +869,12 @@ def new_refresh_token() -> tuple[str, str]:
     return raw, hash_refresh_token(raw)
 ```
 
-- [ ] **Step 4: Chạy test**
+- [x] **Step 4: Chạy test**
 
 Run: `uv run pytest tests/test_security.py -v`
 Expected: PASS
 
-- [ ] **Step 5: `app/modules/auth/models.py`** (`app/modules/__init__.py` và `app/modules/auth/__init__.py` để trống)
+- [x] **Step 5: `app/modules/auth/models.py`** (`app/modules/__init__.py` và `app/modules/auth/__init__.py` để trống)
 
 ```python
 import enum
@@ -924,23 +924,23 @@ class RefreshToken(IdMixin, TimestampMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 ```
 
-- [ ] **Step 6: Đăng ký vào `app/models_registry.py`**: thêm vào cuối file:
+- [x] **Step 6: Đăng ký vào `app/models_registry.py`**: thêm vào cuối file:
 
 ```python
 from app.modules.auth import models as auth_models  # noqa: F401
 ```
 
-- [ ] **Step 7: Sinh migration**
+- [x] **Step 7: Sinh migration**
 
 Run: `uv run alembic revision --autogenerate -m "users"` rồi `uv run alembic upgrade head`
 Expected: file mới có `op.create_table('users', ...)` (bên trong có `sa.CheckConstraint('email = lower(email)', name='ck_users_email_lowercase')`) và `op.create_table('refresh_tokens', ...)`, với `down_revision = '0001'`. Mở file ra kiểm tra lại rồi mới upgrade.
 
-- [ ] **Step 8: Chạy toàn bộ test** (fixture `_migrate` sẽ chạy migration mới)
+- [x] **Step 8: Chạy toàn bộ test** (fixture `_migrate` sẽ chạy migration mới)
 
 Run: `uv run pytest -v`
 Expected: PASS
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add . && git commit -m "feat(auth): user and refresh token models, password hashing, jwt helpers"
