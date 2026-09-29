@@ -34,6 +34,7 @@ async def test_role_matrix(client):
 
     app = _app_with_probe_routes()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+
         async def code(path, headers):
             r = await c.get(path, headers=headers)
             return r.status_code, (r.json().get("error") or {}).get("code")

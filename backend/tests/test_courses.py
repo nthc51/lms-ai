@@ -50,7 +50,9 @@ async def test_delete_course(client):
     _, gv = await make_teacher(client)
     c = await create_course(client, gv)
     assert (await client.delete(f"{API}/courses/{c['id']}", headers=gv)).status_code == 204
-    assert (await client.patch(f"{API}/courses/{c['id']}", json={"title": "Xyz"}, headers=gv)).status_code == 404
+    assert (
+        await client.patch(f"{API}/courses/{c['id']}", json={"title": "Xyz"}, headers=gv)
+    ).status_code == 404
 
 
 async def test_publish_empty_course_is_rejected(client):

@@ -12,8 +12,12 @@ from app.modules.materials.models import Asset, AssetKind
 from app.modules.materials.schemas import PresignIn, PresignOut
 
 MB = 1024 * 1024
-SIZE_LIMITS = {AssetKind.pdf: 50 * MB, AssetKind.video: 500 * MB,
-               AssetKind.submission: 20 * MB, AssetKind.image: 5 * MB}
+SIZE_LIMITS = {
+    AssetKind.pdf: 50 * MB,
+    AssetKind.video: 500 * MB,
+    AssetKind.submission: 20 * MB,
+    AssetKind.image: 5 * MB,
+}
 ALLOWED_MIME = {
     AssetKind.pdf: {"application/pdf"},
     AssetKind.video: {"video/mp4"},
@@ -21,8 +25,14 @@ ALLOWED_MIME = {
     AssetKind.image: {"image/png", "image/jpeg", "image/webp"},
 }
 STAFF_ONLY_KINDS = {AssetKind.pdf, AssetKind.video}  # tài liệu và video bài học chỉ giảng viên/admin upload
-EXTENSIONS = {"application/pdf": "pdf", "video/mp4": "mp4", "text/plain": "txt",
-              "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
+EXTENSIONS = {
+    "application/pdf": "pdf",
+    "video/mp4": "mp4",
+    "text/plain": "txt",
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+}
 
 
 def _too_large() -> AppError:
@@ -41,7 +51,9 @@ def mime_matches(declared: str, head: bytes) -> bool:
     return guessed is not None and guessed.mime == declared
 
 
-async def create_presigned_upload(db: AsyncSession, storage: Storage, user: User, data: PresignIn) -> PresignOut:
+async def create_presigned_upload(
+    db: AsyncSession, storage: Storage, user: User, data: PresignIn
+) -> PresignOut:
     kind = AssetKind(data.kind)
     if kind in STAFF_ONLY_KINDS:
         await require_staff(user)
@@ -97,7 +109,11 @@ async def complete_upload(db: AsyncSession, storage: Storage, user: User, asset_
 
 async def require_verified_asset(db: AsyncSession, asset_id: uuid.UUID, user: User, kind: AssetKind) -> Asset:
     asset = await db.get(Asset, asset_id)
-    if (asset is None or asset.kind != kind or asset.verified_at is None
-            or (asset.owner_id != user.id and user.role != Role.admin)):
+    if (
+        asset is None
+        or asset.kind != kind
+        or asset.verified_at is None
+        or (asset.owner_id != user.id and user.role != Role.admin)
+    ):
         raise AppError("INVALID_ASSET", "File không hợp lệ hoặc chưa upload xong", 400)
     return asset

@@ -41,8 +41,12 @@ class _Para:
 
 def _is_fence_close(line: str, fence: str) -> bool:
     m = FENCE_RE.match(line)
-    return (m is not None and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence)
-            and line.strip() == m.group(1))
+    return (
+        m is not None
+        and m.group(1)[0] == fence[0]
+        and len(m.group(1)) >= len(fence)
+        and line.strip() == m.group(1)
+    )
 
 
 def _paragraphs(markdown: str) -> list[tuple[str, bool]]:
@@ -78,8 +82,7 @@ def _paragraphs(markdown: str) -> list[tuple[str, bool]]:
     return out
 
 
-def _pack(units: list[str], sep: str, max_tokens: int,
-          fallback: Callable[[str], list[str]]) -> list[str]:
+def _pack(units: list[str], sep: str, max_tokens: int, fallback: Callable[[str], list[str]]) -> list[str]:
     """Gom các unit liên tiếp (nối bằng sep) sao cho mỗi phần <= max_tokens; unit quá lớn -> fallback."""
     out: list[str] = []
     cur: list[str] = []
@@ -104,7 +107,7 @@ def _hard_split(text: str, max_tokens: int) -> list[str]:
     step = max_tokens * CHARS_PER_TOKEN
 
     def by_chars(word: str) -> list[str]:
-        return [word[i:i + step] for i in range(0, len(word), step)]
+        return [word[i : i + step] for i in range(0, len(word), step)]
 
     def by_words(line: str) -> list[str]:
         return _pack(line.split(), " ", max_tokens, by_chars)
@@ -116,8 +119,9 @@ def _join(paras: list[_Para]) -> str:
     return "\n\n".join(p.text for p in paras)
 
 
-def chunk_pages(pages: list[PageText], max_tokens: int = 700, overlap_tokens: int = 100,
-                flush_min_tokens: int = 150) -> list[ChunkDraft]:
+def chunk_pages(
+    pages: list[PageText], max_tokens: int = 700, overlap_tokens: int = 100, flush_min_tokens: int = 150
+) -> list[ChunkDraft]:
     if max_tokens <= 0:
         raise ValueError("max_tokens must be positive")
     if overlap_tokens < 0 or overlap_tokens >= max_tokens:

@@ -10,8 +10,9 @@ MB = 1024 * 1024
 
 
 async def _presign(client, headers, kind="pdf", mime="application/pdf", size=1000):
-    return await client.post(f"{API}/uploads/presign", json={"kind": kind, "mime": mime, "size": size},
-                             headers=headers)
+    return await client.post(
+        f"{API}/uploads/presign", json={"kind": kind, "mime": mime, "size": size}, headers=headers
+    )
 
 
 def _staging(presign_response) -> str:
@@ -38,7 +39,11 @@ async def test_presign_returns_staging_url_and_asset(client):
     _, gv = await make_teacher(client)
     r = await _presign(client, gv)
     assert r.status_code == 200
-    assert r.json()["asset_id"] and _staging(r).startswith(f"{STAGING_PREFIX}pdf/") and _final(r).endswith(".pdf")
+    assert (
+        r.json()["asset_id"]
+        and _staging(r).startswith(f"{STAGING_PREFIX}pdf/")
+        and _final(r).endswith(".pdf")
+    )
 
 
 async def test_presign_rejects_mime_not_allowed_for_kind(client):
@@ -53,8 +58,9 @@ async def test_presign_rejects_declared_size_over_limit(client):
     assert (r.status_code, r.json()["error"]["code"]) == (413, "FILE_TOO_LARGE")
 
 
-@pytest.mark.parametrize(("kind", "mime", "limit"), [("pdf", "application/pdf", 50 * MB),
-                                                     ("video", "video/mp4", 500 * MB)])
+@pytest.mark.parametrize(
+    ("kind", "mime", "limit"), [("pdf", "application/pdf", 50 * MB), ("video", "video/mp4", 500 * MB)]
+)
 async def test_presign_declared_size_boundary(client, kind, mime, limit):
     _, gv = await make_teacher(client)
     assert (await _presign(client, gv, kind, mime, size=limit)).status_code == 200
@@ -149,8 +155,9 @@ async def test_attach_video_and_stream_url(client, storage):
     course, _, lesson = await make_published_course(client, gv)
     r, done = await _upload(client, storage, gv, MP4, kind="video", mime="video/mp4")
     assert done.status_code == 200
-    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
-                               headers=gv)
+    patch = await client.patch(
+        f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]}, headers=gv
+    )
     assert patch.status_code == 200 and patch.json()["video_asset_id"] == r.json()["asset_id"]
 
     denied = await client.get(f"{API}/lessons/{lesson['id']}/video", headers=sv)
@@ -165,8 +172,9 @@ async def test_attach_pdf_as_video_is_rejected(client, storage):
     _, gv = await make_teacher(client)
     _, _, lesson = await make_published_course(client, gv)
     r, _ = await _upload(client, storage, gv, PDF)
-    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
-                               headers=gv)
+    patch = await client.patch(
+        f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]}, headers=gv
+    )
     assert (patch.status_code, patch.json()["error"]["code"]) == (400, "INVALID_ASSET")
 
 
@@ -176,8 +184,9 @@ async def test_attach_other_teachers_video_is_rejected(client, storage):
     _, _, lesson = await make_published_course(client, gv)
     r, done = await _upload(client, storage, gv2, MP4, kind="video", mime="video/mp4")
     assert done.status_code == 200
-    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
-                               headers=gv)
+    patch = await client.patch(
+        f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]}, headers=gv
+    )
     assert (patch.status_code, patch.json()["error"]["code"]) == (400, "INVALID_ASSET")
 
 
@@ -185,8 +194,9 @@ async def test_attach_unverified_video_is_rejected(client):
     _, gv = await make_teacher(client)
     _, _, lesson = await make_published_course(client, gv)
     r = await _presign(client, gv, kind="video", mime="video/mp4")
-    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
-                               headers=gv)
+    patch = await client.patch(
+        f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]}, headers=gv
+    )
     assert (patch.status_code, patch.json()["error"]["code"]) == (400, "INVALID_ASSET")
 
 
@@ -196,6 +206,7 @@ async def test_student_cannot_patch_lesson(client, storage):
     course, _, lesson = await make_published_course(client, gv)
     r, _ = await _upload(client, storage, gv, MP4, kind="video", mime="video/mp4")
     await client.post(f"{API}/courses/{course['id']}/enroll", headers=sv)
-    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
-                               headers=sv)
+    patch = await client.patch(
+        f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]}, headers=sv
+    )
     assert (patch.status_code, patch.json()["error"]["code"]) == (403, "FORBIDDEN")

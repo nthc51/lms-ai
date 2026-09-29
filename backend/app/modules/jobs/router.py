@@ -26,7 +26,9 @@ class JobOut(BaseModel):
 
 
 @router.get("/jobs/{job_id}", response_model=JobOut)
-async def get_job(job_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_job(
+    job_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     job = await db.get(Job, job_id)
     # Chỉ người tạo job hoặc admin được xem; người khác (kể cả với job hệ thống created_by NULL)
     # nhận 404 giống hệt job không tồn tại, để không lộ id job.

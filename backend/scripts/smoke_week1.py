@@ -3,6 +3,7 @@
 Chạy từ thư mục backend/:  PYTHONUTF8=1 uv run python -m scripts.smoke_week1 [duong/dan/file.pdf]
 Không truyền file thì tự sinh một PDF 2 trang có text.
 """
+
 import asyncio
 import sys
 import time
@@ -17,7 +18,8 @@ from app.modules.auth.service import approve_teacher
 
 API = "http://localhost:8000/api/v1"
 SAMPLE = [
-    "Chương 1. Tìm kiếm nhị phân\n\n" + "Tìm kiếm nhị phân chia đôi khoảng tìm kiếm trên mảng đã sắp xếp. " * 12,
+    "Chương 1. Tìm kiếm nhị phân\n\n"
+    + "Tìm kiếm nhị phân chia đôi khoảng tìm kiếm trên mảng đã sắp xếp. " * 12,
     "Chương 2. Sắp xếp trộn\n\n" + "Sắp xếp trộn chia mảng làm hai nửa, sắp xếp từng nửa rồi trộn lại. " * 12,
 ]
 
@@ -43,25 +45,30 @@ def main(pdf_path: str | None) -> int:
     email = f"smoke-{uuid.uuid4().hex[:6]}@example.com"
     h: dict[str, str] = {}
     with httpx.Client(base_url=API, timeout=30) as c:
+
         def post(url: str, **kw) -> dict:
             resp = c.post(url, headers=h, **kw)
             if resp.is_error:
                 raise SystemExit(f"POST {url} → {resp.status_code}: {resp.text}")
             return resp.json()
 
-        post("/auth/register", json={"email": email, "password": "password123",
-                                     "full_name": "Smoke GV", "role": "teacher"})
+        post(
+            "/auth/register",
+            json={"email": email, "password": "password123", "full_name": "Smoke GV", "role": "teacher"},
+        )
         asyncio.run(_approve(email))
-        h["Authorization"] = "Bearer " + post("/auth/login", json={"email": email,
-                                                                  "password": "password123"})["access_token"]
+        h["Authorization"] = (
+            "Bearer " + post("/auth/login", json={"email": email, "password": "password123"})["access_token"]
+        )
 
         course = post("/courses", json={"title": "Khóa smoke test"})
         section = post(f"/courses/{course['id']}/sections", json={"title": "Chương 1"})
         lesson = post(f"/sections/{section['id']}/lessons", json={"title": "Bài 1"})
 
         pre = post("/uploads/presign", json={"kind": "pdf", "mime": "application/pdf", "size": len(data)})
-        httpx.put(pre["put_url"], content=data, headers={"Content-Type": "application/pdf"},
-                  timeout=120).raise_for_status()  # PUT thẳng vào MinIO (key staging) như trình duyệt
+        httpx.put(
+            pre["put_url"], content=data, headers={"Content-Type": "application/pdf"}, timeout=120
+        ).raise_for_status()  # PUT thẳng vào MinIO (key staging) như trình duyệt
         post(f"/uploads/{pre['asset_id']}/complete")
 
         created = post(f"/lessons/{lesson['id']}/sources", json={"asset_id": pre["asset_id"]})

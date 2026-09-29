@@ -22,11 +22,13 @@ class Course(IdMixin, TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(String(240), unique=True, index=True)
     description: Mapped[str] = mapped_column(Text, default="")
     cover_key: Mapped[str | None] = mapped_column(String(512))
-    status: Mapped[CourseStatus] = mapped_column(SAEnum(CourseStatus, name="course_status"),
-                                                 default=CourseStatus.draft)
+    status: Mapped[CourseStatus] = mapped_column(
+        SAEnum(CourseStatus, name="course_status"), default=CourseStatus.draft
+    )
 
     sections: Mapped[list["Section"]] = relationship(
-        back_populates="course", order_by="Section.position", passive_deletes=True)
+        back_populates="course", order_by="Section.position", passive_deletes=True
+    )
 
 
 class Section(IdMixin, TimestampMixin, Base):
@@ -38,7 +40,8 @@ class Section(IdMixin, TimestampMixin, Base):
 
     course: Mapped[Course] = relationship(back_populates="sections")
     lessons: Mapped[list["Lesson"]] = relationship(
-        back_populates="section", order_by="Lesson.position", passive_deletes=True)
+        back_populates="section", order_by="Lesson.position", passive_deletes=True
+    )
 
 
 class Lesson(IdMixin, TimestampMixin, Base):
@@ -49,7 +52,8 @@ class Lesson(IdMixin, TimestampMixin, Base):
     position: Mapped[int] = mapped_column(Integer)
     content_md: Mapped[str] = mapped_column(Text, default="")
     duration_sec: Mapped[int | None] = mapped_column(Integer)
-    video_asset_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"),
-                                                            index=True)
+    video_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL"), index=True
+    )
 
     section: Mapped[Section] = relationship(back_populates="lessons")

@@ -70,8 +70,9 @@ class Source(IdMixin, TimestampMixin, Base):
     lesson_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), index=True)
     asset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("assets.id", ondelete="RESTRICT"))
     type: Mapped[SourceType] = mapped_column(SAEnum(SourceType, name="source_type"))
-    status: Mapped[SourceStatus] = mapped_column(SAEnum(SourceStatus, name="source_status"),
-                                                 default=SourceStatus.pending)
+    status: Mapped[SourceStatus] = mapped_column(
+        SAEnum(SourceStatus, name="source_status"), default=SourceStatus.pending
+    )
     error_msg: Mapped[str | None] = mapped_column(Text)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -79,18 +80,26 @@ class Source(IdMixin, TimestampMixin, Base):
 class SourcePage(Base):
     __tablename__ = "source_pages"
 
-    source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), primary_key=True)
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), primary_key=True
+    )
     page_no: Mapped[int] = mapped_column(Integer, primary_key=True)
-    extraction_method: Mapped[ExtractionMethod] = mapped_column(SAEnum(ExtractionMethod, name="extraction_method"))
+    extraction_method: Mapped[ExtractionMethod] = mapped_column(
+        SAEnum(ExtractionMethod, name="extraction_method")
+    )
     markdown: Mapped[str] = mapped_column(Text)
 
 
 class Chunk(IdMixin, TimestampMixin, Base):
     __tablename__ = "chunks"
     __table_args__ = (
-        Index("ix_chunks_embedding_hnsw", "embedding", postgresql_using="hnsw",
-              postgresql_with={"m": 16, "ef_construction": 64},
-              postgresql_ops={"embedding": "vector_cosine_ops"}),
+        Index(
+            "ix_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
         Index("ix_chunks_tsv", "tsv", postgresql_using="gin"),
         Index("ix_chunks_scope", "course_id", "lesson_id", "embedding_model"),
     )
@@ -108,5 +117,7 @@ class Chunk(IdMixin, TimestampMixin, Base):
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBED_DIM))
     tsv: Mapped[Any] = mapped_column(
         TSVECTOR,
-        Computed("to_tsvector('simple'::regconfig, immutable_unaccent(coalesce(content, '')))", persisted=True),
+        Computed(
+            "to_tsvector('simple'::regconfig, immutable_unaccent(coalesce(content, '')))", persisted=True
+        ),
     )

@@ -27,8 +27,14 @@ class Job(IdMixin, TimestampMixin, Base):
 
     __tablename__ = "jobs"
     __table_args__ = (
-        Index("uq_active_job", "type", "ref_id", "ref_version", unique=True,
-              postgresql_where=text(ACTIVE_JOB_PREDICATE)),
+        Index(
+            "uq_active_job",
+            "type",
+            "ref_id",
+            "ref_version",
+            unique=True,
+            postgresql_where=text(ACTIVE_JOB_PREDICATE),
+        ),
     )
 
     type: Mapped[str] = mapped_column(String(50))

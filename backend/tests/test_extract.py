@@ -70,7 +70,11 @@ async def test_vision_cap_falls_back_to_text_and_flags_pages():
     vision = FakeVision()
     pages = await extract_pages(make_pdf(["", "", "", ""]), vision, max_vision_pages=2)
     assert [(p.page_no, p.method, p.vision_skipped) for p in pages] == [
-        (1, "vision", False), (2, "vision", False), (3, "text", True), (4, "text", True)]
+        (1, "vision", False),
+        (2, "vision", False),
+        (3, "text", True),
+        (4, "text", True),
+    ]
     assert vision.calls == 2
 
 

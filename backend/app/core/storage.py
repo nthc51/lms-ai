@@ -28,8 +28,9 @@ def download_headers(mime: str, download_name: str | None = None) -> dict[str, s
 
 class Storage(Protocol):
     async def presign_put(self, key: str, expires_s: int = 900) -> str: ...
-    async def presign_get(self, key: str, mime: str, expires_s: int = 3600,
-                          download_name: str | None = None) -> str: ...
+    async def presign_get(
+        self, key: str, mime: str, expires_s: int = 3600, download_name: str | None = None
+    ) -> str: ...
     async def stat_size(self, key: str) -> int | None: ...
     async def read_head(self, key: str, n: int = 2048) -> bytes: ...
     async def read_all(self, key: str) -> bytes: ...
@@ -42,9 +43,13 @@ class MinioStorage:
     REGION = "us-east-1"  # có sẵn region thì client không cần gọi mạng để dò region khi ký URL
 
     def __init__(self, s: Settings):
-        kw = {"access_key": s.minio_access_key, "secret_key": s.minio_secret_key,
-              "secure": s.minio_secure, "region": self.REGION}
-        self._internal = Minio(s.minio_endpoint, **kw)       # API và worker gọi trong mạng Docker
+        kw = {
+            "access_key": s.minio_access_key,
+            "secret_key": s.minio_secret_key,
+            "secure": s.minio_secure,
+            "region": self.REGION,
+        }
+        self._internal = Minio(s.minio_endpoint, **kw)  # API và worker gọi trong mạng Docker
         self._public = Minio(s.minio_public_endpoint, **kw)  # chỉ dùng để ký URL cho trình duyệt
         self._bucket = s.minio_bucket
 
@@ -57,17 +62,23 @@ class MinioStorage:
             except S3Error as e:  # API và worker cùng khởi động: bên kia vừa tạo xong thì bỏ qua
                 if e.code not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
                     raise
+
         await asyncio.to_thread(run)
 
     async def presign_put(self, key: str, expires_s: int = 900) -> str:
-        return await asyncio.to_thread(self._public.presigned_put_object, self._bucket, key,
-                                       timedelta(seconds=expires_s))
+        return await asyncio.to_thread(
+            self._public.presigned_put_object, self._bucket, key, timedelta(seconds=expires_s)
+        )
 
-    async def presign_get(self, key: str, mime: str, expires_s: int = 3600,
-                          download_name: str | None = None) -> str:
+    async def presign_get(
+        self, key: str, mime: str, expires_s: int = 3600, download_name: str | None = None
+    ) -> str:
         headers = download_headers(mime, download_name)
-        return await asyncio.to_thread(lambda: self._public.presigned_get_object(
-            self._bucket, key, expires=timedelta(seconds=expires_s), response_headers=headers))
+        return await asyncio.to_thread(
+            lambda: self._public.presigned_get_object(
+                self._bucket, key, expires=timedelta(seconds=expires_s), response_headers=headers
+            )
+        )
 
     async def stat_size(self, key: str) -> int | None:
         def run() -> int | None:
@@ -77,6 +88,7 @@ class MinioStorage:
                 if e.code in ("NoSuchKey", "NoSuchObject"):
                     return None
                 raise
+
         return await asyncio.to_thread(run)
 
     async def read_head(self, key: str, n: int = 2048) -> bytes:
@@ -87,6 +99,7 @@ class MinioStorage:
             finally:
                 resp.close()
                 resp.release_conn()
+
         return await asyncio.to_thread(run)
 
     async def read_all(self, key: str) -> bytes:
@@ -97,16 +110,19 @@ class MinioStorage:
             finally:
                 resp.close()
                 resp.release_conn()
+
         return await asyncio.to_thread(run)
 
     async def put(self, key: str, data: bytes, mime: str) -> None:
-        await asyncio.to_thread(self._internal.put_object, self._bucket, key, io.BytesIO(data), len(data),
-                                content_type=mime)
+        await asyncio.to_thread(
+            self._internal.put_object, self._bucket, key, io.BytesIO(data), len(data), content_type=mime
+        )
 
     async def copy(self, src_key: str, dst_key: str) -> None:
         # copy phía server, giữ nguyên metadata (Content-Type) của object nguồn
-        await asyncio.to_thread(self._internal.copy_object, self._bucket, dst_key,
-                                CopySource(self._bucket, src_key))
+        await asyncio.to_thread(
+            self._internal.copy_object, self._bucket, dst_key, CopySource(self._bucket, src_key)
+        )
 
     async def remove(self, key: str) -> None:
         await asyncio.to_thread(self._internal.remove_object, self._bucket, key)

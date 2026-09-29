@@ -14,7 +14,8 @@ def test_download_headers():
     assert download_headers("application/pdf") == {"response-content-type": "application/pdf"}
     assert download_headers("text/plain", "bai.txt") == {
         "response-content-type": "text/plain",
-        "response-content-disposition": 'attachment; filename="bai.txt"'}
+        "response-content-disposition": 'attachment; filename="bai.txt"',
+    }
 
 
 async def test_presign_get_signs_public_host_with_content_type():
@@ -41,6 +42,7 @@ class _RacingMinio:
 
     def make_bucket(self, bucket):
         from minio.error import S3Error
+
         raise S3Error(None, self.code, "race", bucket, "req", "host", bucket_name=bucket)
 
 

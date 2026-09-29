@@ -45,16 +45,22 @@ async def get_owned_course(db: AsyncSession, course_id: uuid.UUID, user: User) -
 
 
 async def create_course(db: AsyncSession, teacher: User, data: CourseCreate) -> Course:
-    course = Course(teacher_id=teacher.id, title=data.title, description=data.description,
-                    slug=make_slug(data.title), status=CourseStatus.draft)
+    course = Course(
+        teacher_id=teacher.id,
+        title=data.title,
+        description=data.description,
+        slug=make_slug(data.title),
+        status=CourseStatus.draft,
+    )
     db.add(course)
     await db.commit()
     return course
 
 
 async def list_teacher_courses(db: AsyncSession, teacher: User) -> list[Course]:
-    rows = await db.scalars(select(Course).where(Course.teacher_id == teacher.id)
-                            .order_by(Course.created_at.desc()))
+    rows = await db.scalars(
+        select(Course).where(Course.teacher_id == teacher.id).order_by(Course.created_at.desc())
+    )
     return list(rows)
 
 
@@ -71,8 +77,11 @@ async def delete_course(db: AsyncSession, course: Course) -> None:
 
 
 async def count_lessons(db: AsyncSession, course_id: uuid.UUID) -> int:
-    return await db.scalar(select(func.count(Lesson.id)).join(Section, Section.id == Lesson.section_id)
-                           .where(Section.course_id == course_id))
+    return await db.scalar(
+        select(func.count(Lesson.id))
+        .join(Section, Section.id == Lesson.section_id)
+        .where(Section.course_id == course_id)
+    )
 
 
 async def publish_course(db: AsyncSession, course: Course) -> Course:
@@ -96,8 +105,13 @@ async def add_section(db: AsyncSession, course: Course, data: SectionCreate) -> 
 
 
 async def get_owned_section(db: AsyncSession, section_id: uuid.UUID, user: User) -> Section:
-    row = (await db.execute(select(Section, Course).join(Course, Course.id == Section.course_id)
-                            .where(Section.id == section_id))).one_or_none()
+    row = (
+        await db.execute(
+            select(Section, Course)
+            .join(Course, Course.id == Section.course_id)
+            .where(Section.id == section_id)
+        )
+    ).one_or_none()
     if row is None:
         raise not_found("Chương")
     section, course = row
@@ -125,12 +139,14 @@ async def add_lesson(db: AsyncSession, section: Section, data: LessonCreate) -> 
 
 
 async def get_lesson_with_course(db: AsyncSession, lesson_id: uuid.UUID) -> tuple[Lesson, Course]:
-    row = (await db.execute(
-        select(Lesson, Course)
-        .join(Section, Section.id == Lesson.section_id)
-        .join(Course, Course.id == Section.course_id)
-        .where(Lesson.id == lesson_id)
-    )).one_or_none()
+    row = (
+        await db.execute(
+            select(Lesson, Course)
+            .join(Section, Section.id == Lesson.section_id)
+            .join(Course, Course.id == Section.course_id)
+            .where(Lesson.id == lesson_id)
+        )
+    ).one_or_none()
     if row is None:
         raise not_found("Bài học")
     return row[0], row[1]
@@ -156,11 +172,17 @@ async def delete_lesson(db: AsyncSession, lesson: Lesson) -> None:
 
 async def reorder(db: AsyncSession, course: Course, data: ReorderIn) -> None:
     sections = {s.id: s for s in await db.scalars(select(Section).where(Section.course_id == course.id))}
-    lessons = {lesson.id: lesson for lesson in await db.scalars(
-        select(Lesson).join(Section, Section.id == Lesson.section_id).where(Section.course_id == course.id))}
+    lessons = {
+        lesson.id: lesson
+        for lesson in await db.scalars(
+            select(Lesson)
+            .join(Section, Section.id == Lesson.section_id)
+            .where(Section.course_id == course.id)
+        )
+    }
     given_sections = [s.id for s in data.sections]
     given_lessons = [lid for s in data.sections for lid in s.lesson_ids]
-    if (sorted(given_sections) != sorted(sections) or sorted(given_lessons) != sorted(lessons)):
+    if sorted(given_sections) != sorted(sections) or sorted(given_lessons) != sorted(lessons):
         raise AppError("INVALID_REORDER", "Danh sách sắp xếp không khớp với khóa học", 400)
     for s_pos, item in enumerate(data.sections, start=1):
         sections[item.id].position = s_pos
@@ -171,23 +193,35 @@ async def reorder(db: AsyncSession, course: Course, data: ReorderIn) -> None:
 
 
 async def list_published(db: AsyncSession, q: str | None, page: int, size: int) -> CoursePage:
-    base = (select(Course, User.full_name).join(User, User.id == Course.teacher_id)
-            .where(Course.status == CourseStatus.published))
+    base = (
+        select(Course, User.full_name)
+        .join(User, User.id == Course.teacher_id)
+        .where(Course.status == CourseStatus.published)
+    )
     if q and q.strip():
         pattern = f"%{q.strip().lower()}%"
-        base = base.where(func.immutable_unaccent(func.lower(Course.title)).like(func.immutable_unaccent(pattern)))
+        base = base.where(
+            func.immutable_unaccent(func.lower(Course.title)).like(func.immutable_unaccent(pattern))
+        )
     total = await db.scalar(select(func.count()).select_from(base.subquery()))
-    rows = (await db.execute(base.order_by(Course.created_at.desc()).offset((page - 1) * size).limit(size))).all()
-    items = [CourseCard(id=c.id, title=c.title, slug=c.slug, description=c.description, teacher_name=name)
-             for c, name in rows]
+    rows = (
+        await db.execute(base.order_by(Course.created_at.desc()).offset((page - 1) * size).limit(size))
+    ).all()
+    items = [
+        CourseCard(id=c.id, title=c.title, slug=c.slug, description=c.description, teacher_name=name)
+        for c, name in rows
+    ]
     return CoursePage(items=items, total=total, page=page, size=size)
 
 
 async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> CourseDetail:
     from app.modules.enrollment.service import is_enrolled  # import trong hàm để tránh vòng import
 
-    course = await db.scalar(select(Course).where(Course.slug == slug)
-                             .options(selectinload(Course.sections).selectinload(Section.lessons)))
+    course = await db.scalar(
+        select(Course)
+        .where(Course.slug == slug)
+        .options(selectinload(Course.sections).selectinload(Section.lessons))
+    )
     if course is None:
         raise not_found("Khóa học")
     is_owner = user is not None and (user.role == Role.admin or course.teacher_id == user.id)

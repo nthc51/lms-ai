@@ -68,7 +68,9 @@ async def test_create_job_records_creator(db):
 
 
 async def _job_by(db, created_by: str | None) -> Job:
-    job = Job(type="ingest_pdf", ref_id=uuid.uuid4(), created_by=uuid.UUID(created_by) if created_by else None)
+    job = Job(
+        type="ingest_pdf", ref_id=uuid.uuid4(), created_by=uuid.UUID(created_by) if created_by else None
+    )
     db.add(job)
     await db.commit()
     return job

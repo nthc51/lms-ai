@@ -39,8 +39,11 @@ def test_long_text_splits_with_overlap():
 
 
 def test_chunk_page_is_page_of_first_paragraph():
-    chunks = chunk_pages([PageText(1, words(60, "a"), "text"), PageText(2, words(60, "b"), "text")],
-                         max_tokens=100, overlap_tokens=0)
+    chunks = chunk_pages(
+        [PageText(1, words(60, "a"), "text"), PageText(2, words(60, "b"), "text")],
+        max_tokens=100,
+        overlap_tokens=0,
+    )
     assert [c.page_no for c in chunks] == [1, 2]
 
 
@@ -54,7 +57,9 @@ def test_empty_pages_give_no_chunks():
     assert chunk_pages([PageText(1, "   \n\n  ", "text")]) == []
 
 
-CODE_BLOCK = "```python\ndef tong(a):\n    s = 0\n\n# tinh tong\n    for x in a:\n        s += x\n    return s\n```"
+CODE_BLOCK = (
+    "```python\ndef tong(a):\n    s = 0\n\n# tinh tong\n    for x in a:\n        s += x\n    return s\n```"
+)
 
 
 def test_code_fence_lines_are_not_headings_and_block_is_not_split():

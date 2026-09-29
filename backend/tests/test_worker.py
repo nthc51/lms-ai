@@ -61,6 +61,7 @@ class CommitRecorder:
 
                 session.commit = commit
                 yield session
+
         return cm()
 
 
@@ -151,6 +152,7 @@ async def test_generic_handler_success_marks_done(db):
 
 
 # ---- dọn job bị treo (worker chết giữa chừng) ----
+
 
 def _threshold(type_: str = "ingest_pdf") -> timedelta:
     return timedelta(seconds=JOB_TIMEOUTS[type_]) + STALE_GRACE
@@ -279,6 +281,7 @@ def _sweep_racing_first_claim():
 
             session.get, session.scalar, session.execute = get, scalar, execute
             yield session
+
     return cm
 
 
@@ -322,6 +325,7 @@ async def test_late_worker_failure_does_not_overwrite_swept_job(db):
 
 
 # ---- job 'pending' bị kẹt (Redis mất job): enqueue lại một lần, rồi failed ----
+
 
 class FakeArqRedis:
     """Thay cho ctx['redis'] (ArqRedis) của worker: ghi lại các lần enqueue_job, hoặc giả lập Redis lỗi."""

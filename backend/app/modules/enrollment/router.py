@@ -15,8 +15,9 @@ _require_student = require_role(Role.student)
 
 
 @router.post("/courses/{course_id}/enroll", response_model=EnrollmentOut, status_code=201)
-async def enroll(course_id: uuid.UUID, user: User = Depends(_require_student),
-                 db: AsyncSession = Depends(get_db)):
+async def enroll(
+    course_id: uuid.UUID, user: User = Depends(_require_student), db: AsyncSession = Depends(get_db)
+):
     return await service.enroll(db, user, course_id)
 
 
@@ -26,12 +27,17 @@ async def my_courses(user: User = Depends(_require_student), db: AsyncSession = 
 
 
 @router.get("/lessons/{lesson_id}", response_model=LessonDetail)
-async def lesson_detail(lesson_id: uuid.UUID, user: User = Depends(get_current_user),
-                        db: AsyncSession = Depends(get_db)):
+async def lesson_detail(
+    lesson_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     return await service.get_lesson_detail(db, lesson_id, user)
 
 
 @router.put("/lessons/{lesson_id}/progress", response_model=ProgressOut)
-async def save_progress(lesson_id: uuid.UUID, data: ProgressIn, user: User = Depends(get_current_user),
-                        db: AsyncSession = Depends(get_db)):
+async def save_progress(
+    lesson_id: uuid.UUID,
+    data: ProgressIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     return await service.update_progress(db, lesson_id, user, data)

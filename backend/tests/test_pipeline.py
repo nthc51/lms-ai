@@ -26,8 +26,13 @@ async def test_ingest_success_writes_pages_and_chunks(db):
     await db.refresh(source)
     assert source.status == SourceStatus.ready and source.processed_at is not None
     assert source.error_msg is None
-    methods = (await db.scalars(select(SourcePage.extraction_method).where(SourcePage.source_id == source.id)
-                                .order_by(SourcePage.page_no))).all()
+    methods = (
+        await db.scalars(
+            select(SourcePage.extraction_method)
+            .where(SourcePage.source_id == source.id)
+            .order_by(SourcePage.page_no)
+        )
+    ).all()
     assert [m.value for m in methods] == ["text", "vision"]
     chunk = await db.scalar(select(Chunk).where(Chunk.source_id == source.id).limit(1))
     assert (chunk.course_id, chunk.lesson_id) == (course.id, lesson.id)
@@ -57,7 +62,9 @@ async def test_document_without_any_text_fails(db):
     storage = InMemoryStorage()
     _, _, source = await _source(db, storage, make_pdf([""]))
     with pytest.raises(ValueError):
-        await ingest_pdf_source(source.id, storage=storage, embedder=FakeEmbedder(768), vision=FakeVision(text=""))
+        await ingest_pdf_source(
+            source.id, storage=storage, embedder=FakeEmbedder(768), vision=FakeVision(text="")
+        )
     fresh = await db.get(Source, source.id, populate_existing=True)
     assert fresh.status == SourceStatus.failed
 
@@ -66,13 +73,16 @@ async def test_vision_cap_reached_still_ready_with_warning(db):
     storage = InMemoryStorage()
     _, _, source = await _source(db, storage, make_pdf([LONG_TEXT, "", "", ""]))
     vision = FakeVision()
-    await ingest_pdf_source(source.id, storage=storage, embedder=FakeEmbedder(768), vision=vision,
-                            max_vision_pages=1)
+    await ingest_pdf_source(
+        source.id, storage=storage, embedder=FakeEmbedder(768), vision=vision, max_vision_pages=1
+    )
     assert vision.calls == 1
     fresh = await db.get(Source, source.id, populate_existing=True)
     assert fresh.status == SourceStatus.ready and fresh.processed_at is not None
-    assert fresh.error_msg == ("Cảnh báo: vượt giới hạn 1 trang vision (VISION_MAX_PAGES_PER_DOC); "
-                               "2 trang cần vision đã dùng text thường.")
+    assert fresh.error_msg == (
+        "Cảnh báo: vượt giới hạn 1 trang vision (VISION_MAX_PAGES_PER_DOC); "
+        "2 trang cần vision đã dùng text thường."
+    )
 
 
 async def test_reingest_after_failure_clears_old_error(db):

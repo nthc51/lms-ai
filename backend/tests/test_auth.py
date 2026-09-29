@@ -14,15 +14,18 @@ async def test_register_teacher_is_pending(client):
 
 
 async def test_register_cannot_create_admin(client):
-    r = await client.post(f"{API}/auth/register",
-                          json={"email": "ad@x.com", "password": "password123", "role": "admin", "full_name": "A"})
+    r = await client.post(
+        f"{API}/auth/register",
+        json={"email": "ad@x.com", "password": "password123", "role": "admin", "full_name": "A"},
+    )
     assert r.status_code == 422
 
 
 async def test_register_duplicate_email_is_case_insensitive(client):
     await register_user(client, "A@x.com")
-    r = await client.post(f"{API}/auth/register",
-                          json={"email": "a@x.com", "password": "password123", "full_name": "B"})
+    r = await client.post(
+        f"{API}/auth/register", json={"email": "a@x.com", "password": "password123", "full_name": "B"}
+    )
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "EMAIL_TAKEN"
 
@@ -39,7 +42,9 @@ async def test_db_rejects_uppercase_email_even_outside_the_api(db):
 
 
 async def test_register_short_password_is_422(client):
-    r = await client.post(f"{API}/auth/register", json={"email": "b@x.com", "password": "123", "full_name": "B"})
+    r = await client.post(
+        f"{API}/auth/register", json={"email": "b@x.com", "password": "123", "full_name": "B"}
+    )
     assert r.status_code == 422
 
 

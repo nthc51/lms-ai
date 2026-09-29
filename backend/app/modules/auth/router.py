@@ -17,8 +17,15 @@ REFRESH_PATH = "/api/v1/auth"
 
 def set_refresh_cookie(response: Response, raw: str) -> None:
     s = get_settings()
-    response.set_cookie(REFRESH_COOKIE, raw, httponly=True, samesite="lax", secure=s.cookie_secure,
-                        path=REFRESH_PATH, max_age=s.refresh_token_days * 86400)
+    response.set_cookie(
+        REFRESH_COOKIE,
+        raw,
+        httponly=True,
+        samesite="lax",
+        secure=s.cookie_secure,
+        path=REFRESH_PATH,
+        max_age=s.refresh_token_days * 86400,
+    )
 
 
 @router.post("/auth/register", response_model=UserOut, status_code=201)
@@ -39,8 +46,9 @@ async def me(user: User = Depends(get_current_user)):
 
 
 @router.post("/auth/refresh", response_model=TokenOut)
-async def refresh(response: Response, refresh_token: str | None = Cookie(default=None),
-                  db: AsyncSession = Depends(get_db)):
+async def refresh(
+    response: Response, refresh_token: str | None = Cookie(default=None), db: AsyncSession = Depends(get_db)
+):
     if not refresh_token:
         raise AppError("INVALID_TOKEN", "Phiên đăng nhập không hợp lệ", 401)
     access, raw = await service.refresh(db, refresh_token)

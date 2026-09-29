@@ -12,7 +12,9 @@ from tests.pdfs import LONG_TEXT, make_pdf
 
 
 async def _attach(client, headers, lesson_id, asset_id):
-    return await client.post(f"{API}/lessons/{lesson_id}/sources", json={"asset_id": asset_id}, headers=headers)
+    return await client.post(
+        f"{API}/lessons/{lesson_id}/sources", json={"asset_id": asset_id}, headers=headers
+    )
 
 
 async def _attached_source(client, storage, headers) -> tuple[dict, str]:
@@ -55,18 +57,21 @@ async def test_other_teacher_gets_404_on_source_endpoints(client, storage):
     _, gv1 = await make_teacher(client, "gv1@x.com")
     _, gv2 = await make_teacher(client, "gv2@x.com")
     lesson, source_id = await _attached_source(client, storage, gv1)
-    for r in (await client.get(f"{API}/sources/{source_id}", headers=gv2),
-              await client.get(f"{API}/sources/{source_id}/pages", headers=gv2),
-              await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv2),
-              await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv2)):
+    for r in (
+        await client.get(f"{API}/sources/{source_id}", headers=gv2),
+        await client.get(f"{API}/sources/{source_id}/pages", headers=gv2),
+        await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv2),
+        await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv2),
+    ):
         assert (r.status_code, r.json()["error"]["code"]) == (404, "NOT_FOUND")
 
 
 async def test_unverified_asset_is_rejected(client):
     _, gv = await make_teacher(client)
     _, _, lesson = await make_published_course(client, gv)
-    r = await client.post(f"{API}/uploads/presign", json={"kind": "pdf", "mime": "application/pdf", "size": 10},
-                          headers=gv)
+    r = await client.post(
+        f"{API}/uploads/presign", json={"kind": "pdf", "mime": "application/pdf", "size": 10}, headers=gv
+    )
     attach = await _attach(client, gv, lesson["id"], r.json()["asset_id"])
     assert (attach.status_code, attach.json()["error"]["code"]) == (400, "INVALID_ASSET")
 
@@ -123,7 +128,9 @@ async def test_pages_and_counts_after_processing(client, storage):
     asset_id = await upload_file(client, storage, gv, make_pdf([LONG_TEXT, ""]))
     source_id = (await _attach(client, gv, lesson["id"], asset_id)).json()["source"]["id"]
 
-    await ingest_pdf_source(uuid.UUID(source_id), storage=storage, embedder=FakeEmbedder(768), vision=FakeVision())
+    await ingest_pdf_source(
+        uuid.UUID(source_id), storage=storage, embedder=FakeEmbedder(768), vision=FakeVision()
+    )
 
     detail = (await client.get(f"{API}/sources/{source_id}", headers=gv)).json()
     assert detail["status"] == "ready" and detail["page_count"] == 2 and detail["chunk_count"] >= 1
@@ -139,10 +146,17 @@ async def test_vision_pages_counted_per_source_in_detail_and_list(client, storag
     asset_id = await upload_file(client, storage, gv, make_pdf([LONG_TEXT]))
     second_id = (await _attach(client, gv, lesson["id"], asset_id)).json()["source"]["id"]
     methods = [ExtractionMethod.vision, ExtractionMethod.text, ExtractionMethod.vision]
-    db.add_all([SourcePage(source_id=uuid.UUID(first_id), page_no=i + 1, extraction_method=m, markdown="x")
-                for i, m in enumerate(methods)])
-    db.add(SourcePage(source_id=uuid.UUID(second_id), page_no=1, extraction_method=ExtractionMethod.text,
-                      markdown="y"))
+    db.add_all(
+        [
+            SourcePage(source_id=uuid.UUID(first_id), page_no=i + 1, extraction_method=m, markdown="x")
+            for i, m in enumerate(methods)
+        ]
+    )
+    db.add(
+        SourcePage(
+            source_id=uuid.UUID(second_id), page_no=1, extraction_method=ExtractionMethod.text, markdown="y"
+        )
+    )
     await db.commit()
 
     detail = (await client.get(f"{API}/sources/{first_id}", headers=gv)).json()
@@ -172,8 +186,13 @@ async def test_ready_source_with_vision_cap_exposes_warning(client, storage):
     asset_id = await upload_file(client, storage, gv, make_pdf(["", ""]))
     source_id = (await _attach(client, gv, lesson["id"], asset_id)).json()["source"]["id"]
 
-    await ingest_pdf_source(uuid.UUID(source_id), storage=storage, embedder=FakeEmbedder(768),
-                            vision=FakeVision(), max_vision_pages=1)
+    await ingest_pdf_source(
+        uuid.UUID(source_id),
+        storage=storage,
+        embedder=FakeEmbedder(768),
+        vision=FakeVision(),
+        max_vision_pages=1,
+    )
 
     detail = (await client.get(f"{API}/sources/{source_id}", headers=gv)).json()
     assert detail["status"] == "ready" and detail["vision_pages"] == 1
@@ -213,8 +232,17 @@ async def test_reprocess_with_leftover_active_job_keeps_source_failed(client, st
 async def test_pages_are_paginated(client, storage, db):
     _, gv = await make_teacher(client)
     _, source_id = await _attached_source(client, storage, gv)
-    db.add_all([SourcePage(source_id=uuid.UUID(source_id), page_no=n, extraction_method=ExtractionMethod.text,
-                           markdown=f"trang {n}") for n in (3, 1, 2)])
+    db.add_all(
+        [
+            SourcePage(
+                source_id=uuid.UUID(source_id),
+                page_no=n,
+                extraction_method=ExtractionMethod.text,
+                markdown=f"trang {n}",
+            )
+            for n in (3, 1, 2)
+        ]
+    )
     await db.commit()
 
     r = await client.get(f"{API}/sources/{source_id}/pages", params={"page": 2, "size": 2}, headers=gv)

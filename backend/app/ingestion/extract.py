@@ -9,7 +9,9 @@ from app.core.config import get_settings
 from app.ingestion.chunker import PageText
 
 MIN_TEXT_CHARS = 50
-MIN_FORMULAS_FOR_VISION = 1  # layout mode bỏ mất nội dung công thức khỏi markdown → trang có công thức phải nhờ vision
+MIN_FORMULAS_FOR_VISION = (
+    1  # layout mode bỏ mất nội dung công thức khỏi markdown → trang có công thức phải nhờ vision
+)
 MAX_PAGES = 300
 _MARKUP_RE = re.compile(r"[#*_`>\-|\s]")
 
@@ -17,7 +19,9 @@ _MARKUP_RE = re.compile(r"[#*_`>\-|\s]")
 def needs_vision(markdown: str, formula_count: int = 0) -> bool:
     """Trang gần như không có chữ (scan/ảnh), chữ bị vỡ font hoặc có công thức → nhờ vision đọc lại."""
     visible = _MARKUP_RE.sub("", markdown)
-    return len(visible) < MIN_TEXT_CHARS or markdown.count("�") > 5 or formula_count >= MIN_FORMULAS_FOR_VISION
+    return (
+        len(visible) < MIN_TEXT_CHARS or markdown.count("�") > 5 or formula_count >= MIN_FORMULAS_FOR_VISION
+    )
 
 
 def _extract_text_pages(pdf_bytes: bytes) -> list[tuple[int, str, int]]:
@@ -43,8 +47,9 @@ def _render_png(pdf_bytes: bytes, page_no: int, dpi: int = 150) -> bytes:
         doc.close()
 
 
-async def extract_pages(pdf_bytes: bytes, vision: VisionExtractor,
-                        max_vision_pages: int | None = None) -> list[PageText]:
+async def extract_pages(
+    pdf_bytes: bytes, vision: VisionExtractor, max_vision_pages: int | None = None
+) -> list[PageText]:
     """Trích từng trang. Tối đa max_vision_pages trang gửi vision (mặc định VISION_MAX_PAGES_PER_DOC),
     xét theo thứ tự trang; vượt trần thì dùng text và đánh dấu vision_skipped=True."""
     if max_vision_pages is None:

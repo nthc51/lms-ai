@@ -22,15 +22,17 @@ async def _user_from_token(token: str, db: AsyncSession) -> User:
     return user
 
 
-async def get_current_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer),
-                           db: AsyncSession = Depends(get_db)) -> User:
+async def get_current_user(
+    cred: HTTPAuthorizationCredentials | None = Depends(_bearer), db: AsyncSession = Depends(get_db)
+) -> User:
     if cred is None:
         raise AppError("NOT_AUTHENTICATED", "Bạn cần đăng nhập", 401)
     return await _user_from_token(cred.credentials, db)
 
 
-async def get_optional_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer),
-                            db: AsyncSession = Depends(get_db)) -> User | None:
+async def get_optional_user(
+    cred: HTTPAuthorizationCredentials | None = Depends(_bearer), db: AsyncSession = Depends(get_db)
+) -> User | None:
     """Không có token thì trả None. Token có nhưng sai hoặc hết hạn thì vẫn báo 401 để frontend refresh."""
     if cred is None:
         return None

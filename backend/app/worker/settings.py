@@ -24,8 +24,15 @@ class WorkerSettings:
     functions: ClassVar = [func(ingest_pdf, name="ingest_pdf", timeout=JOB_TIMEOUTS["ingest_pdf"])]
     # 5 phút một lần: job processing quá timeout + 5 phút → failed "Worker bị gián đoạn";
     # job pending bị kẹt → enqueue lại một lần, vẫn kẹt → failed "Không đưa được job vào hàng đợi"
-    cron_jobs: ClassVar = [cron(sweep_stale_jobs, name="sweep_stale_jobs", minute=set(range(0, 60, 5)),
-                                 run_at_startup=True, timeout=60)]
+    cron_jobs: ClassVar = [
+        cron(
+            sweep_stale_jobs,
+            name="sweep_stale_jobs",
+            minute=set(range(0, 60, 5)),
+            run_at_startup=True,
+            timeout=60,
+        )
+    ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     max_jobs = 5

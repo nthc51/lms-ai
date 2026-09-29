@@ -16,7 +16,9 @@ class VisionExtractor(Protocol):
 
 
 class FakeVision:
-    def __init__(self, text: str = "Nội dung được trích từ ảnh của trang tài liệu (chế độ giả lập, không gọi AI)."):
+    def __init__(
+        self, text: str = "Nội dung được trích từ ảnh của trang tài liệu (chế độ giả lập, không gọi AI)."
+    ):
         self.text = text
         self.calls = 0
 
@@ -26,10 +28,12 @@ class FakeVision:
 
 
 class GeminiVision:
-    def __init__(self, api_key: str, model: str, client=None, *,
-                 timeout_s: float = 120.0, sleep: Sleep = asyncio.sleep):
+    def __init__(
+        self, api_key: str, model: str, client=None, *, timeout_s: float = 120.0, sleep: Sleep = asyncio.sleep
+    ):
         if client is None:
             from google import genai
+
             client = genai.Client(api_key=api_key)
         self._client = client
         self._model = model
@@ -43,7 +47,9 @@ class GeminiVision:
         config = types.GenerateContentConfig(http_options=types.HttpOptions(timeout=self._timeout_ms))
         resp = await call_with_retry(
             "vision",
-            lambda: self._client.aio.models.generate_content(model=self._model, contents=contents, config=config),
+            lambda: self._client.aio.models.generate_content(
+                model=self._model, contents=contents, config=config
+            ),
             sleep=self._sleep,
         )
         return (resp.text or "").strip()

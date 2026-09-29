@@ -24,8 +24,12 @@ def verify_password(password: str, hashed: str) -> bool:
 def create_access_token(user_id: uuid.UUID, role: str, expires_minutes: int | None = None) -> str:
     s = get_settings()
     minutes = s.access_token_minutes if expires_minutes is None else expires_minutes
-    payload = {"sub": str(user_id), "role": role, "type": "access",
-               "exp": utcnow() + timedelta(minutes=minutes)}
+    payload = {
+        "sub": str(user_id),
+        "role": role,
+        "type": "access",
+        "exp": utcnow() + timedelta(minutes=minutes),
+    }
     return jwt.encode(payload, s.jwt_secret, algorithm="HS256")
 
 

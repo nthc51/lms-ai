@@ -22,8 +22,13 @@ async def register(db: AsyncSession, data: RegisterIn) -> User:
     if await db.scalar(select(User.id).where(User.email == email)):
         raise AppError("EMAIL_TAKEN", "Email đã được sử dụng", 409)
     role = Role(data.role)
-    user = User(email=email, password_hash=hash_password(data.password), full_name=data.full_name,
-                role=role, teacher_status=TeacherStatus.pending if role == Role.teacher else None)
+    user = User(
+        email=email,
+        password_hash=hash_password(data.password),
+        full_name=data.full_name,
+        role=role,
+        teacher_status=TeacherStatus.pending if role == Role.teacher else None,
+    )
     db.add(user)
     await db.commit()
     return user
@@ -32,8 +37,13 @@ async def register(db: AsyncSession, data: RegisterIn) -> User:
 async def issue_tokens(db: AsyncSession, user: User) -> tuple[str, str]:
     """Trả về (access_token, refresh_token_raw). Commit luôn cả các thay đổi đang chờ trong session."""
     raw, hashed = new_refresh_token()
-    db.add(RefreshToken(user_id=user.id, token_hash=hashed,
-                        expires_at=utcnow() + timedelta(days=get_settings().refresh_token_days)))
+    db.add(
+        RefreshToken(
+            user_id=user.id,
+            token_hash=hashed,
+            expires_at=utcnow() + timedelta(days=get_settings().refresh_token_days),
+        )
+    )
     await db.commit()
     return create_access_token(user.id, user.role.value), raw
 
@@ -55,9 +65,11 @@ async def refresh(db: AsyncSession, raw: str) -> tuple[str, str]:
         raise AppError("INVALID_TOKEN", "Phiên đăng nhập không hợp lệ", 401)
     if token.revoked_at is not None:
         # Token đã bị xoay mà vẫn có người dùng lại, coi như bị đánh cắp: thu hồi toàn bộ phiên của user.
-        await db.execute(update(RefreshToken)
-                         .where(RefreshToken.user_id == token.user_id, RefreshToken.revoked_at.is_(None))
-                         .values(revoked_at=utcnow()))
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == token.user_id, RefreshToken.revoked_at.is_(None))
+            .values(revoked_at=utcnow())
+        )
         await db.commit()
         raise AppError("TOKEN_REUSED", "Phiên đăng nhập đã bị thu hồi, vui lòng đăng nhập lại", 401)
     if token.expires_at <= utcnow():

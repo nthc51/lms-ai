@@ -34,8 +34,11 @@ async def test_update_lesson(client):
     c = await create_course(client, gv)
     s = await add_section(client, gv, c["id"])
     lesson = await add_lesson(client, gv, s["id"])
-    r = await client.patch(f"{API}/lessons/{lesson['id']}",
-                           json={"content_md": "## Tìm kiếm nhị phân", "duration_sec": 600}, headers=gv)
+    r = await client.patch(
+        f"{API}/lessons/{lesson['id']}",
+        json={"content_md": "## Tìm kiếm nhị phân", "duration_sec": 600},
+        headers=gv,
+    )
     assert r.status_code == 200
     assert r.json()["content_md"] == "## Tìm kiếm nhị phân" and r.json()["duration_sec"] == 600
 
@@ -47,8 +50,9 @@ async def test_reorder_moves_lesson_between_sections(client, db):
     s2 = await add_section(client, gv, c["id"], "Chương 2")
     a = await add_lesson(client, gv, s1["id"], "A")
     b = await add_lesson(client, gv, s1["id"], "B")
-    body = {"sections": [{"id": s2["id"], "lesson_ids": [b["id"]]},
-                         {"id": s1["id"], "lesson_ids": [a["id"]]}]}
+    body = {
+        "sections": [{"id": s2["id"], "lesson_ids": [b["id"]]}, {"id": s1["id"], "lesson_ids": [a["id"]]}]
+    }
     r = await client.patch(f"{API}/courses/{c['id']}/reorder", json=body, headers=gv)
     assert r.status_code == 204
     sec2 = await db.get(Section, uuid.UUID(s2["id"]))

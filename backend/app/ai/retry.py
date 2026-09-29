@@ -1,4 +1,5 @@
 """Retry dùng chung cho các lời gọi Gemini: chỉ thử lại khi 429, 5xx hoặc timeout."""
+
 import asyncio
 import logging
 import time
@@ -53,15 +54,24 @@ async def call_with_retry[T](
             result = await fn()
         except Exception as exc:
             if not is_retryable(exc) or attempt >= max_retries:
-                logger.warning("ai_call op=%s status=error attempts=%d latency_ms=%d error=%r",
-                               op, attempt + 1, (time.perf_counter() - start) * 1000, exc)
+                logger.warning(
+                    "ai_call op=%s status=error attempts=%d latency_ms=%d error=%r",
+                    op,
+                    attempt + 1,
+                    (time.perf_counter() - start) * 1000,
+                    exc,
+                )
                 raise
             delay = retry_after_s(exc)
             if delay is None:
-                delay = base_delay_s * 2 ** attempt
+                delay = base_delay_s * 2**attempt
             attempt += 1
             await sleep(delay)
             continue
-        logger.info("ai_call op=%s status=ok attempts=%d latency_ms=%d",
-                    op, attempt + 1, (time.perf_counter() - start) * 1000)
+        logger.info(
+            "ai_call op=%s status=ok attempts=%d latency_ms=%d",
+            op,
+            attempt + 1,
+            (time.perf_counter() - start) * 1000,
+        )
         return result

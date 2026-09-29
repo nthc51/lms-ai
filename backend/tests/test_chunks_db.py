@@ -4,8 +4,7 @@ from app.modules.materials.models import Chunk, ExtractionMethod, Source, Source
 from tests.factories import add_chunk, make_lesson, make_pdf_source, make_user, unit_vector
 from tests.fakes import InMemoryStorage
 
-FTS = text("SELECT count(*) FROM chunks "
-           "WHERE tsv @@ websearch_to_tsquery('simple', immutable_unaccent(:q))")
+FTS = text("SELECT count(*) FROM chunks WHERE tsv @@ websearch_to_tsquery('simple', immutable_unaccent(:q))")
 
 
 async def _setup(db):
@@ -28,10 +27,16 @@ async def test_hnsw_index_can_serve_nearest_neighbour_query(db):
     for i in range(3):
         await add_chunk(db, source, course, lesson, f"đoạn {i}", unit_vector(i))
     await db.execute(text("SET LOCAL enable_seqscan = off"))
-    plan = (await db.execute(
-        text("EXPLAIN SELECT id FROM chunks ORDER BY embedding <=> CAST(:v AS vector) LIMIT 3"),
-        {"v": str(unit_vector(1))},
-    )).scalars().all()
+    plan = (
+        (
+            await db.execute(
+                text("EXPLAIN SELECT id FROM chunks ORDER BY embedding <=> CAST(:v AS vector) LIMIT 3"),
+                {"v": str(unit_vector(1))},
+            )
+        )
+        .scalars()
+        .all()
+    )
     await db.rollback()
     assert any("ix_chunks_embedding_hnsw" in line for line in plan), plan
 

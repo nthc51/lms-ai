@@ -16,14 +16,18 @@ class RegisterIn(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     role: Literal["student", "teacher"] = "student"
 
-    normalize_email = field_validator("email")(_lower)  # tên không được bắt đầu bằng "_" (pydantic coi là private)
+    normalize_email = field_validator("email")(
+        _lower
+    )  # tên không được bắt đầu bằng "_" (pydantic coi là private)
 
 
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
 
-    normalize_email = field_validator("email")(_lower)  # tên không được bắt đầu bằng "_" (pydantic coi là private)
+    normalize_email = field_validator("email")(
+        _lower
+    )  # tên không được bắt đầu bằng "_" (pydantic coi là private)
 
 
 class TokenOut(BaseModel):

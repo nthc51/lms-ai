@@ -58,21 +58,28 @@ async def test_progress_done_completes_course_and_never_downgrades(client):
     course, _, lesson = await make_published_course(client, gv)
     await _enroll(client, sv, course["id"])
 
-    r = await client.put(f"{API}/lessons/{lesson['id']}/progress",
-                         json={"status": "done", "video_position_sec": 120}, headers=sv)
+    r = await client.put(
+        f"{API}/lessons/{lesson['id']}/progress",
+        json={"status": "done", "video_position_sec": 120},
+        headers=sv,
+    )
     assert r.status_code == 200 and r.json()["status"] == "done"
 
     [mine] = (await client.get(f"{API}/me/courses", headers=sv)).json()
     assert mine["progress_pct"] == 100 and mine["completed_at"] is not None
 
-    r = await client.put(f"{API}/lessons/{lesson['id']}/progress",
-                         json={"status": "in_progress", "video_position_sec": 30}, headers=sv)
+    r = await client.put(
+        f"{API}/lessons/{lesson['id']}/progress",
+        json={"status": "in_progress", "video_position_sec": 30},
+        headers=sv,
+    )
     assert r.json()["status"] == "done" and r.json()["video_position_sec"] == 30
 
 
 async def test_teacher_cannot_save_progress(client):
     _, gv = await make_teacher(client)
     _, _, lesson = await make_published_course(client, gv)
-    r = await client.put(f"{API}/lessons/{lesson['id']}/progress",
-                         json={"status": "done", "video_position_sec": 0}, headers=gv)
+    r = await client.put(
+        f"{API}/lessons/{lesson['id']}/progress", json={"status": "done", "video_position_sec": 0}, headers=gv
+    )
     assert (r.status_code, r.json()["error"]["code"]) == (403, "FORBIDDEN")

@@ -28,13 +28,15 @@ INGEST_PDF = "ingest_pdf"  # job.type = tên hàm trong worker; job.ref_id = sou
 
 
 async def get_owned_source(db: AsyncSession, source_id: uuid.UUID, user: User) -> Source:
-    row = (await db.execute(
-        select(Source, Course)
-        .join(Lesson, Lesson.id == Source.lesson_id)
-        .join(Section, Section.id == Lesson.section_id)
-        .join(Course, Course.id == Section.course_id)
-        .where(Source.id == source_id)
-    )).one_or_none()
+    row = (
+        await db.execute(
+            select(Source, Course)
+            .join(Lesson, Lesson.id == Source.lesson_id)
+            .join(Section, Section.id == Lesson.section_id)
+            .join(Course, Course.id == Section.course_id)
+            .where(Source.id == source_id)
+        )
+    ).one_or_none()
     if row is None:
         raise not_found("Tài liệu")
     ensure_owner(row[1], user)
@@ -46,8 +48,11 @@ async def _counts(db: AsyncSession, source_ids: list[uuid.UUID]) -> tuple[dict, 
     if not source_ids:
         return {}, {}
     page_rows = await db.execute(
-        select(SourcePage.source_id, func.count(),
-               func.count().filter(SourcePage.extraction_method == ExtractionMethod.vision))
+        select(
+            SourcePage.source_id,
+            func.count(),
+            func.count().filter(SourcePage.extraction_method == ExtractionMethod.vision),
+        )
         .where(SourcePage.source_id.in_(source_ids))
         .group_by(SourcePage.source_id)
     )
@@ -66,12 +71,21 @@ async def to_out_many(db: AsyncSession, sources: Sequence[Source]) -> list[Sourc
     result = []
     for s in sources:
         page_count, vision_pages = pages.get(s.id, (0, 0))
-        result.append(SourceOut(
-            id=s.id, lesson_id=s.lesson_id, type=s.type, status=s.status, error_msg=s.error_msg,
-            # source ready vẫn có thể mang error_msg (cảnh báo vượt trần vision): tách riêng cho client
-            warning=s.error_msg if s.status == SourceStatus.ready else None,
-            processed_at=s.processed_at, page_count=page_count, vision_pages=vision_pages,
-            chunk_count=chunks.get(s.id, 0)))
+        result.append(
+            SourceOut(
+                id=s.id,
+                lesson_id=s.lesson_id,
+                type=s.type,
+                status=s.status,
+                error_msg=s.error_msg,
+                # source ready vẫn có thể mang error_msg (cảnh báo vượt trần vision): tách riêng cho client
+                warning=s.error_msg if s.status == SourceStatus.ready else None,
+                processed_at=s.processed_at,
+                page_count=page_count,
+                vision_pages=vision_pages,
+                chunk_count=chunks.get(s.id, 0),
+            )
+        )
     return result
 
 
@@ -79,15 +93,21 @@ async def to_out(db: AsyncSession, source: Source) -> SourceOut:
     return (await to_out_many(db, [source]))[0]
 
 
-async def attach_pdf(db: AsyncSession, queue: JobQueue, user: User, lesson_id: uuid.UUID,
-                     asset_id: uuid.UUID) -> tuple[Source, Job]:
+async def attach_pdf(
+    db: AsyncSession, queue: JobQueue, user: User, lesson_id: uuid.UUID, asset_id: uuid.UUID
+) -> tuple[Source, Job]:
     lesson, _ = await get_owned_lesson(db, lesson_id, user)
     asset = await require_verified_asset(db, asset_id, user, AssetKind.pdf)
     # ON CONFLICT theo uq_sources_lesson_asset: hai request gắn cùng file đồng thời thì chỉ một cái thành công
     source_id = await db.scalar(
         pg_insert(Source)
-        .values(id=uuid.uuid4(), lesson_id=lesson.id, asset_id=asset.id, type=SourceType.pdf,
-                status=SourceStatus.pending)
+        .values(
+            id=uuid.uuid4(),
+            lesson_id=lesson.id,
+            asset_id=asset.id,
+            type=SourceType.pdf,
+            status=SourceStatus.pending,
+        )
         .on_conflict_do_nothing(constraint="uq_sources_lesson_asset")
         .returning(Source.id)
     )
@@ -102,16 +122,25 @@ async def attach_pdf(db: AsyncSession, queue: JobQueue, user: User, lesson_id: u
 
 async def list_lesson_sources(db: AsyncSession, user: User, lesson_id: uuid.UUID) -> list[SourceOut]:
     await get_owned_lesson(db, lesson_id, user)
-    sources = (await db.scalars(select(Source).where(Source.lesson_id == lesson_id)
-                                .order_by(Source.created_at, Source.id))).all()
+    sources = (
+        await db.scalars(
+            select(Source).where(Source.lesson_id == lesson_id).order_by(Source.created_at, Source.id)
+        )
+    ).all()
     return await to_out_many(db, sources)
 
 
 async def list_pages(db: AsyncSession, source: Source, page: int, size: int) -> SourcePagesPage:
-    total = await db.scalar(select(func.count()).select_from(SourcePage)
-                            .where(SourcePage.source_id == source.id))
-    rows = await db.scalars(select(SourcePage).where(SourcePage.source_id == source.id)
-                            .order_by(SourcePage.page_no).offset((page - 1) * size).limit(size))
+    total = await db.scalar(
+        select(func.count()).select_from(SourcePage).where(SourcePage.source_id == source.id)
+    )
+    rows = await db.scalars(
+        select(SourcePage)
+        .where(SourcePage.source_id == source.id)
+        .order_by(SourcePage.page_no)
+        .offset((page - 1) * size)
+        .limit(size)
+    )
     return SourcePagesPage(items=[PageOut.model_validate(p) for p in rows], total=total, page=page, size=size)
 
 

@@ -1,4 +1,5 @@
 """Timeout + retry của GeminiEmbedder / GeminiVision (không gọi mạng, không ngủ thật)."""
+
 from types import SimpleNamespace
 
 import httpx
@@ -150,8 +151,11 @@ async def test_real_sdk_client_over_mock_transport():
     def handler(req: httpx.Request) -> httpx.Response:
         seen.append(req.extensions.get("timeout"))
         if len(seen) == 1:
-            return httpx.Response(429, headers={"Retry-After": "7"},
-                                  json={"error": {"code": 429, "message": "q", "status": "RESOURCE_EXHAUSTED"}})
+            return httpx.Response(
+                429,
+                headers={"Retry-After": "7"},
+                json={"error": {"code": 429, "message": "q", "status": "RESOURCE_EXHAUSTED"}},
+            )
         if len(seen) == 2:
             raise httpx.ReadTimeout("slow", request=req)
         return httpx.Response(200, json={"embeddings": [{"values": [3.0, 4.0]}]})

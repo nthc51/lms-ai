@@ -7,8 +7,10 @@ API = "/api/v1"
 
 
 async def register_user(client, email, password="password123", role="student", full_name="Người dùng"):
-    r = await client.post(f"{API}/auth/register",
-                          json={"email": email, "password": password, "role": role, "full_name": full_name})
+    r = await client.post(
+        f"{API}/auth/register",
+        json={"email": email, "password": password, "role": role, "full_name": full_name},
+    )
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -47,7 +49,9 @@ async def make_admin(client, email="admin@x.com") -> tuple[str, dict]:
 
 
 async def create_course(client, headers, title="Cấu trúc dữ liệu và Giải thuật", description="Mô tả") -> dict:
-    r = await client.post(f"{API}/courses", json={"title": title, "description": description}, headers=headers)
+    r = await client.post(
+        f"{API}/courses", json={"title": title, "description": description}, headers=headers
+    )
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -59,8 +63,11 @@ async def add_section(client, headers, course_id, title="Chương 1") -> dict:
 
 
 async def add_lesson(client, headers, section_id, title="Bài 1", content_md="# Nội dung") -> dict:
-    r = await client.post(f"{API}/sections/{section_id}/lessons",
-                          json={"title": title, "content_md": content_md}, headers=headers)
+    r = await client.post(
+        f"{API}/sections/{section_id}/lessons",
+        json={"title": title, "content_md": content_md},
+        headers=headers,
+    )
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -76,8 +83,9 @@ async def make_published_course(client, teacher_headers, title="Cấu trúc dữ
 
 async def upload_file(client, storage, headers, data: bytes, kind="pdf", mime="application/pdf") -> str:
     """Presign → 'upload' vào key tạm của storage giả → complete. Trả về asset_id."""
-    r = await client.post(f"{API}/uploads/presign", json={"kind": kind, "mime": mime, "size": len(data)},
-                          headers=headers)
+    r = await client.post(
+        f"{API}/uploads/presign", json={"kind": kind, "mime": mime, "size": len(data)}, headers=headers
+    )
     assert r.status_code == 200, r.text
     storage.client_put(r.json()["put_url"], data, mime)  # vào key tạm; complete sẽ copy sang key chính thức
     done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=headers)

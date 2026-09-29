@@ -54,10 +54,19 @@ class FakeEmbedder:
 class GeminiEmbedder:
     BATCH = 100
 
-    def __init__(self, api_key: str, model: str, dim: int, client=None, *,
-                 timeout_s: float = 30.0, sleep: Sleep = asyncio.sleep):
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        dim: int,
+        client=None,
+        *,
+        timeout_s: float = 30.0,
+        sleep: Sleep = asyncio.sleep,
+    ):
         if client is None:
             from google import genai
+
             client = genai.Client(api_key=api_key)
         self._client = client
         self._timeout_ms = int(timeout_s * 1000)
@@ -69,15 +78,18 @@ class GeminiEmbedder:
         from google.genai import types
 
         config = types.EmbedContentConfig(
-            task_type=task_type, output_dimensionality=self.dim,
+            task_type=task_type,
+            output_dimensionality=self.dim,
             http_options=types.HttpOptions(timeout=self._timeout_ms),
         )
         out: list[list[float]] = []
         for i in range(0, len(texts), self.BATCH):
-            batch = texts[i:i + self.BATCH]
+            batch = texts[i : i + self.BATCH]
             resp = await call_with_retry(
                 "embed",
-                lambda b=batch: self._client.aio.models.embed_content(model=self.model, contents=b, config=config),
+                lambda b=batch: self._client.aio.models.embed_content(
+                    model=self.model, contents=b, config=config
+                ),
                 sleep=self._sleep,
             )
             # Khi giảm số chiều, vector trả về không còn chuẩn hóa → tự chuẩn hóa để dùng cosine
