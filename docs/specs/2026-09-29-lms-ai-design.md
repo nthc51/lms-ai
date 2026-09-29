@@ -40,7 +40,7 @@
 
 ### Tầng S: chất lượng hệ thống (rải từ tuần 1 đến tuần 4, trước tầng C)
 
-- [ ] **S1. CI:** GitHub Actions chạy ruff, pytest (có service Postgres pgvector) và build image Docker cho mỗi lần push và PR.
+- [~] **S1. CI:** GitHub Actions chạy ruff, pytest (có service Postgres pgvector) và build image Docker cho mỗi lần push và PR.
 - [ ] **S2. Deploy production:** VPS với Caddy (HTTPS tự động) và file `docker-compose.prod.yml`, gồm healthcheck, `restart: unless-stopped`, secrets lấy từ `.env` trên server. Backup `pg_dump` hằng ngày, giữ bản của 7 ngày gần nhất, và **đã thử khôi phục** ít nhất một lần.
 - [ ] **S3. CD:** push lên `main` và CI xanh thì tự deploy lên VPS (qua SSH action), chạy `alembic upgrade head` trước khi khởi động lại API.
 - [ ] **S4. Giám sát:**
