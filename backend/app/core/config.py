@@ -1,6 +1,9 @@
+import json
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -14,6 +17,8 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 7
     cookie_secure: bool = False
+    # Origin frontend được phép gọi API kèm cookie. Env CORS_ORIGINS: JSON list hoặc chuỗi phân tách dấu phẩy.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
 
     minio_endpoint: str = "localhost:9000"
     minio_public_endpoint: str = "localhost:9000"
@@ -33,6 +38,16 @@ class Settings(BaseSettings):
     vision_max_pages_per_doc: int = 60  # trần số trang gửi vision mỗi tài liệu (chi phí API)
     # Job 'pending' quá số phút này (Redis mất job) → sweeper enqueue lại một lần; quá thêm lần nữa → failed
     pending_job_requeue_after_min: int = 10
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: object) -> object:
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                return json.loads(v)
+            return [o.strip() for o in v.split(",") if o.strip()]
+        return v
 
 
 @lru_cache

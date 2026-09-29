@@ -2,8 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.core.config import get_settings
 from app.core.errors import register_error_handlers
-from app.core.middleware import RequestIdMiddleware
+from app.core.middleware import RequestIdMiddleware, StrictCORSMiddleware
 from app.core.storage import get_storage
 from app.modules.auth.router import router as auth_router
 from app.modules.courses.router import router as courses_router
@@ -24,6 +25,15 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="LMS-AI API", lifespan=lifespan)
     app.add_middleware(RequestIdMiddleware)
+    # allow_credentials: frontend gửi cookie refresh (HttpOnly) tới /auth/refresh.
+    app.add_middleware(
+        StrictCORSMiddleware,
+        allow_origins=get_settings().cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
+        expose_headers=["x-request-id"],
+    )
     register_error_handlers(app)
 
     @app.get("/api/v1/health")
