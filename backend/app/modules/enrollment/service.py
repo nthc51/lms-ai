@@ -1,14 +1,16 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import AppError, not_found
-from app.modules.auth.models import User
+from app.core.errors import AppError, forbidden, not_found
+from app.core.time import utcnow
+from app.modules.auth.models import Role, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
+from app.modules.courses.service import get_lesson_with_course
 from app.modules.enrollment.models import Enrollment, LessonProgress, ProgressStatus
-from app.modules.enrollment.schemas import EnrollmentOut, MyCourseOut
+from app.modules.enrollment.schemas import EnrollmentOut, LessonDetail, MyCourseOut, ProgressIn, ProgressOut
 
 
 async def enroll(db: AsyncSession, user: User, course_id: uuid.UUID) -> EnrollmentOut:
@@ -57,3 +59,63 @@ async def my_courses(db: AsyncSession, user: User) -> list[MyCourseOut]:
             progress_pct=round(done * 100 / total) if total else 0,
         ))
     return result
+
+
+async def ensure_lesson_access(db: AsyncSession, lesson_id: uuid.UUID, user: User) -> tuple[Lesson, Course]:
+    """Admin và giảng viên sở hữu khóa luôn được vào. Học viên phải đăng ký khóa đã xuất bản."""
+    lesson, course = await get_lesson_with_course(db, lesson_id)
+    if user.role == Role.admin or course.teacher_id == user.id:
+        return lesson, course
+    if course.status != CourseStatus.published:
+        raise not_found("Bài học")
+    if not await is_enrolled(db, user.id, course.id):
+        raise AppError("NOT_ENROLLED", "Bạn cần đăng ký khóa học để xem bài này", 403)
+    return lesson, course
+
+
+async def get_lesson_detail(db: AsyncSession, lesson_id: uuid.UUID, user: User) -> LessonDetail:
+    lesson, course = await ensure_lesson_access(db, lesson_id, user)
+    progress = await db.get(LessonProgress, (user.id, lesson.id))
+    return LessonDetail(id=lesson.id, section_id=lesson.section_id, course_id=course.id, title=lesson.title,
+                        content_md=lesson.content_md, duration_sec=lesson.duration_sec,
+                        progress=ProgressOut.model_validate(progress) if progress else None)
+
+
+async def update_progress(db: AsyncSession, lesson_id: uuid.UUID, user: User, data: ProgressIn) -> ProgressOut:
+    if user.role != Role.student:
+        raise forbidden("Chỉ học viên mới lưu tiến độ")
+    lesson, course = await ensure_lesson_access(db, lesson_id, user)
+    new_status = ProgressStatus(data.status)
+    now = utcnow()
+    stmt = pg_insert(LessonProgress).values(
+        user_id=user.id, lesson_id=lesson.id, status=new_status, video_position_sec=data.video_position_sec,
+        completed_at=now if new_status == ProgressStatus.done else None,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[LessonProgress.user_id, LessonProgress.lesson_id],
+        set_={
+            # Đã "done" thì giữ nguyên "done" (học viên xem lại bài không làm mất tiến độ)
+            "status": case((LessonProgress.status == ProgressStatus.done, LessonProgress.status),
+                           else_=stmt.excluded.status),
+            "video_position_sec": stmt.excluded.video_position_sec,
+            "completed_at": func.coalesce(LessonProgress.completed_at, stmt.excluded.completed_at),
+            "updated_at": func.now(),
+        },
+    )
+    await db.execute(stmt)
+
+    total = await db.scalar(select(func.count(Lesson.id)).join(Section, Section.id == Lesson.section_id)
+                            .where(Section.course_id == course.id))
+    done = await db.scalar(
+        select(func.count(LessonProgress.lesson_id))
+        .join(Lesson, Lesson.id == LessonProgress.lesson_id)
+        .join(Section, Section.id == Lesson.section_id)
+        .where(Section.course_id == course.id, LessonProgress.user_id == user.id,
+               LessonProgress.status == ProgressStatus.done))
+    if total and done >= total:
+        await db.execute(update(Enrollment)
+                         .where(Enrollment.user_id == user.id, Enrollment.course_id == course.id)
+                         .values(completed_at=func.coalesce(Enrollment.completed_at, func.now())))
+    await db.commit()
+    progress = await db.get(LessonProgress, (user.id, lesson.id), populate_existing=True)
+    return ProgressOut.model_validate(progress)
