@@ -1,6 +1,22 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger("app.errors")
+
+INTERNAL_ERROR_MESSAGE = "Lỗi hệ thống"
+
+_HTTP_CODES: dict[int, tuple[str, str]] = {
+    400: ("VALIDATION_ERROR", "Yêu cầu không hợp lệ"),
+    401: ("NOT_AUTHENTICATED", "Bạn cần đăng nhập"),
+    403: ("FORBIDDEN", "Bạn không có quyền thực hiện thao tác này"),
+    404: ("NOT_FOUND", "Tài nguyên không tồn tại"),
+    405: ("METHOD_NOT_ALLOWED", "Phương thức không được hỗ trợ"),
+    422: ("VALIDATION_ERROR", "Dữ liệu không hợp lệ"),
+}
 
 
 class AppError(Exception):
@@ -28,15 +44,27 @@ def forbidden(message: str = "Bạn không có quyền thực hiện thao tác n
     return AppError("FORBIDDEN", message, 403)
 
 
+def error_body(request_id: str | None, code: str, message: str, details: dict) -> dict:
+    return {"error": {"code": code, "message": message, "details": details, "request_id": request_id}}
+
+
 def _body(request: Request, code: str, message: str, details: dict) -> dict:
-    return {
-        "error": {
-            "code": code,
-            "message": message,
-            "details": details,
-            "request_id": getattr(request.state, "request_id", None),
-        }
-    }
+    return error_body(getattr(request.state, "request_id", None), code, message, details)
+
+
+def internal_error_body(request_id: str | None) -> dict:
+    """Thân 500 thống nhất: không bao giờ chứa traceback/nội dung exception."""
+    return error_body(request_id, "INTERNAL_ERROR", INTERNAL_ERROR_MESSAGE, {})
+
+
+def http_error_code(status: int) -> tuple[str, str]:
+    if status in _HTTP_CODES:
+        return _HTTP_CODES[status]
+    return (
+        ("INTERNAL_ERROR", INTERNAL_ERROR_MESSAGE)
+        if status >= 500
+        else ("HTTP_ERROR", "Yêu cầu không hợp lệ")
+    )
 
 
 def register_error_handlers(app: FastAPI) -> None:
@@ -52,3 +80,18 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             _body(request, "VALIDATION_ERROR", "Dữ liệu không hợp lệ", {"errors": errors}), status_code=422
         )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        code, message = http_error_code(exc.status_code)
+        return JSONResponse(
+            _body(request, code, message, {}), status_code=exc.status_code, headers=exc.headers
+        )
+
+    @app.exception_handler(Exception)
+    async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        # Dự phòng: bình thường RequestIdMiddleware đã bắt exception trước (để 500 cũng có x-request-id);
+        # handler này chỉ chạy nếu exception lọt ra ngoài middleware đó (ServerErrorMiddleware).
+        request_id = getattr(request.state, "request_id", None)
+        logger.exception("Unhandled exception (request_id=%s)", request_id)
+        return JSONResponse(internal_error_body(request_id), status_code=500)

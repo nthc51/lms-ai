@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -17,10 +18,14 @@ from app.modules.auth.models import RefreshToken, Role, TeacherStatus, User
 from app.modules.auth.schemas import LoginIn, RegisterIn
 
 
+def _email_taken() -> AppError:
+    return AppError("EMAIL_TAKEN", "Email đã được sử dụng", 409)
+
+
 async def register(db: AsyncSession, data: RegisterIn) -> User:
     email = data.email.lower()
     if await db.scalar(select(User.id).where(User.email == email)):
-        raise AppError("EMAIL_TAKEN", "Email đã được sử dụng", 409)
+        raise _email_taken()
     role = Role(data.role)
     user = User(
         email=email,
@@ -30,7 +35,15 @@ async def register(db: AsyncSession, data: RegisterIn) -> User:
         teacher_status=TeacherStatus.pending if role == Role.teacher else None,
     )
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Hai request đăng ký cùng email chạy song song: cả hai qua được bước kiểm tra ở trên,
+        # request thua vấp unique constraint khi commit → vẫn trả 409 thay vì 500.
+        await db.rollback()
+        if await db.scalar(select(User.id).where(User.email == email)):
+            raise _email_taken() from None
+        raise
     return user
 
 

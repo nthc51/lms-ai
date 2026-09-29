@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.deps import get_optional_user, require_staff, require_teacher_approved
+from app.core.pagination import MAX_PAGE
 from app.modules.auth.models import User
 from app.modules.courses import service
 from app.modules.courses.schemas import (
@@ -145,7 +146,7 @@ async def reorder(
 @router.get("/courses", response_model=CoursePage)
 async def catalog(
     q: str | None = None,
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=MAX_PAGE),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):

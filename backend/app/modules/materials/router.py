@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.core.deps import get_current_user, require_staff
 from app.core.errors import not_found
+from app.core.pagination import MAX_PAGE
 from app.core.storage import Storage, get_storage
 from app.modules.auth.models import User
 from app.modules.enrollment.service import ensure_lesson_access
@@ -90,7 +91,7 @@ async def source_detail(
 @router.get("/sources/{source_id}/pages", response_model=SourcePagesPage)
 async def source_pages(
     source_id: uuid.UUID,
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=MAX_PAGE),
     size: int = Query(20, ge=1, le=100),
     user: User = Depends(require_staff),
     db: AsyncSession = Depends(get_db),

@@ -76,3 +76,37 @@ async def test_me_returns_current_user(client):
     r = await client.get(f"{API}/me", headers=headers)
     assert r.status_code == 200
     assert r.json()["email"] == "e@x.com" and r.json()["full_name"] == "Chiến"
+
+
+async def test_concurrent_duplicate_registration_gives_one_201_one_409(client):
+    import asyncio
+
+    body = {"email": "race@x.com", "password": "password123", "full_name": "R"}
+    r1, r2 = await asyncio.gather(
+        client.post(f"{API}/auth/register", json=body), client.post(f"{API}/auth/register", json=body)
+    )
+    assert sorted([r1.status_code, r2.status_code]) == [201, 409]
+    loser = r1 if r1.status_code == 409 else r2
+    assert loser.json()["error"]["code"] == "EMAIL_TAKEN"
+
+
+async def test_register_integrity_error_on_commit_maps_to_email_taken(client, monkeypatch):
+    """Ép đúng nhánh race: bỏ qua bước kiểm tra trước, để unique constraint bắt lúc commit."""
+    from app.modules.auth import service
+
+    await register_user(client, "race2@x.com")
+    real_scalar = service.AsyncSession.scalar
+    calls = {"n": 0}
+
+    async def first_check_misses(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return None
+        return await real_scalar(self, *args, **kwargs)
+
+    monkeypatch.setattr(service.AsyncSession, "scalar", first_check_misses)
+    r = await client.post(
+        f"{API}/auth/register", json={"email": "race2@x.com", "password": "password123", "full_name": "B"}
+    )
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "EMAIL_TAKEN"

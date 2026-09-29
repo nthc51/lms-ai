@@ -249,7 +249,7 @@ async def test_pages_are_paginated(client, storage, db):
     body = r.json()
     assert (body["total"], body["page"], body["size"]) == (3, 2, 2)
     assert [(p["page_no"], p["markdown"]) for p in body["items"]] == [(3, "trang 3")]
-    for params in ({"size": 101}, {"page": 0}):
+    for params in ({"size": 101}, {"page": 0}, {"page": 10001}, {"page": 10**19}):
         bad = await client.get(f"{API}/sources/{source_id}/pages", params=params, headers=gv)
         assert (bad.status_code, bad.json()["error"]["code"]) == (422, "VALIDATION_ERROR")
 
