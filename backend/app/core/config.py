@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     vision_provider: str = "fake"  # fake | gemini
     vision_model: str = "gemini-2.5-flash"
     gemini_api_key: str = ""
+    embed_timeout_s: float = 30.0
+    vision_timeout_s: float = 120.0
 
 
 @lru_cache
