@@ -44,3 +44,9 @@ async def make_admin(client, email="admin@x.com") -> tuple[str, dict]:
     async with SessionLocal() as db:
         user = await create_admin(db, email, "password123")
     return str(user.id), await login(client, email)
+
+
+async def create_course(client, headers, title="Cấu trúc dữ liệu và Giải thuật", description="Mô tả") -> dict:
+    r = await client.post(f"{API}/courses", json={"title": title, "description": description}, headers=headers)
+    assert r.status_code == 201, r.text
+    return r.json()
