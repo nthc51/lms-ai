@@ -67,14 +67,14 @@ Mỗi module đi theo nguyên tắc: `models` chỉ định nghĩa bảng, `serv
 **Files:**
 - Create: `lms-ai/.gitignore`, `lms-ai/docker-compose.yml`, `lms-ai/infra/db/init.sql`
 
-- [ ] **Step 1: Tạo thư mục và git**
+- [x] **Step 1: Tạo thư mục và git**
 
 ```bash
 mkdir lms-ai && cd lms-ai && git init
 mkdir -p infra/db backend
 ```
 
-- [ ] **Step 2: `.gitignore`**
+- [x] **Step 2: `.gitignore`**
 
 ```
 __pycache__/
@@ -87,13 +87,13 @@ node_modules/
 .next/
 ```
 
-- [ ] **Step 3: `infra/db/init.sql`**
+- [x] **Step 3: `infra/db/init.sql`**
 
 ```sql
 CREATE DATABASE lms_test;
 ```
 
-- [ ] **Step 4: `docker-compose.yml`** (service `api` và `worker` sẽ thêm ở Task 22)
+- [x] **Step 4: `docker-compose.yml`** (service `api` và `worker` sẽ thêm ở Task 22)
 
 ```yaml
 services:
@@ -128,14 +128,14 @@ volumes:
   miniodata:
 ```
 
-- [ ] **Step 5: Chạy và kiểm tra**
+- [x] **Step 5: Chạy và kiểm tra**
 
 Run: `docker compose up -d db redis minio` rồi `docker compose exec db psql -U lms -d lms_test -c "SELECT 1"`
 Expected: in ra một bảng có giá trị `1`. Nếu báo `database "lms_test" does not exist`, nghĩa là volume đã được tạo từ trước khi có init.sql. Chạy `docker compose down -v` rồi `up` lại.
 
-- [ ] **Step 6: Lưu spec vào repo**: tải file `2026-09-29-lms-ai-design.md` từ chat về, đặt vào `lms-ai/docs/specs/`.
+- [x] **Step 6: Lưu spec vào repo**: tải file `2026-09-29-lms-ai-design.md` từ chat về, đặt vào `lms-ai/docs/specs/`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add . && git commit -m "chore: init repo with postgres/pgvector, redis, minio"
