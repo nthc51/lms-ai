@@ -955,7 +955,7 @@ git add . && git commit -m "feat(auth): user and refresh token models, password 
 - Modify: `backend/app/main.py`
 - Test: `backend/tests/test_auth.py`
 
-- [ ] **Step 1: `tests/helpers.py`**
+- [x] **Step 1: `tests/helpers.py`**
 
 ```python
 import uuid
@@ -998,7 +998,7 @@ async def make_teacher(client, email="gv@x.com", approved=True) -> tuple[str, di
     return user["id"], await login(client, email)
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_auth.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_auth.py`**
 
 ```python
 from tests.helpers import API, login, register_user
@@ -1076,12 +1076,12 @@ async def test_me_returns_current_user(client):
     assert r.json()["email"] == "e@x.com" and r.json()["full_name"] == "Chiến"
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_auth.py -v`
 Expected: FAIL (404 do chưa có route, hoặc lỗi import `app.modules.auth.models` trong helpers chạy được nhưng route thì chưa có)
 
-- [ ] **Step 4: `app/modules/auth/schemas.py`**
+- [x] **Step 4: `app/modules/auth/schemas.py`**
 
 ```python
 import uuid
@@ -1127,7 +1127,7 @@ class UserOut(BaseModel):
     teacher_status: TeacherStatus | None
 ```
 
-- [ ] **Step 5: `app/modules/auth/service.py`**
+- [x] **Step 5: `app/modules/auth/service.py`**
 
 ```python
 from datetime import timedelta
@@ -1173,7 +1173,7 @@ async def login(db: AsyncSession, data: LoginIn) -> tuple[str, str]:
     return await issue_tokens(db, user)
 ```
 
-- [ ] **Step 6: `app/core/deps.py`**
+- [x] **Step 6: `app/core/deps.py`**
 
 ```python
 import uuid
@@ -1215,7 +1215,7 @@ async def get_optional_user(cred: HTTPAuthorizationCredentials | None = Depends(
     return await _user_from_token(cred.credentials, db)
 ```
 
-- [ ] **Step 7: `app/modules/auth/router.py`**
+- [x] **Step 7: `app/modules/auth/router.py`**
 
 ```python
 from fastapi import APIRouter, Depends, Response
@@ -1257,16 +1257,16 @@ async def me(user: User = Depends(get_current_user)):
     return user
 ```
 
-- [ ] **Step 8: Gắn router vào `app/main.py`**
+- [x] **Step 8: Gắn router vào `app/main.py`**
   - Import ở đầu file: `from app.modules.auth.router import router as auth_router`
   - Thêm ngay dưới dòng `# routers`: `app.include_router(auth_router)`
 
-- [ ] **Step 9: Chạy test**
+- [x] **Step 9: Chạy test**
 
 Run: `uv run pytest tests/test_auth.py -v`
 Expected: PASS cả 10 test
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add . && git commit -m "feat(auth): register, login with refresh cookie, /me"
