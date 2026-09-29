@@ -77,7 +77,12 @@ async def add_lesson(section_id: uuid.UUID, data: LessonCreate, user: User = Dep
 @router.patch("/lessons/{lesson_id}", response_model=LessonOut)
 async def update_lesson(lesson_id: uuid.UUID, data: LessonUpdate, user: User = Depends(require_staff),
                         db: AsyncSession = Depends(get_db)):
+    from app.modules.materials.assets import require_verified_asset
+    from app.modules.materials.models import AssetKind
+
     lesson, _ = await service.get_owned_lesson(db, lesson_id, user)
+    if data.video_asset_id is not None:
+        await require_verified_asset(db, data.video_asset_id, user, AssetKind.video)
     return await service.update_lesson(db, lesson, data)
 
 

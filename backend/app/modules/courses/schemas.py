@@ -54,6 +54,7 @@ class LessonUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     content_md: str | None = Field(default=None, max_length=100_000)
     duration_sec: int | None = Field(default=None, ge=0)
+    video_asset_id: uuid.UUID | None = None
 
 
 class LessonOut(BaseModel):
@@ -65,6 +66,7 @@ class LessonOut(BaseModel):
     position: int
     content_md: str
     duration_sec: int | None
+    video_asset_id: uuid.UUID | None
 
 
 class ReorderSection(BaseModel):

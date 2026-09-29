@@ -5,6 +5,7 @@ from app.core.middleware import RequestIdMiddleware
 from app.modules.auth.router import router as auth_router
 from app.modules.courses.router import router as courses_router
 from app.modules.enrollment.router import router as enrollment_router
+from app.modules.materials.router import router as materials_router
 
 
 def create_app() -> FastAPI:
@@ -20,6 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(courses_router)
     app.include_router(enrollment_router)
+    app.include_router(materials_router)
     return app
 
 
