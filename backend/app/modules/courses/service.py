@@ -164,8 +164,15 @@ async def get_owned_lesson(db: AsyncSession, lesson_id: uuid.UUID, user: User) -
     return lesson, course
 
 
+# Cột nullable của lesson: gửi null tường minh nghĩa là xóa (vd. gỡ video). Các cột khác bỏ qua null.
+_LESSON_NULLABLE_FIELDS = frozenset({"video_asset_id", "duration_sec"})
+
+
 async def update_lesson(db: AsyncSession, lesson: Lesson, data: LessonUpdate) -> Lesson:
-    for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
+    # exclude_unset: trường không gửi thì giữ nguyên
+    for field, value in data.model_dump(exclude_unset=True).items():
+        if value is None and field not in _LESSON_NULLABLE_FIELDS:
+            continue
         setattr(lesson, field, value)
     await db.commit()
     return lesson

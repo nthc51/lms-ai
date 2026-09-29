@@ -168,6 +168,28 @@ async def test_attach_video_and_stream_url(client, storage):
     assert storage.signed_gets[_final(r)] == {"response-content-type": "video/mp4"}
 
 
+async def test_patch_null_detaches_video_and_omission_keeps_it(client, storage):
+    _, gv = await make_teacher(client)
+    _, _, lesson = await make_published_course(client, gv)
+    r, _ = await _upload(client, storage, gv, MP4, kind="video", mime="video/mp4")
+    asset_id = r.json()["asset_id"]
+    url = f"{API}/lessons/{lesson['id']}"
+    await client.patch(url, json={"video_asset_id": asset_id, "duration_sec": 90}, headers=gv)
+
+    kept = await client.patch(url, json={"title": "Bài 1 (sửa)"}, headers=gv)
+    assert kept.status_code == 200
+    assert (kept.json()["video_asset_id"], kept.json()["duration_sec"]) == (asset_id, 90)
+
+    # null ở trường bắt buộc (title) vẫn bị bỏ qua như trước
+    ignored = await client.patch(url, json={"title": None}, headers=gv)
+    assert ignored.status_code == 200 and ignored.json()["title"] == "Bài 1 (sửa)"
+
+    detached = await client.patch(url, json={"video_asset_id": None}, headers=gv)
+    assert detached.status_code == 200
+    assert detached.json()["video_asset_id"] is None and detached.json()["duration_sec"] == 90
+    assert (await client.get(f"{API}/lessons/{lesson['id']}/video", headers=gv)).status_code == 404
+
+
 async def test_attach_pdf_as_video_is_rejected(client, storage):
     _, gv = await make_teacher(client)
     _, _, lesson = await make_published_course(client, gv)

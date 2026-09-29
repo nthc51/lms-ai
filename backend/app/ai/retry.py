@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 import time
 from collections.abc import Awaitable, Callable
 
@@ -13,6 +14,8 @@ Sleep = Callable[[float], Awaitable[None]]
 
 MAX_RETRIES = 3
 BASE_DELAY_S = 1.0
+# Trần cho Retry-After: server trả giá trị quá lớn cũng không giữ worker chờ lâu hơn mức này
+MAX_RETRY_AFTER_S = 60.0
 
 
 def _status_code(exc: BaseException) -> int | None:
@@ -29,14 +32,19 @@ def is_retryable(exc: BaseException) -> bool:
 
 
 def retry_after_s(exc: BaseException) -> float | None:
-    """Giây chờ từ header Retry-After của response lỗi (APIError.response là httpx.Response)."""
+    """Giây chờ từ header Retry-After của response lỗi (APIError.response là httpx.Response), tối đa
+    MAX_RETRY_AFTER_S. Không có, không phải số, âm hoặc không hữu hạn (inf/nan) → None (dùng backoff)."""
     headers = getattr(getattr(exc, "response", None), "headers", None)
     value = headers.get("retry-after") if headers is not None else None
+    if value is None:
+        return None
     try:
-        delay = float(value) if value is not None else None
+        delay = float(value)
     except ValueError:
         return None
-    return delay if delay is not None and delay >= 0 else None
+    if not math.isfinite(delay) or delay < 0:
+        return None
+    return min(delay, MAX_RETRY_AFTER_S)
 
 
 async def call_with_retry[T](

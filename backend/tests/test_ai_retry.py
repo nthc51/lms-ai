@@ -122,6 +122,21 @@ async def test_unparseable_retry_after_falls_back_to_backoff():
     assert sleep.delays == [1.0]
 
 
+async def test_huge_retry_after_is_capped_at_60s():
+    sleep = Sleeps()
+    e, _ = embedder([api_error(429, {"Retry-After": "86400"}), None], sleep)
+    await e.embed_query("q")
+    assert sleep.delays == [60.0]
+
+
+@pytest.mark.parametrize("value", ["inf", "-inf", "nan", "-5", "1e400"])
+async def test_non_finite_or_negative_retry_after_falls_back_to_backoff(value):
+    sleep = Sleeps()
+    e, _ = embedder([api_error(429, {"Retry-After": value}), None], sleep)
+    await e.embed_query("q")
+    assert sleep.delays == [1.0]
+
+
 async def test_gives_up_after_three_retries():
     sleep = Sleeps()
     e, models = embedder([api_error(429)] * 4 + [None], sleep)
