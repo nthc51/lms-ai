@@ -4,7 +4,7 @@
 - **Ngày tạo:** 2026-09-29
 - **Loại:** Đồ án tốt nghiệp: full stack, web động, tích hợp AI
 - **Nguồn lực:** 1 người làm full-time trong 5 tuần, có Claude hỗ trợ viết code
-- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), chờ lập kế hoạch triển khai
+- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), đang triển khai (xong backend tuần 1)
 
 ---
 
@@ -12,14 +12,14 @@
 
 > Cập nhật mục này mỗi khi xong việc. Ký hiệu: `[ ]` chưa làm · `[~]` đang làm · `[x]` xong · `[-]` đã cắt.
 
-**Tuần hiện tại:** 0 / 5  **Tổng tiến độ:** 0 / 33 hạng mục
+**Tuần hiện tại:** 1 / 5  **Tổng tiến độ:** 0 / 33 hạng mục
 
 ### Tầng A: lõi (bắt buộc xong trước cuối tuần 2)
 
-- [ ] A1. Auth, phân quyền 3 vai trò (Student / Teacher / Admin)
-- [ ] A2. Khóa học, chương, bài học; upload PDF và video (presign MinIO)
-- [ ] A3. Đăng ký khóa, tiến độ học
-- [ ] A4. Pipeline xử lý tài liệu: parse → chunk → embed (có fallback vision)
+- [~] A1. Auth, phân quyền 3 vai trò (Student / Teacher / Admin)
+- [~] A2. Khóa học, chương, bài học; upload PDF và video (presign MinIO)
+- [~] A3. Đăng ký khóa, tiến độ học
+- [~] A4. Pipeline xử lý tài liệu: parse → chunk → embed (có fallback vision)
 - [ ] A5. AI Tutor: RAG, trích nguồn, streaming SSE, giới hạn phạm vi
 - [ ] A6. AI sinh quiz + màn duyệt của giáo viên
 - [ ] A7. Học viên làm quiz, chấm tự động
@@ -132,6 +132,7 @@ Thanh toán, stream video HLS, ứng dụng mobile, reranker, so sánh embedding
 
 - **Luôn chạy:** `web`, `api`, `worker`, `db`, `redis`, `minio`.
 - **Chỉ bật khi dùng profile `local-ai`:** `worker-heavy`.
+- **Image MinIO:** `pgsty/minio`, ghim tag cố định (`RELEASE.2026-08-04T00-00-00Z`). Image chính thức `minio/minio` đã bị gỡ khỏi Docker Hub (2026-09-11); `pgsty/minio` là bản fork của bên thứ ba, nên luôn ghim tag, không dùng `latest`.
 
 ### 3.2 Quyết định kiến trúc
 
@@ -197,6 +198,7 @@ courses          id, teacher_id→users, title, slug UNIQUE, description, cover_
 sections         id, course_id→courses ON DELETE CASCADE, title, position
 lessons          id, section_id→sections ON DELETE CASCADE, title, position, content_md,
                  video_asset_id→assets NULL, duration_sec
+                 INDEX(video_asset_id)
 enrollments      (user_id, course_id) PK, enrolled_at, completed_at
 lesson_progress  (user_id, lesson_id) PK, status ENUM(not_started|in_progress|done),
                  video_position_sec, completed_at
@@ -207,6 +209,7 @@ assets           id, owner_id, kind ENUM(pdf|video|submission|certificate|image)
 sources          id, lesson_id→lessons ON DELETE CASCADE, asset_id→assets,
                  type ENUM(pdf|video), status ENUM(pending|processing|ready|failed),
                  error_msg, processed_at
+                 UNIQUE(lesson_id, asset_id)   (gắn trùng → 409 ALREADY_ATTACHED)
 source_pages     (source_id, page_no) PK, extraction_method ENUM(text|vision), markdown
 chunks           id, source_id→sources ON DELETE CASCADE, course_id, lesson_id,
                  content, heading_path, page_no NULL, start_sec NULL, end_sec NULL,
@@ -215,10 +218,12 @@ chunks           id, source_id→sources ON DELETE CASCADE, course_id, lesson_id
                      (to_tsvector('simple', immutable_unaccent(coalesce(content,'')))) STORED
                  INDEX HNSW(embedding vector_cosine_ops), GIN(tsv),
                        BTREE(course_id, lesson_id, embedding_model)
-jobs             id, type, ref_id, status ENUM(pending|processing|done|failed),
+jobs             id, type, ref_id, ref_version INT DEFAULT 0,
+                 status ENUM(pending|processing|done|failed),
                  attempts, error_msg, started_at, finished_at
-                 UNIQUE INDEX uq_active_job (type, ref_id)
+                 UNIQUE INDEX uq_active_job (type, ref_id, ref_version)
                      WHERE status IN ('pending','processing')
+                 (ref_version = submissions.version với grade_submission; job khác = 0)
 
 -- AI Tutor
 chat_sessions    id, user_id, course_id, lesson_id NULL      (NULL = hỏi cả khóa)
@@ -291,16 +296,19 @@ certificates     id, user_id, course_id, code UNIQUE, asset_id, issued_at
 Mọi lời gọi LLM đều đi qua lớp này:
 
 - Timeout riêng cho từng loại lời gọi.
-- Retry khi gặp 429 hoặc 5xx: tối đa 3 lần, chờ lâu dần theo cấp số nhân (exponential backoff).
+- Retry khi gặp 429, 5xx hoặc timeout: tối đa 3 lần, chờ lâu dần theo cấp số nhân (exponential backoff); có header `Retry-After` thì chờ theo header. Các lỗi 4xx khác (sai key, request sai) báo lỗi ngay, không retry.
+- **Đã làm ở tuần 1:** timeout và retry cho embedder và vision của Gemini (`EMBED_TIMEOUT_S`, `VISION_TIMEOUT_S`; hàm chờ inject được để test không phải ngủ thật). Phần cache `llm_cache`, log token và `prompt_version` làm cùng LLM ở tuần 2.
 - Cache theo `hash(model + prompt)` trong bảng `llm_cache`.
 - Log token, độ trễ và `prompt_version`.
 - Output có cấu trúc luôn dùng JSON schema, rồi validate lại bằng Pydantic.
 
 ### 5.1 Xử lý tài liệu (job `ingest_pdf`)
 
-1. Chạy `pymupdf4llm` để lấy markdown của từng trang.
-2. Trang có dưới 50 ký tự text (slide scan, trang toàn ảnh) hoặc nhiều công thức: render trang thành ảnh, gửi **Gemini vision** để lấy markdown (công thức dạng LaTeX). Ghi `extraction_method = vision`.
-3. Chunk theo heading markdown, mỗi chunk khoảng 500–800 token, overlap khoảng 100. Giữ lại `page_no` và `heading_path`.
+1. Chạy `pymupdf4llm` để lấy markdown của từng trang, với `use_ocr=False` (không dùng OCR của pymupdf4llm; trang scan đi qua vision).
+2. Trang có dưới 50 ký tự text (slide scan, trang toàn ảnh) hoặc có **từ 1 công thức trở lên** (chế độ layout làm mất nội dung công thức): render trang thành ảnh, gửi **Gemini vision** để lấy markdown (công thức dạng LaTeX). Ghi `extraction_method = vision`.
+   - Trần `VISION_MAX_PAGES_PER_DOC` (mặc định 60) trang vision mỗi tài liệu, xét theo thứ tự trang. Vượt trần thì các trang còn lại dùng markdown text thường; source vẫn `ready` nhưng `sources.error_msg` ghi cảnh báo (API trả thêm trường `warning`).
+   - API trả số trang vision của từng source (`vision_pages`, đếm từ `source_pages`, không thêm cột) để đưa vào báo cáo.
+3. Chunk theo heading markdown, mỗi chunk khoảng 500–800 token, overlap khoảng 100. Giữ lại `page_no` và `heading_path`. Token ước lượng bằng 1.4 × số từ. Khối code rào bằng `` ``` `` hoặc `~~~` là một khối nguyên (không cắt ở dòng trống bên trong); chỉ cắt cứng theo ranh giới dòng khi riêng khối đó vượt `max_tokens`.
 4. Embed theo batch và lưu vào `chunks`. Cập nhật `sources.status`.
 
 ### 5.2 Xử lý video (job `ingest_video`)
@@ -368,8 +376,16 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | LLM timeout hoặc hết quota khi đang chat | SSE gửi `error` và giao diện hiện nút "Thử lại". Câu hỏi của học viên vẫn được lưu |
 | Structured output sai định dạng | Retry 1 lần. Với quiz thì bỏ câu đó và ghi log; với assignment thì chuyển `ai_failed` |
 | Job xử lý tài liệu thất bại | `sources.status = failed` kèm `error_msg`, giáo viên thấy nút "Xử lý lại" |
+| Worker chết hoặc bị kill giữa chừng | Cron arq 5 phút một lần: job `processing` quá `job_timeout + 5 phút` → `failed` với `error_msg = "Worker bị gián đoạn"`, source tương ứng cũng `failed` (cùng transaction) để giáo viên bấm "Xử lý lại" |
 | Khóa học chưa có chunk nào ở trạng thái ready | Ẩn AI Tutor, hiện "Tài liệu đang được xử lý" |
 | Đang demo | Bật cache cho các câu demo và có sẵn video demo dự phòng |
+
+**Worker (đã làm ở tuần 1):**
+
+- `job_timeout` của `ingest_pdf` là 600 giây.
+- Khi bắt đầu, worker nhận job bằng `UPDATE ... WHERE status IN ('pending','processing')` có điều kiện; job đã `done`/`failed` (ví dụ đã bị sweeper chốt) thì bỏ qua, không chạy lại.
+- Trạng thái cuối của job (`done`/`failed`) được ghi **cùng transaction** với trạng thái cuối của source, nên không có lúc job xong mà source còn treo. Worker đến muộn không ghi đè job đã bị sweeper đánh dấu `failed`.
+- `POST /sources/{id}/reprocess` khi đã có job đang chờ hoặc đang chạy: rollback, trả `409 INVALID_STATE`, source giữ nguyên.
 
 ---
 
@@ -405,9 +421,9 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 | Module | Endpoint |
 |---|---|
-| Khóa học | `GET /courses` · `GET /courses/{slug}` · `POST/PATCH/DELETE /courses` · `POST /courses/{id}/publish` · CRUD sections/lessons · `PATCH /courses/{id}/reorder` |
-| Học | `POST /courses/{id}/enroll` · `GET /me/courses` · `PUT /lessons/{id}/progress` |
-| Tài liệu | `POST /lessons/{id}/sources` · `GET /sources/{id}` · `POST /sources/{id}/reprocess` · `GET /sources/{id}/pages` |
+| Khóa học | `GET /courses` · `GET /courses/{slug}` · `POST/PATCH/DELETE /courses` · `POST /courses/{id}/publish` · CRUD sections/lessons · `PATCH /courses/{id}/reorder` · `GET /teacher/courses` (khóa của giảng viên đang đăng nhập) |
+| Học | `POST /courses/{id}/enroll` · `GET /me/courses` · `GET /lessons/{id}` (nội dung bài học) · `GET /lessons/{id}/video` (presigned GET) · `PUT /lessons/{id}/progress` |
+| Tài liệu | `POST /uploads/presign` · `POST /uploads/{id}/complete` · `POST /lessons/{id}/sources` → 202 · `GET /lessons/{id}/sources` · `GET /sources/{id}` · `POST /sources/{id}/reprocess` → 202 · `GET /sources/{id}/pages?page=&size=` (`size ≤ 100`, trả `{items, total, page, size}`) |
 | Tutor | `POST /tutor/sessions` · `GET /tutor/sessions/{id}/messages` · `POST /tutor/sessions/{id}/messages` (SSE, frontend đọc bằng `fetch` + `ReadableStream`) · `POST /tutor/messages/{id}/feedback` |
 | Câu hỏi | `POST /lessons/{id}/questions/generate` → 202 · `GET /lessons/{id}/questions?review_status=` · `PATCH /questions/{id}` |
 | Quiz | CRUD `/quizzes` · `POST /quizzes/{id}/attempts` (**không trả đáp án**) · `PUT /attempts/{id}/answers/{qid}` · `POST /attempts/{id}/submit {final_answers?}` · `GET /attempts/{id}/result` (chỉ khi `completed` hoặc `timed_out`) · `POST /attempts/{id}/answers/{qid}/explain` |
@@ -445,11 +461,11 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 | HTTP | Mã lỗi |
 |---|---|
-| 400 / 422 | `VALIDATION_ERROR`, `INVALID_FILE_TYPE` |
-| 401 | `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` |
-| 403 | `TEACHER_NOT_APPROVED`, `NOT_ENROLLED`, `ACCOUNT_LOCKED` |
+| 400 / 422 | `VALIDATION_ERROR`, `INVALID_FILE_TYPE`, `INVALID_REORDER`, `UPLOAD_MISSING`, `INVALID_ASSET` |
+| 401 | `TOKEN_EXPIRED`, `INVALID_CREDENTIALS`, `INVALID_TOKEN`, `TOKEN_REUSED`, `NOT_AUTHENTICATED` |
+| 403 | `TEACHER_NOT_APPROVED`, `NOT_ENROLLED`, `ACCOUNT_LOCKED`, `FORBIDDEN` |
 | 404 | `NOT_FOUND` |
-| 409 | `QUIZ_ATTEMPT_LIMIT`, `ATTEMPT_CLOSED`, `SUBMISSION_LOCKED`, `ALREADY_ENROLLED` |
+| 409 | `QUIZ_ATTEMPT_LIMIT`, `ATTEMPT_CLOSED`, `SUBMISSION_LOCKED`, `ALREADY_ENROLLED`, `EMAIL_TAKEN`, `COURSE_EMPTY`, `INVALID_STATE`, `ALREADY_ATTACHED` |
 | 413 | `FILE_TOO_LARGE` |
 | 429 | `RATE_LIMITED` (kèm header `Retry-After`) |
 | 503 | `AI_UNAVAILABLE` |
@@ -599,3 +615,13 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-09-29 | Hủy stream Tutor qua `async with` + `is_disconnected` (mỗi 10 chunk) + `finally` lưu phần đã sinh |
 | 2026-09-29 | Kiểm tra file: đọc 2KB đầu bằng `filetype` và `stat_object` |
 | 2026-09-29 | Upload qua key tạm `staging/<key>`: `complete` khóa dòng, copy sang key chính thức rồi mới kiểm tra, thất bại thì xóa object và asset; học viên không presign được `pdf`/`video` |
+| 2026-09-29 | Email lưu chữ thường, bảo đảm bằng CHECK constraint; test bắt buộc chạy trên DB *_test; token ước lượng 1.4 × số từ |
+| 2026-09-29 | Ghim Python 3.12; migration nào tạo ENUM thì `downgrade()` phải `DROP TYPE IF EXISTS` |
+| 2026-09-29 | MinIO dùng image `pgsty/minio` ghim tag, vì image chính thức đã bị gỡ khỏi Docker Hub (2026-09-11) |
+| 2026-09-29 | `uq_active_job` mở rộng thành `(type, ref_id, ref_version)`, thêm cột `jobs.ref_version` (cho nộp lại assignment); `sources` UNIQUE `(lesson_id, asset_id)` → `409 ALREADY_ATTACHED`; index `lessons.video_asset_id` |
+| 2026-09-29 | Embedder/vision Gemini: timeout + retry 3 lần chỉ với 429/5xx/timeout, tôn trọng `Retry-After`, hàm chờ inject được |
+| 2026-09-29 | PDF: `use_ocr=False`; trang có ≥ 1 công thức đi vision; trần `VISION_MAX_PAGES_PER_DOC = 60`, vượt thì dùng text và ghi cảnh báo vào `error_msg` khi source vẫn `ready`; API trả số trang vision của từng source |
+| 2026-09-29 | Chunker coi khối code rào `` ``` ``/`~~~` là một khối nguyên, chỉ cắt cứng theo dòng khi khối vượt `max_tokens` |
+| 2026-09-29 | Worker ghi trạng thái job cùng transaction với trạng thái cuối của source; `reprocess` khi đã có job đang chạy trả 409 và không đổi source; `GET /sources/{id}/pages` phân trang |
+| 2026-09-29 | Cron sweeper 5 phút/lần: job `processing` quá `job_timeout + 5 phút` → `failed` "Worker bị gián đoạn", source cũng `failed`; `ingest_pdf` có `job_timeout = 600` giây |
+| 2026-09-29 | Ruff: cấu hình `extend-immutable-calls` cho `Depends`/`Query`/`Cookie` của FastAPI thay vì tắt B008 |
