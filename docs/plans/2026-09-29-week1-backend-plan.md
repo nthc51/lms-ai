@@ -4044,7 +4044,7 @@ git add . && git commit -m "feat(jobs): jobs table with partial unique index, de
 - Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_sources_chunks.py`
 - Test: `backend/tests/test_chunks_db.py`
 
-- [ ] **Step 1: Thêm vào `app/modules/materials/models.py`**
+- [x] **Step 1: Thêm vào `app/modules/materials/models.py`**
   - Sửa các dòng import thành:
 
 ```python
@@ -4132,7 +4132,7 @@ class Chunk(IdMixin, TimestampMixin, Base):
     )
 ```
 
-- [ ] **Step 2: Sinh migration và upgrade**
+- [x] **Step 2: Sinh migration và upgrade**
 
 Run: `uv run alembic revision --autogenerate -m "sources and chunks"`
 Mở file migration và kiểm tra 3 điều:
@@ -4143,7 +4143,7 @@ Mở file migration và kiểm tra 3 điều:
 Run tiếp: `uv run alembic upgrade head`
 Expected: không lỗi. Nếu báo `generation expression is not immutable`, kiểm tra migration 0001 đã chạy và hàm có `IMMUTABLE`.
 
-- [ ] **Step 3: `tests/factories.py`** (tạo dữ liệu thẳng trong DB, không qua API)
+- [x] **Step 3: `tests/factories.py`** (tạo dữ liệu thẳng trong DB, không qua API)
 
 ```python
 import uuid
@@ -4207,7 +4207,7 @@ async def add_chunk(db, source: Source, course: Course, lesson: Lesson, content:
     return chunk
 ```
 
-- [ ] **Step 4: Viết test hỏng trước — `tests/test_chunks_db.py`**
+- [x] **Step 4: Viết test hỏng trước — `tests/test_chunks_db.py`**
 
 ```python
 from sqlalchemy import func, select, text
@@ -4259,12 +4259,12 @@ async def test_deleting_source_cascades_pages_and_chunks(db):
     assert await db.scalar(select(func.count()).select_from(SourcePage)) == 0
 ```
 
-- [ ] **Step 5: Chạy test**
+- [x] **Step 5: Chạy test**
 
 Run: `uv run pytest tests/test_chunks_db.py -v`
 Expected: PASS cả 3 test (model và migration đã có từ Step 1–2). Nếu `test_full_text_matches_without_diacritics` hỏng, nghĩa là `tsv` không đi qua `immutable_unaccent`: kiểm tra lại biểu thức `Computed`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add . && git commit -m "feat(materials): sources, pages, chunks with pgvector hnsw and unaccented tsvector"
