@@ -220,7 +220,9 @@ chunks           id, source_id→sources ON DELETE CASCADE, course_id, lesson_id
                        BTREE(course_id, lesson_id, embedding_model)
 jobs             id, type, ref_id, ref_version INT DEFAULT 0,
                  status ENUM(pending|processing|done|failed),
-                 attempts, error_msg, started_at, finished_at
+                 attempts, error_msg, started_at, finished_at,
+                 created_by→users NULL ON DELETE SET NULL   (NULL = job hệ thống, vd. do cron tạo),
+                 requeued_at NULL   (lúc sweeper enqueue lại job pending bị kẹt, chỉ một lần)
                  UNIQUE INDEX uq_active_job (type, ref_id, ref_version)
                      WHERE status IN ('pending','processing')
                  (ref_version = submissions.version với grade_submission; job khác = 0)
@@ -376,7 +378,8 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | LLM timeout hoặc hết quota khi đang chat | SSE gửi `error` và giao diện hiện nút "Thử lại". Câu hỏi của học viên vẫn được lưu |
 | Structured output sai định dạng | Retry 1 lần. Với quiz thì bỏ câu đó và ghi log; với assignment thì chuyển `ai_failed` |
 | Job xử lý tài liệu thất bại | `sources.status = failed` kèm `error_msg`, giáo viên thấy nút "Xử lý lại" |
-| Worker chết hoặc bị kill giữa chừng | Cron arq 5 phút một lần: job `processing` quá `job_timeout + 5 phút` → `failed` với `error_msg = "Worker bị gián đoạn"`, source tương ứng cũng `failed` (cùng transaction) để giáo viên bấm "Xử lý lại" |
+| Worker chết hoặc bị kill giữa chừng | Cron arq 5 phút một lần: job `processing` quá `job_timeout + 5 phút` → `failed` với `error_msg = "Worker bị gián đoạn"`; source tương ứng, nếu vẫn còn `pending`/`processing`, cũng chuyển `failed` (cùng transaction) để giáo viên bấm "Xử lý lại" |
+| Job kẹt `pending` (Redis down lúc enqueue, mất job trong Redis) | Cùng cron: job `pending` quá `PENDING_JOB_REQUEUE_AFTER_MIN` (mặc định 10) phút và chưa `requeued_at` → enqueue lại **một lần** với cùng `_job_id` (arq tự bỏ qua nếu job còn), ghi `requeued_at` chỉ khi enqueue không lỗi (lỗi thì để lần sweep sau). Vẫn `pending` quá N phút sau `requeued_at` → `failed` với `error_msg = "Không đưa được job vào hàng đợi"`; source còn `pending`/`processing` cũng `failed`, cùng transaction |
 | Khóa học chưa có chunk nào ở trạng thái ready | Ẩn AI Tutor, hiện "Tài liệu đang được xử lý" |
 | Đang demo | Bật cache cho các câu demo và có sẵn video demo dự phòng |
 
@@ -430,7 +433,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | Assignment | CRUD `/assignments` · `PUT /assignments/{id}/submission` · `GET /assignments/{id}/submissions` · `POST /submissions/{id}/grade` |
 | Thảo luận | `GET/POST /lessons/{id}/comments` · `DELETE /comments/{id}` |
 | Thông báo | `GET /notifications` · `POST /notifications/read` · `GET /notifications/stream-token` (sống 60 giây) · `GET /notifications/stream?t=` (dùng `EventSource`) |
-| Khác | `GET /jobs/{id}` · `GET /courses/{id}/analytics` · `GET /me/certificates` · `GET /certificates/verify/{code}` (công khai) |
+| Khác | `GET /jobs/{id}` (chỉ người tạo job hoặc admin; người khác nhận `404`) · `GET /courses/{id}/analytics` · `GET /me/certificates` · `GET /certificates/verify/{code}` (công khai) |
 | Admin | `GET/PATCH /admin/users` · `GET/PATCH /admin/courses` |
 
 ### 6.5 Luật làm quiz
@@ -624,4 +627,6 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-09-29 | Chunker coi khối code rào `` ``` ``/`~~~` là một khối nguyên, chỉ cắt cứng theo dòng khi khối vượt `max_tokens` |
 | 2026-09-29 | Worker ghi trạng thái job cùng transaction với trạng thái cuối của source; `reprocess` khi đã có job đang chạy trả 409 và không đổi source; `GET /sources/{id}/pages` phân trang |
 | 2026-09-29 | Cron sweeper 5 phút/lần: job `processing` quá `job_timeout + 5 phút` → `failed` "Worker bị gián đoạn", source cũng `failed`; `ingest_pdf` có `job_timeout = 600` giây |
+| 2026-09-29 | Job kẹt `pending` (mất trong Redis): sweeper enqueue lại một lần cùng `_job_id`, ghi `jobs.requeued_at`; vẫn kẹt sau `PENDING_JOB_REQUEUE_AFTER_MIN` phút → `failed` "Không đưa được job vào hàng đợi", source còn `pending`/`processing` cũng `failed` |
+| 2026-09-29 | Thêm `jobs.created_by` (FK users, `ON DELETE SET NULL`, NULL = job hệ thống); `GET /jobs/{id}` chỉ trả cho người tạo hoặc admin, người khác `404` (thay luật cũ "chỉ cần đăng nhập") |
 | 2026-09-29 | Ruff: cấu hình `extend-immutable-calls` cho `Depends`/`Query`/`Cookie` của FastAPI thay vì tắt B008 |
