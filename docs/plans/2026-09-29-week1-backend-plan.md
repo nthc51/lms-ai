@@ -6089,7 +6089,7 @@ git add . && git commit -m "feat(materials): attach pdf sources to lessons, stat
 - Modify: `backend/app/modules/jobs/service.py`, `backend/app/ingestion/pipeline.py`, `backend/app/core/storage.py`, `backend/app/main.py`, `docker-compose.yml`
 - Test: `backend/tests/test_worker.py`, `backend/tests/test_storage.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_worker.py`** (worker + sweeper; `CommitRecorder` chụp trạng thái job/source sau mỗi commit để chứng minh hai trạng thái cuối nằm chung một transaction)
+- [x] **Step 1: Viết test hỏng trước — `tests/test_worker.py`** (worker + sweeper; `CommitRecorder` chụp trạng thái job/source sau mỗi commit để chứng minh hai trạng thái cuối nằm chung một transaction)
 
 ```python
 import uuid
@@ -6406,12 +6406,12 @@ async def test_late_worker_failure_does_not_overwrite_swept_job(db):
     assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_worker.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.worker'`
 
-- [ ] **Step 3: `finish_job` trong `app/modules/jobs/service.py`**
+- [x] **Step 3: `finish_job` trong `app/modules/jobs/service.py`**
   - Import: `from sqlalchemy import select, text, update` và `from app.core.time import utcnow`
   - Thêm vào cuối file:
 
@@ -6429,7 +6429,7 @@ async def finish_job(db: AsyncSession, job_id: uuid.UUID, status: JobStatus, err
     return new_id is not None
 ```
 
-- [ ] **Step 4: Pipeline ghi trạng thái job cùng transaction với source — toàn bộ `app/ingestion/pipeline.py`**
+- [x] **Step 4: Pipeline ghi trạng thái job cùng transaction với source — toàn bộ `app/ingestion/pipeline.py`**
 
 ```python
 import logging
@@ -6550,7 +6550,7 @@ async def ingest_pdf_source(source_id: uuid.UUID, *, storage: Storage, embedder:
     return len(drafts)
 ```
 
-- [ ] **Step 5: `app/worker/tasks.py`** (`app/worker/__init__.py` để trống) — `run_job`, `ingest_pdf`, sweeper `sweep_stale_jobs`
+- [x] **Step 5: `app/worker/tasks.py`** (`app/worker/__init__.py` để trống) — `run_job`, `ingest_pdf`, sweeper `sweep_stale_jobs`
 
 ```python
 import logging
@@ -6651,7 +6651,7 @@ async def sweep_stale_jobs(ctx: dict) -> int:
     return swept
 ```
 
-- [ ] **Step 6: `app/worker/settings.py`** (timeout theo loại job + cron sweeper 5 phút)
+- [x] **Step 6: `app/worker/settings.py`** (timeout theo loại job + cron sweeper 5 phút)
 
 ```python
 from typing import ClassVar
@@ -6686,12 +6686,12 @@ class WorkerSettings:
     max_jobs = 5
 ```
 
-- [ ] **Step 7: Chạy test**
+- [x] **Step 7: Chạy test**
 
 Run: `uv run pytest tests/test_worker.py tests/test_pipeline.py -v`
 Expected: PASS (15 test worker/sweeper + 6 test pipeline cũ không đổi)
 
-- [ ] **Step 8: `ensure_bucket` chịu được race giữa API và worker**
+- [x] **Step 8: `ensure_bucket` chịu được race giữa API và worker**
   - Thêm vào cuối `tests/test_storage.py`:
 
 ```python
@@ -6741,7 +6741,7 @@ async def test_ensure_bucket_tolerates_concurrent_creation():
 
   - Run lại: PASS
 
-- [ ] **Step 9: Tạo bucket khi API khởi động** (`app/main.py`)
+- [x] **Step 9: Tạo bucket khi API khởi động** (`app/main.py`)
   - Thêm import: `from contextlib import asynccontextmanager` và `from app.core.storage import get_storage`
   - Thêm hàm sau ngay trên `def create_app()`:
 
@@ -6759,7 +6759,7 @@ async def lifespan(app: FastAPI):
 
 (Test dùng `httpx.ASGITransport`, không gửi sự kiện lifespan, nên không đụng tới MinIO thật.)
 
-- [ ] **Step 10: `backend/Dockerfile` và `backend/.dockerignore`**
+- [x] **Step 10: `backend/Dockerfile` và `backend/.dockerignore`**
 
 ```dockerfile
 # Python khớp backend/.python-version (3.12)
@@ -6789,7 +6789,7 @@ tests
 scripts
 ```
 
-- [ ] **Step 11: Thêm `api` và `worker` vào `docker-compose.yml`** (dưới service `minio`, trong khối `services:`)
+- [x] **Step 11: Thêm `api` và `worker` vào `docker-compose.yml`** (dưới service `minio`, trong khối `services:`)
 
 ```yaml
   api:
@@ -6823,7 +6823,7 @@ scripts
         condition: service_started
 ```
 
-- [ ] **Step 12: `backend/scripts/smoke_week1.py`** (+ `backend/scripts/__init__.py` rỗng): kiểm tra end-to-end trên hệ thống thật (API, worker, MinIO, Postgres)
+- [x] **Step 12: `backend/scripts/smoke_week1.py`** (+ `backend/scripts/__init__.py` rỗng): kiểm tra end-to-end trên hệ thống thật (API, worker, MinIO, Postgres)
 
 ```python
 """Smoke test tuần 1: API, worker, MinIO, Postgres thật. Cần `docker compose up -d --build` trước.
@@ -6916,7 +6916,7 @@ if __name__ == "__main__":
     sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else None))
 ```
 
-- [ ] **Step 13: Chạy toàn bộ hệ thống và smoke test**
+- [x] **Step 13: Chạy toàn bộ hệ thống và smoke test**
 
 Run (thư mục gốc repo): `docker compose up -d --build` rồi `docker compose logs -f worker` (mở ở cửa sổ khác)
 Run: `cd backend && PYTHONUTF8=1 uv run python -m scripts.smoke_week1 [một file PDF bài giảng có text]`
@@ -6931,12 +6931,12 @@ SMOKE OK
 Log worker có `sweep_stale_jobs ● 0` lúc khởi động và mỗi 5 phút.
 Nếu `put_url` lỗi `SignatureDoesNotMatch`: kiểm tra `MINIO_PUBLIC_ENDPOINT` của service `api` phải là `localhost:9000`, đúng host mà script dùng để PUT.
 
-- [ ] **Step 14 (tùy chọn, cần API key): chạy với Gemini thật**
+- [x] **Step 14 (tùy chọn, cần API key): chạy với Gemini thật**
   - Trong `backend/.env`: đặt `EMBED_PROVIDER=gemini`, `EMBED_MODEL=gemini-embedding-001`, `VISION_PROVIDER=gemini` và `GEMINI_API_KEY=...`. Trước đó kiểm tra lại tên model hiện hành trên trang tài liệu Google AI.
   - Chạy `docker compose up -d --build worker` rồi chạy lại smoke test với một PDF có trang scan.
   - Expected: có trang mang `vision`, và chunk có `embedding_model = gemini-embedding-001`.
 
-- [ ] **Step 15: Chạy toàn bộ test rồi commit**
+- [x] **Step 15: Chạy toàn bộ test rồi commit**
 
 Run: `uv run pytest` → PASS toàn bộ
 
