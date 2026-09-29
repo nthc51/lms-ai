@@ -1423,7 +1423,7 @@ git add . && git commit -m "feat(auth): refresh token rotation with reuse detect
 - Create: `backend/app/scripts/__init__.py`, `backend/app/scripts/seed_admin.py`, `backend/app/scripts/approve_teacher.py`
 - Test: `backend/tests/test_deps.py`
 
-- [ ] **Step 1: Thêm vào cuối `tests/helpers.py`**
+- [x] **Step 1: Thêm vào cuối `tests/helpers.py`**
 
 ```python
 async def make_admin(client, email="admin@x.com") -> tuple[str, dict]:
@@ -1434,7 +1434,7 @@ async def make_admin(client, email="admin@x.com") -> tuple[str, dict]:
     return str(user.id), await login(client, email)
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_deps.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_deps.py`**
 
 ```python
 import httpx
@@ -1495,12 +1495,12 @@ async def test_approve_teacher_service(client, db):
     assert str(user.id) == uid and user.teacher_status.value == "approved"
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_deps.py -v`
 Expected: FAIL với `ImportError: cannot import name 'require_role'`
 
-- [ ] **Step 4: Thêm vào cuối `app/core/deps.py`**
+- [x] **Step 4: Thêm vào cuối `app/core/deps.py`**
   - Thêm import: `from app.core.errors import AppError, forbidden` (thay cho dòng import `AppError` cũ)
   - Thêm import: `from app.modules.auth.models import Role, TeacherStatus, User` (thay cho dòng import `User` cũ)
   - Thêm các hàm sau:
@@ -1537,7 +1537,7 @@ async def require_staff(user: User = Depends(get_current_user)) -> User:
     raise forbidden()
 ```
 
-- [ ] **Step 5: Thêm vào cuối `app/modules/auth/service.py`**
+- [x] **Step 5: Thêm vào cuối `app/modules/auth/service.py`**
 
 ```python
 async def create_admin(db: AsyncSession, email: str, password: str, full_name: str = "Quản trị viên") -> User:
@@ -1562,7 +1562,7 @@ async def approve_teacher(db: AsyncSession, email: str) -> User:
     return user
 ```
 
-- [ ] **Step 6: Các script dòng lệnh** (`app/scripts/__init__.py` để trống)
+- [x] **Step 6: Các script dòng lệnh** (`app/scripts/__init__.py` để trống)
 
 `app/scripts/seed_admin.py`:
 
@@ -1610,17 +1610,17 @@ if __name__ == "__main__":
     asyncio.run(main(p.parse_args().email))
 ```
 
-- [ ] **Step 7: Chạy test**
+- [x] **Step 7: Chạy test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 8: Chạy thử script trên DB dev**
+- [x] **Step 8: Chạy thử script trên DB dev**
 
 Run: `uv run python -m app.scripts.seed_admin --email admin@lms.local --password admin12345`
 Expected: `Admin sẵn sàng: admin@lms.local`
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add . && git commit -m "feat(auth): role dependencies, admin seed and teacher approval scripts"
