@@ -36,3 +36,11 @@ async def make_teacher(client, email="gv@x.com", approved=True) -> tuple[str, di
     if approved:
         await approve_teacher_in_db(user["id"])
     return user["id"], await login(client, email)
+
+
+async def make_admin(client, email="admin@x.com") -> tuple[str, dict]:
+    from app.modules.auth.service import create_admin
+
+    async with SessionLocal() as db:
+        user = await create_admin(db, email, "password123")
+    return str(user.id), await login(client, email)

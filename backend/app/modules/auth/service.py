@@ -68,3 +68,25 @@ async def logout(db: AsyncSession, raw: str) -> None:
     if token is not None and token.revoked_at is None:
         token.revoked_at = utcnow()
         await db.commit()
+
+
+async def create_admin(db: AsyncSession, email: str, password: str, full_name: str = "Quản trị viên") -> User:
+    email = email.lower()
+    user = await db.scalar(select(User).where(User.email == email))
+    if user is None:
+        user = User(email=email, password_hash=hash_password(password), full_name=full_name, role=Role.admin)
+        db.add(user)
+    else:
+        user.role = Role.admin
+        user.password_hash = hash_password(password)
+    await db.commit()
+    return user
+
+
+async def approve_teacher(db: AsyncSession, email: str) -> User:
+    user = await db.scalar(select(User).where(User.email == email.lower(), User.role == Role.teacher))
+    if user is None:
+        raise AppError("NOT_FOUND", "Không tìm thấy giảng viên", 404)
+    user.teacher_status = TeacherStatus.approved
+    await db.commit()
+    return user

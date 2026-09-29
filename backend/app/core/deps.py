@@ -5,9 +5,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.errors import AppError
+from app.core.errors import AppError, forbidden
 from app.core.security import decode_access_token
-from app.modules.auth.models import User
+from app.modules.auth.models import Role, TeacherStatus, User
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -35,3 +35,34 @@ async def get_optional_user(cred: HTTPAuthorizationCredentials | None = Depends(
     if cred is None:
         return None
     return await _user_from_token(cred.credentials, db)
+
+
+def require_role(*roles: Role):
+    async def dependency(user: User = Depends(get_current_user)) -> User:
+        if user.role not in roles:
+            raise forbidden()
+        return user
+
+    return dependency
+
+
+def _ensure_approved(user: User) -> None:
+    if user.teacher_status != TeacherStatus.approved:
+        raise AppError("TEACHER_NOT_APPROVED", "Tài khoản giảng viên chưa được duyệt", 403)
+
+
+async def require_teacher_approved(user: User = Depends(get_current_user)) -> User:
+    if user.role != Role.teacher:
+        raise forbidden()
+    _ensure_approved(user)
+    return user
+
+
+async def require_staff(user: User = Depends(get_current_user)) -> User:
+    """Giảng viên đã được duyệt hoặc admin."""
+    if user.role == Role.admin:
+        return user
+    if user.role == Role.teacher:
+        _ensure_approved(user)
+        return user
+    raise forbidden()
