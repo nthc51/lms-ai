@@ -2997,7 +2997,7 @@ git add . && git commit -m "feat(enrollment): lesson access rules, progress upse
 - Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_assets.py`, `backend/alembic/versions/<rev>_lesson_video_index.py`
 - Test: `backend/tests/test_uploads.py`, `backend/tests/test_storage.py`
 
-- [ ] **Step 1: `app/core/storage.py`**
+- [x] **Step 1: `app/core/storage.py`**
   - Trình duyệt chỉ được ký URL PUT vào key tạm `staging/<key>`; key chính thức chỉ server ghi (copy sau khi kiểm tra).
   - `presign_get` luôn ký kèm `response-content-type` = mime của asset (spec §6.3), nên `mime` là tham số bắt buộc.
 
@@ -3116,7 +3116,7 @@ def get_storage() -> Storage:
     return MinioStorage(get_settings())
 ```
 
-- [ ] **Step 2: `tests/fakes.py`**
+- [x] **Step 2: `tests/fakes.py`**
 
 ```python
 from app.core.storage import download_headers
@@ -3170,7 +3170,7 @@ class InMemoryStorage:
         self.mimes.pop(key, None)
 ```
 
-- [ ] **Step 3: Sửa fixture `client` trong `tests/conftest.py`**: thay fixture `client` cũ bằng:
+- [x] **Step 3: Sửa fixture `client` trong `tests/conftest.py`**: thay fixture `client` cũ bằng:
 
 ```python
 from app.core.storage import get_storage  # noqa: E402
@@ -3190,7 +3190,7 @@ async def client(storage):
         yield c
 ```
 
-- [ ] **Step 4: `app/modules/materials/models.py`** (phần Asset; Source và Chunk sẽ thêm ở Task 16)
+- [x] **Step 4: `app/modules/materials/models.py`** (phần Asset; Source và Chunk sẽ thêm ở Task 16)
 
 ```python
 import enum
@@ -3222,7 +3222,7 @@ class Asset(IdMixin, TimestampMixin, Base):
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 ```
 
-- [ ] **Step 5: Thêm cột video vào `Lesson`** (`app/modules/courses/models.py`)
+- [x] **Step 5: Thêm cột video vào `Lesson`** (`app/modules/courses/models.py`)
   - Thêm vào class `Lesson`, ngay dưới `duration_sec`:
 
 ```python
@@ -3233,13 +3233,13 @@ class Asset(IdMixin, TimestampMixin, Base):
     - Thêm vào `LessonUpdate`: `video_asset_id: uuid.UUID | None = None`
     - Thêm vào `LessonOut`: `video_asset_id: uuid.UUID | None`
 
-- [ ] **Step 6: Đăng ký model và sinh migration**
+- [x] **Step 6: Đăng ký model và sinh migration**
   - Thêm vào `app/models_registry.py`: `from app.modules.materials import models as materials_models  # noqa: F401`
 
 Run: `uv run alembic revision --autogenerate -m "assets"` rồi `uv run alembic upgrade head`
 Expected: migration tạo bảng `assets`, enum `asset_kind`, và thêm cột `lessons.video_asset_id` kèm FK
 
-- [ ] **Step 7: Index cho `lessons.video_asset_id` (migration riêng)**
+- [x] **Step 7: Index cho `lessons.video_asset_id` (migration riêng)**
   - Trong `app/modules/courses/models.py`, sửa cột vừa thêm ở Step 5 thành:
 
 ```python
@@ -3250,7 +3250,7 @@ Expected: migration tạo bảng `assets`, enum `asset_kind`, và thêm cột `l
 Run: `uv run alembic revision --autogenerate -m "lesson video index"` rồi `uv run alembic upgrade head`
 Expected: migration mới (revises `<rev>_assets`) chỉ có `op.create_index(op.f('ix_lessons_video_asset_id'), 'lessons', ['video_asset_id'], unique=False)`, downgrade là `op.drop_index(...)`
 
-- [ ] **Step 8: Viết test hỏng trước — `tests/test_uploads.py`**
+- [x] **Step 8: Viết test hỏng trước — `tests/test_uploads.py`**
 
 ```python
 import pytest
@@ -3491,12 +3491,12 @@ async def test_presign_put_targets_given_staging_key():
     assert parts.netloc == "files.example.com" and parts.path == "/lms/staging/pdf/u/a.pdf"
 ```
 
-- [ ] **Step 9: Chạy test**
+- [x] **Step 9: Chạy test**
 
 Run: `uv run pytest tests/test_uploads.py tests/test_storage.py -v`
 Expected: `test_uploads.py` FAIL (404 vì chưa có route `/uploads/presign`); `test_storage.py` PASS (storage.py đã có từ Step 1)
 
-- [ ] **Step 10: `app/modules/materials/schemas.py`**
+- [x] **Step 10: `app/modules/materials/schemas.py`**
 
 ```python
 import uuid
@@ -3533,7 +3533,7 @@ class UrlOut(BaseModel):
     url: str
 ```
 
-- [ ] **Step 11: `app/modules/materials/assets.py`**
+- [x] **Step 11: `app/modules/materials/assets.py`**
   - `pdf`/`video` chỉ giảng viên đã duyệt hoặc admin được presign (`require_staff`); học viên nhận `403 FORBIDDEN`.
   - `complete` khóa dòng asset (`FOR UPDATE`), copy `staging/<key>` sang key chính thức, rồi kiểm tra kích thước và magic bytes trên bản ở key chính thức (client không ghi được vào đó). Hỏng thì xóa cả hai object và dòng asset. Thành công thì commit rồi mới xóa key tạm.
 
@@ -3643,7 +3643,7 @@ async def require_verified_asset(db: AsyncSession, asset_id: uuid.UUID, user: Us
     return asset
 ```
 
-- [ ] **Step 12: `app/modules/materials/router.py`**
+- [x] **Step 12: `app/modules/materials/router.py`**
 
 ```python
 import uuid
@@ -3686,7 +3686,7 @@ async def lesson_video(lesson_id: uuid.UUID, user: User = Depends(get_current_us
     return UrlOut(url=await storage.presign_get(asset.storage_key, asset.mime))
 ```
 
-- [ ] **Step 13: Kiểm tra video khi PATCH bài học** (`app/modules/courses/router.py`): thay hàm `update_lesson` bằng:
+- [x] **Step 13: Kiểm tra video khi PATCH bài học** (`app/modules/courses/router.py`): thay hàm `update_lesson` bằng:
 
 ```python
 @router.patch("/lessons/{lesson_id}", response_model=LessonOut)
@@ -3701,16 +3701,16 @@ async def update_lesson(lesson_id: uuid.UUID, data: LessonUpdate, user: User = D
     return await service.update_lesson(db, lesson, data)
 ```
 
-- [ ] **Step 14: Gắn router vào `app/main.py`**
+- [x] **Step 14: Gắn router vào `app/main.py`**
   - Import: `from app.modules.materials.router import router as materials_router`
   - Dưới `# routers`: `app.include_router(materials_router)`
 
-- [ ] **Step 15: Chạy toàn bộ test**
+- [x] **Step 15: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 16: Commit**
+- [x] **Step 16: Commit**
 
 ```bash
 git add . && git commit -m "feat(materials): presigned uploads with magic-byte verification, lesson video"
