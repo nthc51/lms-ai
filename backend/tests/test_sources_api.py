@@ -71,6 +71,25 @@ async def test_unverified_asset_is_rejected(client):
     assert (attach.status_code, attach.json()["error"]["code"]) == (400, "INVALID_ASSET")
 
 
+async def test_attach_and_reprocess_record_job_creator(client, storage, db):
+    gv_id, gv = await make_teacher(client)
+    _, _, lesson = await make_published_course(client, gv)
+    asset_id = await upload_file(client, storage, gv, make_pdf([LONG_TEXT]))
+    attached = (await _attach(client, gv, lesson["id"], asset_id)).json()
+    first = await db.get(Job, uuid.UUID(attached["job_id"]))
+    assert first.created_by == uuid.UUID(gv_id)
+
+    first.status = JobStatus.failed
+    src = await db.get(Source, uuid.UUID(attached["source"]["id"]))
+    src.status = SourceStatus.failed
+    await db.commit()
+    r = await client.post(f"{API}/sources/{src.id}/reprocess", headers=gv)
+    assert r.status_code == 202, r.text
+    second = await db.get(Job, uuid.UUID(r.json()["job_id"]))
+    assert second.created_by == uuid.UUID(gv_id)
+    assert (await client.get(f"{API}/jobs/{second.id}", headers=gv)).status_code == 200
+
+
 async def test_reprocess_only_when_finished(client, storage, queue, db):
     _, gv = await make_teacher(client)
     _, _, lesson = await make_published_course(client, gv)

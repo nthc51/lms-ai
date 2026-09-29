@@ -6,12 +6,21 @@ from sqlalchemy import select
 
 from app.ai.embedder import FakeEmbedder
 from app.ai.vision import FakeVision
+from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.time import utcnow
 from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.service import create_job
 from app.modules.materials.models import Chunk, Source, SourceStatus
-from app.worker.tasks import JOB_TIMEOUTS, STALE_GRACE, STALE_JOB_ERROR, ingest_pdf, run_job, sweep_stale_jobs
+from app.worker.tasks import (
+    JOB_TIMEOUTS,
+    PENDING_JOB_ERROR,
+    STALE_GRACE,
+    STALE_JOB_ERROR,
+    ingest_pdf,
+    run_job,
+    sweep_stale_jobs,
+)
 from tests.factories import make_lesson, make_pdf_source, make_user
 from tests.fakes import InMemoryStorage
 from tests.pdfs import LONG_TEXT, make_pdf
@@ -21,7 +30,7 @@ async def _job_for_new_source(db, storage, pdf):
     teacher = await make_user(db)
     _, lesson = await make_lesson(db, teacher)
     source = await make_pdf_source(db, storage, teacher, lesson, pdf)
-    job, _ = await create_job(db, "ingest_pdf", source.id)
+    job, _ = await create_job(db, "ingest_pdf", source.id, created_by=None)
     await db.commit()
     return source, job
 
@@ -106,7 +115,7 @@ async def test_pipeline_failure_writes_job_and_source_failed_in_one_commit(db):
 
 
 async def test_missing_source_still_marks_job_failed(db):
-    job, _ = await create_job(db, "ingest_pdf", uuid.uuid4())
+    job, _ = await create_job(db, "ingest_pdf", uuid.uuid4(), created_by=None)
     await db.commit()
     ctx = {"storage": InMemoryStorage(), "embedder": FakeEmbedder(768), "vision": FakeVision()}
     await ingest_pdf(ctx, str(job.id))
@@ -129,7 +138,7 @@ async def test_finished_job_is_not_run_again(db):
 
 
 async def test_generic_handler_success_marks_done(db):
-    job, _ = await create_job(db, "quiz_gen", uuid.uuid4())
+    job, _ = await create_job(db, "quiz_gen", uuid.uuid4(), created_by=None)
     await db.commit()
     calls = []
 
@@ -310,3 +319,101 @@ async def test_late_worker_failure_does_not_overwrite_swept_job(db):
     source = await db.get(Source, source.id, populate_existing=True)
     assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR
     assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
+
+
+# ---- job 'pending' bị kẹt (Redis mất job): enqueue lại một lần, rồi failed ----
+
+class FakeArqRedis:
+    """Thay cho ctx['redis'] (ArqRedis) của worker: ghi lại các lần enqueue_job, hoặc giả lập Redis lỗi."""
+
+    def __init__(self, fail: bool = False):
+        self.fail = fail
+        self.calls: list[tuple[str, tuple, str | None]] = []
+
+    async def enqueue_job(self, function, *args, _job_id=None, **kwargs):
+        if self.fail:
+            raise ConnectionError("Redis không kết nối được")
+        self.calls.append((function, args, _job_id))
+
+
+def _requeue_after() -> timedelta:
+    return timedelta(minutes=get_settings().pending_job_requeue_after_min)
+
+
+async def _pending_job(db, storage, created_ago: timedelta, requeued_ago: timedelta | None = None):
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+    job.created_at = utcnow() - created_ago
+    job.requeued_at = None if requeued_ago is None else utcnow() - requeued_ago
+    await db.commit()
+    return source, job
+
+
+async def test_old_pending_job_is_requeued_once_with_same_job_id(db):
+    storage = InMemoryStorage()
+    source, job = await _pending_job(db, storage, _requeue_after() + timedelta(minutes=1))
+    redis = FakeArqRedis()
+    assert await sweep_stale_jobs({"redis": redis}) == 0
+    assert redis.calls == [("ingest_pdf", (str(job.id),), str(job.id))]
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.pending and job.requeued_at is not None
+    assert source.status == SourceStatus.pending
+
+    # lần sweep kế tiếp (chưa quá N phút kể từ lúc enqueue lại): không làm gì thêm
+    assert await sweep_stale_jobs({"redis": redis}) == 0
+    assert len(redis.calls) == 1
+    job = await db.get(Job, job.id, populate_existing=True)
+    assert job.status == JobStatus.pending
+
+
+async def test_pending_job_still_stuck_after_requeue_is_failed(db):
+    storage = InMemoryStorage()
+    after = _requeue_after()
+    source, job = await _pending_job(db, storage, after * 3, requeued_ago=after + timedelta(minutes=1))
+    redis = FakeArqRedis()
+    assert await sweep_stale_jobs({"redis": redis}) == 1
+    assert redis.calls == []
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.finished_at is not None
+    assert job.error_msg == PENDING_JOB_ERROR == "Không đưa được job vào hàng đợi"
+    assert source.status == SourceStatus.failed and source.error_msg == PENDING_JOB_ERROR
+
+
+async def test_stuck_pending_job_does_not_clobber_finished_source(db):
+    storage = InMemoryStorage()
+    after = _requeue_after()
+    source, job = await _pending_job(db, storage, after * 3, requeued_ago=after * 2)
+    source.status = SourceStatus.ready
+    await db.commit()
+    assert await sweep_stale_jobs({"redis": FakeArqRedis()}) == 1
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed
+    assert source.status == SourceStatus.ready and source.error_msg is None
+
+
+async def test_recent_pending_job_is_untouched(db):
+    storage = InMemoryStorage()
+    source, job = await _pending_job(db, storage, _requeue_after() - timedelta(minutes=1))
+    redis = FakeArqRedis()
+    assert await sweep_stale_jobs({"redis": redis}) == 0
+    assert redis.calls == []
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.pending and job.requeued_at is None
+    assert source.status == SourceStatus.pending
+
+
+async def test_failed_requeue_leaves_job_for_next_sweep(db):
+    storage = InMemoryStorage()
+    _, job = await _pending_job(db, storage, _requeue_after() + timedelta(minutes=1))
+    assert await sweep_stale_jobs({"redis": FakeArqRedis(fail=True)}) == 0
+    job = await db.get(Job, job.id, populate_existing=True)
+    assert job.status == JobStatus.pending and job.requeued_at is None
+
+    redis = FakeArqRedis()  # Redis sống lại: lần sweep sau enqueue được
+    await sweep_stale_jobs({"redis": redis})
+    assert redis.calls == [("ingest_pdf", (str(job.id),), str(job.id))]
+    job = await db.get(Job, job.id, populate_existing=True)
+    assert job.requeued_at is not None

@@ -3,13 +3,15 @@ import uuid
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.time import utcnow
 from app.ingestion.pipeline import error_text, ingest_pdf_source
 from app.modules.jobs.models import Job, JobStatus
+from app.modules.jobs.queue import ArqQueue, JobQueue
 from app.modules.jobs.service import finish_job
 from app.modules.materials.models import Source, SourceStatus
 
@@ -20,6 +22,8 @@ JOB_TIMEOUTS: dict[str, int] = {"ingest_pdf": 600}
 # Job 'processing' quá job_timeout + STALE_GRACE coi như worker đã chết giữa chừng
 STALE_GRACE = timedelta(minutes=5)
 STALE_JOB_ERROR = "Worker bị gián đoạn"
+# Job 'pending' đã được enqueue lại một lần mà vẫn không có worker nhận (Redis mất job, arq hết hạn...)
+PENDING_JOB_ERROR = "Không đưa được job vào hàng đợi"
 # Loại job có ref_id trỏ tới sources.id: sweeper đánh dấu luôn source failed để giảng viên bấm "Xử lý lại"
 SOURCE_JOB_TYPES = frozenset({"ingest_pdf"})
 
@@ -69,28 +73,75 @@ async def ingest_pdf(ctx: dict, job_id: str) -> None:
     await run_job(job_id, handler, session_factory)
 
 
+async def _fail_jobs(db, jobs_where, error: str, now) -> int:
+    """Chuyển các job khớp điều kiện sang failed; source tương ứng (loại ingest_*) còn pending/processing
+    cũng failed cùng lỗi. Chưa commit — caller commit để job và source đổi trạng thái trong cùng transaction."""
+    rows = (await db.execute(
+        update(Job).where(*jobs_where)
+        .values(status=JobStatus.failed, error_msg=error, finished_at=now)
+        .returning(Job.type, Job.ref_id))).all()
+    source_ids = [ref_id for type_, ref_id in rows if type_ in SOURCE_JOB_TYPES]
+    if source_ids:
+        await db.execute(
+            update(Source)
+            .where(Source.id.in_(source_ids),
+                   Source.status.in_((SourceStatus.pending, SourceStatus.processing)))
+            .values(status=SourceStatus.failed, error_msg=error))
+    return len(rows)
+
+
+async def _requeue_pending(db, queue_factory: Callable[[], JobQueue], cutoff, now) -> int:
+    """Job 'pending' quá hạn và chưa từng được enqueue lại → enqueue lại đúng một lần (cùng _job_id nên
+    arq tự bỏ qua nếu job vẫn còn trong Redis). requeued_at chỉ được ghi khi enqueue không lỗi;
+    enqueue lỗi thì để nguyên cho lần sweep sau."""
+    jobs = (await db.scalars(
+        select(Job).where(Job.type.in_(JOB_TIMEOUTS), Job.status == JobStatus.pending,
+                          Job.created_at < cutoff, Job.requeued_at.is_(None)))).all()
+    if not jobs:
+        return 0
+    queue = queue_factory()
+    requeued = 0
+    for job in jobs:
+        try:
+            await queue.enqueue(job)
+        except Exception:
+            logger.exception("Không enqueue lại được job %s, thử lại ở lần sweep sau", job.id)
+            continue
+        await db.execute(update(Job).where(Job.id == job.id, Job.status == JobStatus.pending,
+                                           Job.requeued_at.is_(None)).values(requeued_at=now))
+        await db.commit()
+        requeued += 1
+    return requeued
+
+
 async def sweep_stale_jobs(ctx: dict) -> int:
-    """Cron: job 'processing' quá job_timeout + STALE_GRACE → failed (worker chết/bị kill giữa chừng).
-    Source tương ứng còn pending/processing cũng chuyển failed, cùng transaction. Trả về số job đã xử lý."""
+    """Cron 5 phút một lần, dọn job bị treo. Trả về số job đã chuyển failed.
+
+    - 'processing' quá job_timeout + STALE_GRACE → failed "Worker bị gián đoạn" (worker chết giữa chừng).
+    - 'pending' đã được enqueue lại mà quá PENDING_JOB_REQUEUE_AFTER_MIN phút vẫn pending → failed
+      "Không đưa được job vào hàng đợi".
+    - 'pending' quá PENDING_JOB_REQUEUE_AFTER_MIN phút, chưa enqueue lại lần nào → enqueue lại một lần qua
+      pool arq của worker (ctx['redis']; test truyền ctx['queue']).
+    Source tương ứng còn pending/processing chuyển failed cùng transaction với job."""
     session_factory = ctx.get("session_factory", SessionLocal)
     now = utcnow()
+    pending_after = timedelta(minutes=get_settings().pending_job_requeue_after_min)
     swept = 0
     async with session_factory() as db:
         for type_, timeout_s in JOB_TIMEOUTS.items():
             cutoff = now - timedelta(seconds=timeout_s) - STALE_GRACE
-            ref_ids = (await db.scalars(
-                update(Job)
-                .where(Job.type == type_, Job.status == JobStatus.processing, Job.started_at < cutoff)
-                .values(status=JobStatus.failed, error_msg=STALE_JOB_ERROR, finished_at=now)
-                .returning(Job.ref_id))).all()
-            swept += len(ref_ids)
-            if ref_ids and type_ in SOURCE_JOB_TYPES:
-                await db.execute(
-                    update(Source)
-                    .where(Source.id.in_(ref_ids),
-                           Source.status.in_((SourceStatus.pending, SourceStatus.processing)))
-                    .values(status=SourceStatus.failed, error_msg=STALE_JOB_ERROR))
+            swept += await _fail_jobs(
+                db, (Job.type == type_, Job.status == JobStatus.processing, Job.started_at < cutoff),
+                STALE_JOB_ERROR, now)
+        swept += await _fail_jobs(
+            db, (Job.type.in_(JOB_TIMEOUTS), Job.status == JobStatus.pending,
+                 Job.requeued_at < now - pending_after),
+            PENDING_JOB_ERROR, now)
         await db.commit()
+        requeued = await _requeue_pending(
+            db, lambda: ctx.get("queue") or ArqQueue(pool=ctx["redis"]), now - pending_after, now)
     if swept:
         logger.warning("Đã đánh dấu %d job bị treo là failed", swept)
+    if requeued:
+        logger.warning("Đã enqueue lại %d job pending bị kẹt", requeued)
     return swept

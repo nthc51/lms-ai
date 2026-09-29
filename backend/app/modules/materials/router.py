@@ -78,5 +78,5 @@ async def source_pages(source_id: uuid.UUID, page: int = Query(1, ge=1), size: i
 async def reprocess_source(source_id: uuid.UUID, user: User = Depends(require_staff),
                            db: AsyncSession = Depends(get_db), queue: JobQueue = Depends(get_queue)):
     source = await sources.get_owned_source(db, source_id, user)
-    job = await sources.reprocess(db, queue, source)
+    job = await sources.reprocess(db, queue, source, user)
     return JobRef(job_id=job.id)

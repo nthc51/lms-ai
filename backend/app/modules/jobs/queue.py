@@ -13,9 +13,13 @@ class JobQueue(Protocol):
 
 
 class ArqQueue:
-    def __init__(self, redis_url: str):
+    """Nơi duy nhất gọi arq enqueue_job. API tạo pool từ redis_url khi cần; worker (sweeper) truyền sẵn
+    pool arq của nó (ctx['redis'])."""
+
+    def __init__(self, redis_url: str | None = None, pool: ArqRedis | None = None):
+        assert redis_url is not None or pool is not None
         self._redis_url = redis_url
-        self._pool: ArqRedis | None = None
+        self._pool = pool
 
     async def enqueue(self, job: Job) -> None:
         if self._pool is None:

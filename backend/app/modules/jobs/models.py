@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Index, Integer, String, Text, text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,7 +20,10 @@ class JobStatus(str, enum.Enum):
 
 class Job(IdMixin, TimestampMixin, Base):
     """type quyết định ref_id trỏ tới đâu: ingest_pdf/ingest_video → sources.id, quiz_gen → lessons.id,
-    grade_submission → submissions.id (ref_version = submissions.version)."""
+    grade_submission → submissions.id (ref_version = submissions.version).
+
+    created_by: người tạo job (NULL = job hệ thống, vd. do cron tạo); GET /jobs/{id} chỉ trả cho người tạo
+    hoặc admin. requeued_at: lúc sweeper đẩy lại job 'pending' bị kẹt vào hàng đợi (chỉ một lần)."""
 
     __tablename__ = "jobs"
     __table_args__ = (
@@ -36,3 +39,5 @@ class Job(IdMixin, TimestampMixin, Base):
     error_msg: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    requeued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

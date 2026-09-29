@@ -95,7 +95,8 @@ async def attach_pdf(db: AsyncSession, queue: JobQueue, user: User, lesson_id: u
         await db.rollback()
         raise AppError("ALREADY_ATTACHED", "File này đã được gắn vào bài học", 409)
     source = await db.get(Source, source_id)
-    job = await create_and_enqueue(db, queue, INGEST_PDF, source.id)  # commit source + job cùng lúc
+    # commit source + job cùng lúc
+    job = await create_and_enqueue(db, queue, INGEST_PDF, source.id, created_by=user.id)
     return source, job
 
 
@@ -118,14 +119,14 @@ def _busy(message: str) -> AppError:
     return AppError("INVALID_STATE", message, 409)
 
 
-async def reprocess(db: AsyncSession, queue: JobQueue, source: Source) -> Job:
+async def reprocess(db: AsyncSession, queue: JobQueue, source: Source, user: User) -> Job:
     if source.status == SourceStatus.pending:
         raise _busy("Tài liệu đang chờ xử lý")
     if source.status == SourceStatus.processing:
         raise _busy("Tài liệu đang được xử lý")
     # Tạo job trước: nếu vẫn còn job đang chạy (chưa được worker đánh dấu xong) thì không đụng tới source,
     # tránh để source kẹt 'pending' mà không có job nào mới được enqueue.
-    job, created = await create_job(db, INGEST_PDF, source.id)
+    job, created = await create_job(db, INGEST_PDF, source.id, created_by=user.id)
     if not created:
         waiting = job.status == JobStatus.pending  # đọc trước rollback (rollback làm hết hạn các object)
         await db.rollback()

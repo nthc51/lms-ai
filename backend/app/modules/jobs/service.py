@@ -11,16 +11,19 @@ from app.modules.jobs.queue import JobQueue
 ACTIVE = (JobStatus.pending, JobStatus.processing)
 
 
-async def create_job(db: AsyncSession, type_: str, ref_id: uuid.UUID, ref_version: int = 0) -> tuple[Job, bool]:
+async def create_job(db: AsyncSession, type_: str, ref_id: uuid.UUID, ref_version: int = 0, *,
+                     created_by: uuid.UUID | None) -> tuple[Job, bool]:
     """Tạo job nếu chưa có job đang chạy cho (type, ref_id, ref_version). Chưa commit — caller tự commit.
 
     Nhờ partial unique index uq_active_job, hai request đồng thời vẫn chỉ tạo được một job.
+    created_by: id người dùng thao tác (NULL = job hệ thống). Nếu trả về job đang chạy sẵn thì giữ nguyên
+    người tạo của job đó.
     """
     for _ in range(2):  # lặp lại một lần phòng khi job cũ vừa kết thúc giữa hai câu lệnh
         stmt = (
             pg_insert(Job)
             .values(id=uuid.uuid4(), type=type_, ref_id=ref_id, ref_version=ref_version,
-                    status=JobStatus.pending, attempts=0)
+                    status=JobStatus.pending, attempts=0, created_by=created_by)
             .on_conflict_do_nothing(index_elements=["type", "ref_id", "ref_version"],
                                     index_where=text(ACTIVE_JOB_PREDICATE))
             .returning(Job.id)
@@ -36,9 +39,9 @@ async def create_job(db: AsyncSession, type_: str, ref_id: uuid.UUID, ref_versio
 
 
 async def create_and_enqueue(db: AsyncSession, queue: JobQueue, type_: str, ref_id: uuid.UUID,
-                             ref_version: int = 0) -> Job:
+                             ref_version: int = 0, *, created_by: uuid.UUID | None) -> Job:
     """Commit mọi thay đổi đang chờ trong session cùng với job, rồi mới đẩy lên hàng đợi."""
-    job, created = await create_job(db, type_, ref_id, ref_version)
+    job, created = await create_job(db, type_, ref_id, ref_version, created_by=created_by)
     await db.commit()
     if created:
         await queue.enqueue(job)
