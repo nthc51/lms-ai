@@ -390,12 +390,14 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 ### 6.3 Upload
 
-1. `POST /uploads/presign {kind, mime, size}` trả về `{asset_id, put_url}`. URL được ký bằng `MINIO_PUBLIC_ENDPOINT`, không dùng host nội bộ.
-2. Trình duyệt gửi file thẳng lên MinIO bằng `PUT <put_url>`.
-3. `POST /uploads/{asset_id}/complete`:
-   - Kiểm tra kích thước bằng `stat_object`.
-   - Đọc 2KB đầu bằng `get_object(offset=0, length=2048)` rồi nhận diện loại file bằng thư viện `filetype`.
-   - Không khớp với mime đã khai báo thì xóa object và trả `400 INVALID_FILE_TYPE`.
+1. `POST /uploads/presign {kind, mime, size}` trả về `{asset_id, put_url}`. URL được ký bằng `MINIO_PUBLIC_ENDPOINT`, không dùng host nội bộ, và chỉ cho PUT vào key tạm `staging/<storage_key>`. Client không bao giờ có URL ghi vào key chính thức.
+   - `pdf` và `video` chỉ giảng viên (đã duyệt) hoặc admin được presign; học viên nhận `403 FORBIDDEN`. `submission` và `image` thì ai đăng nhập cũng được.
+2. Trình duyệt gửi file thẳng lên MinIO bằng `PUT <put_url>` (vào `staging/<storage_key>`).
+3. `POST /uploads/{asset_id}/complete` (khóa dòng asset bằng `SELECT ... FOR UPDATE`):
+   - Kiểm tra kích thước của key tạm bằng `stat_object`, vượt giới hạn thì dừng sớm.
+   - Copy phía server từ `staging/<storage_key>` sang `storage_key`, rồi mới kiểm tra trên bản ở key chính thức (tránh việc client PUT lại vào key tạm giữa lúc kiểm tra và lúc copy): kích thước bằng `stat_object`, đọc 2KB đầu bằng `get_object(offset=0, length=2048)` rồi nhận diện loại file bằng thư viện `filetype`.
+   - Thất bại (quá dung lượng, hoặc không khớp mime đã khai báo) thì xóa cả object tạm lẫn object chính thức, xóa dòng asset, và trả `413` hoặc `400 INVALID_FILE_TYPE`.
+   - Thành công thì ghi `size_bytes`, `verified_at`, commit, rồi xóa key tạm.
 - **Giới hạn dung lượng:** PDF 50MB, video 500MB, bài nộp 20MB. Vượt thì trả `413`.
 - **Tải file về:** dùng presigned GET với đúng `Content-Type`. File bài nộp thêm `Content-Disposition: attachment`.
 
@@ -572,6 +574,14 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 Học thích ứng (SM-2), reranker, embedding chạy local và so sánh với API, OCR offline, stream video HLS, lịch sử các lần nộp bài, ứng dụng mobile.
 
+Việc còn lại từ phần upload (Task 14):
+
+- Lifecycle rule của MinIO để tự xóa các object bị bỏ dở dưới `staging/` (ví dụ sau 1 ngày).
+- Làm sạch `download_name` trong `Content-Disposition` và dùng `filename*` theo RFC 5987 cho tên file có dấu hoặc ký tự đặc biệt.
+- Cờ `secure` riêng cho endpoint MinIO public (HTTPS cho trình duyệt, HTTP trong mạng nội bộ).
+- Nhận thêm `video/quicktime` và `video/x-m4v`.
+- Gắn asset của người khác đang trả `400 INVALID_ASSET` thay vì `404`, để không lộ việc asset có tồn tại hay không.
+
 ---
 
 ## 13. Nhật ký quyết định
@@ -588,3 +598,4 @@ Học thích ứng (SM-2), reranker, embedding chạy local và so sánh với A
 | 2026-09-29 | Chống tạo job trùng bằng partial unique index thay vì Redis lock |
 | 2026-09-29 | Hủy stream Tutor qua `async with` + `is_disconnected` (mỗi 10 chunk) + `finally` lưu phần đã sinh |
 | 2026-09-29 | Kiểm tra file: đọc 2KB đầu bằng `filetype` và `stat_object` |
+| 2026-09-29 | Upload qua key tạm `staging/<key>`: `complete` khóa dòng, copy sang key chính thức rồi mới kiểm tra, thất bại thì xóa object và asset; học viên không presign được `pdf`/`video` |

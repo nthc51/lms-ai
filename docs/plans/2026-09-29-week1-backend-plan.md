@@ -17,6 +17,7 @@
 - **Mã lỗi thêm mới:** `EMAIL_TAKEN`, `INVALID_TOKEN`, `TOKEN_REUSED`, `NOT_AUTHENTICATED`, `FORBIDDEN`, `COURSE_EMPTY`, `INVALID_REORDER`, `UPLOAD_MISSING`, `INVALID_ASSET`, `INVALID_STATE`.
 - **Endpoint thêm mới:** `GET /teacher/courses`, `GET /lessons/{id}` (nội dung bài học), `GET /lessons/{id}/video`, `GET /lessons/{id}/sources`.
 - **`GET /jobs/{id}`:** chỉ cần đăng nhập là gọi được. ID là UUID không đoán được, và endpoint chỉ trả trạng thái job.
+- **Upload qua key tạm (Task 14):** URL presign chỉ cho PUT vào `staging/<storage_key>`. `POST /uploads/{id}/complete` khóa dòng asset, copy phía server sang `storage_key`, kiểm tra kích thước và magic bytes trên bản chính thức, rồi xóa key tạm; hỏng thì xóa object và dòng asset. Client không bao giờ có URL ghi vào key chính thức. Học viên không được presign `pdf`/`video` (`403 FORBIDDEN`); `presign_get` luôn ký kèm `Content-Type` của asset.
 
 ---
 
@@ -2993,10 +2994,12 @@ git add . && git commit -m "feat(enrollment): lesson access rules, progress upse
 **Files:**
 - Create: `backend/app/core/storage.py`, `backend/app/modules/materials/__init__.py`, `backend/app/modules/materials/models.py`, `backend/app/modules/materials/assets.py`, `backend/app/modules/materials/schemas.py`, `backend/app/modules/materials/router.py`, `backend/tests/fakes.py`
 - Modify: `backend/app/modules/courses/models.py`, `backend/app/modules/courses/schemas.py`, `backend/app/modules/courses/router.py`, `backend/app/models_registry.py`, `backend/app/main.py`, `backend/tests/conftest.py`
-- Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_assets.py`
-- Test: `backend/tests/test_uploads.py`
+- Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_assets.py`, `backend/alembic/versions/<rev>_lesson_video_index.py`
+- Test: `backend/tests/test_uploads.py`, `backend/tests/test_storage.py`
 
 - [ ] **Step 1: `app/core/storage.py`**
+  - Trình duyệt chỉ được ký URL PUT vào key tạm `staging/<key>`; key chính thức chỉ server ghi (copy sau khi kiểm tra).
+  - `presign_get` luôn ký kèm `response-content-type` = mime của asset (spec §6.3), nên `mime` là tham số bắt buộc.
 
 ```python
 import asyncio
@@ -3006,18 +3009,36 @@ from functools import lru_cache
 from typing import Protocol
 
 from minio import Minio
+from minio.commonconfig import CopySource
 from minio.error import S3Error
 
 from app.core.config import Settings, get_settings
 
+STAGING_PREFIX = "staging/"
+
+
+def staging_key(key: str) -> str:
+    """Key tạm mà trình duyệt được PUT vào. Key chính thức chỉ server ghi (copy sau khi kiểm tra)."""
+    return STAGING_PREFIX + key
+
+
+def download_headers(mime: str, download_name: str | None = None) -> dict[str, str]:
+    """Header response ký kèm presigned GET: luôn trả đúng Content-Type, thêm attachment nếu có tên file."""
+    headers = {"response-content-type": mime}
+    if download_name:
+        headers["response-content-disposition"] = f'attachment; filename="{download_name}"'
+    return headers
+
 
 class Storage(Protocol):
     async def presign_put(self, key: str, expires_s: int = 900) -> str: ...
-    async def presign_get(self, key: str, expires_s: int = 3600, download_name: str | None = None) -> str: ...
+    async def presign_get(self, key: str, mime: str, expires_s: int = 3600,
+                          download_name: str | None = None) -> str: ...
     async def stat_size(self, key: str) -> int | None: ...
     async def read_head(self, key: str, n: int = 2048) -> bytes: ...
     async def read_all(self, key: str) -> bytes: ...
     async def put(self, key: str, data: bytes, mime: str) -> None: ...
+    async def copy(self, src_key: str, dst_key: str) -> None: ...
     async def remove(self, key: str) -> None: ...
 
 
@@ -3041,9 +3062,9 @@ class MinioStorage:
         return await asyncio.to_thread(self._public.presigned_put_object, self._bucket, key,
                                        timedelta(seconds=expires_s))
 
-    async def presign_get(self, key: str, expires_s: int = 3600, download_name: str | None = None) -> str:
-        headers = ({"response-content-disposition": f'attachment; filename="{download_name}"'}
-                   if download_name else None)
+    async def presign_get(self, key: str, mime: str, expires_s: int = 3600,
+                          download_name: str | None = None) -> str:
+        headers = download_headers(mime, download_name)
         return await asyncio.to_thread(lambda: self._public.presigned_get_object(
             self._bucket, key, expires=timedelta(seconds=expires_s), response_headers=headers))
 
@@ -3081,6 +3102,11 @@ class MinioStorage:
         await asyncio.to_thread(self._internal.put_object, self._bucket, key, io.BytesIO(data), len(data),
                                 content_type=mime)
 
+    async def copy(self, src_key: str, dst_key: str) -> None:
+        # copy phía server, giữ nguyên metadata (Content-Type) của object nguồn
+        await asyncio.to_thread(self._internal.copy_object, self._bucket, dst_key,
+                                CopySource(self._bucket, src_key))
+
     async def remove(self, key: str) -> None:
         await asyncio.to_thread(self._internal.remove_object, self._bucket, key)
 
@@ -3093,14 +3119,29 @@ def get_storage() -> Storage:
 - [ ] **Step 2: `tests/fakes.py`**
 
 ```python
+from app.core.storage import download_headers
+
+
 class InMemoryStorage:
+    """Storage giả trong bộ nhớ. Test đóng vai trình duyệt PUT bằng `client_put` vào đúng key của URL presign."""
+
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        self.mimes: dict[str, str] = {}
+        self.signed_gets: dict[str, dict[str, str]] = {}  # key -> header response đã được yêu cầu ký
+        self.on_copy = None  # hook chạy ngay trước khi copy, để mô phỏng client PUT chen vào giữa chừng
+
+    def client_put(self, put_url: str, data: bytes, mime: str = "application/octet-stream") -> str:
+        key = put_url.removeprefix("memory://put/")
+        self.objects[key] = data
+        self.mimes[key] = mime
+        return key
 
     async def presign_put(self, key, expires_s=900):
         return f"memory://put/{key}"
 
-    async def presign_get(self, key, expires_s=3600, download_name=None):
+    async def presign_get(self, key, mime, expires_s=3600, download_name=None):
+        self.signed_gets[key] = download_headers(mime, download_name)
         return f"memory://get/{key}"
 
     async def stat_size(self, key):
@@ -3115,9 +3156,18 @@ class InMemoryStorage:
 
     async def put(self, key, data, mime):
         self.objects[key] = data
+        self.mimes[key] = mime
+
+    async def copy(self, src_key, dst_key):
+        if self.on_copy is not None:
+            self.on_copy()
+        self.objects[dst_key] = self.objects[src_key]
+        if src_key in self.mimes:
+            self.mimes[dst_key] = self.mimes[src_key]
 
     async def remove(self, key):
         self.objects.pop(key, None)
+        self.mimes.pop(key, None)
 ```
 
 - [ ] **Step 3: Sửa fixture `client` trong `tests/conftest.py`**: thay fixture `client` cũ bằng:
@@ -3189,14 +3239,29 @@ class Asset(IdMixin, TimestampMixin, Base):
 Run: `uv run alembic revision --autogenerate -m "assets"` rồi `uv run alembic upgrade head`
 Expected: migration tạo bảng `assets`, enum `asset_kind`, và thêm cột `lessons.video_asset_id` kèm FK
 
-- [ ] **Step 7: Viết test hỏng trước — `tests/test_uploads.py`**
+- [ ] **Step 7: Index cho `lessons.video_asset_id` (migration riêng)**
+  - Trong `app/modules/courses/models.py`, sửa cột vừa thêm ở Step 5 thành:
 
 ```python
+    video_asset_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"),
+                                                            index=True)
+```
+
+Run: `uv run alembic revision --autogenerate -m "lesson video index"` rồi `uv run alembic upgrade head`
+Expected: migration mới (revises `<rev>_assets`) chỉ có `op.create_index(op.f('ix_lessons_video_asset_id'), 'lessons', ['video_asset_id'], unique=False)`, downgrade là `op.drop_index(...)`
+
+- [ ] **Step 8: Viết test hỏng trước — `tests/test_uploads.py`**
+
+```python
+import pytest
+
+from app.core.storage import STAGING_PREFIX
 from tests.helpers import API, make_published_course, make_student, make_teacher
 
 PDF = b"%PDF-1.7\n" + b"0" * 100
 MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 100
 EXE = b"MZ\x90\x00" + b"\x00" * 100
+MB = 1024 * 1024
 
 
 async def _presign(client, headers, kind="pdf", mime="application/pdf", size=1000):
@@ -3204,23 +3269,31 @@ async def _presign(client, headers, kind="pdf", mime="application/pdf", size=100
                              headers=headers)
 
 
-def _key(presign_response) -> str:
+def _staging(presign_response) -> str:
+    """Key mà URL presign cho phép PUT (luôn là key tạm)."""
     return presign_response.json()["put_url"].removeprefix("memory://put/")
+
+
+def _final(presign_response) -> str:
+    return _staging(presign_response).removeprefix(STAGING_PREFIX)
+
+
+async def _complete(client, presign_response, headers):
+    return await client.post(f"{API}/uploads/{presign_response.json()['asset_id']}/complete", headers=headers)
 
 
 async def _upload(client, storage, headers, data, kind="pdf", mime="application/pdf"):
     r = await _presign(client, headers, kind, mime, len(data))
     assert r.status_code == 200, r.text
-    storage.objects[_key(r)] = data
-    done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=headers)
-    return r, done
+    storage.client_put(r.json()["put_url"], data, mime)
+    return r, await _complete(client, r, headers)
 
 
-async def test_presign_returns_url_and_asset(client):
+async def test_presign_returns_staging_url_and_asset(client):
     _, gv = await make_teacher(client)
     r = await _presign(client, gv)
     assert r.status_code == 200
-    assert r.json()["asset_id"] and _key(r).startswith("pdf/") and _key(r).endswith(".pdf")
+    assert r.json()["asset_id"] and _staging(r).startswith(f"{STAGING_PREFIX}pdf/") and _final(r).endswith(".pdf")
 
 
 async def test_presign_rejects_mime_not_allowed_for_kind(client):
@@ -3231,48 +3304,97 @@ async def test_presign_rejects_mime_not_allowed_for_kind(client):
 
 async def test_presign_rejects_declared_size_over_limit(client):
     _, gv = await make_teacher(client)
-    r = await _presign(client, gv, size=60 * 1024 * 1024)
+    r = await _presign(client, gv, size=60 * MB)
     assert (r.status_code, r.json()["error"]["code"]) == (413, "FILE_TOO_LARGE")
+
+
+@pytest.mark.parametrize(("kind", "mime", "limit"), [("pdf", "application/pdf", 50 * MB),
+                                                     ("video", "video/mp4", 500 * MB)])
+async def test_presign_declared_size_boundary(client, kind, mime, limit):
+    _, gv = await make_teacher(client)
+    assert (await _presign(client, gv, kind, mime, size=limit)).status_code == 200
+    over = await _presign(client, gv, kind, mime, size=limit + 1)
+    assert (over.status_code, over.json()["error"]["code"]) == (413, "FILE_TOO_LARGE")
+
+
+async def test_submission_declared_size_boundary(client):
+    _, sv = await make_student(client)
+    assert (await _presign(client, sv, "submission", "text/plain", size=20 * MB)).status_code == 200
+    over = await _presign(client, sv, "submission", "text/plain", size=20 * MB + 1)
+    assert (over.status_code, over.json()["error"]["code"]) == (413, "FILE_TOO_LARGE")
+
+
+@pytest.mark.parametrize(("kind", "mime"), [("pdf", "application/pdf"), ("video", "video/mp4")])
+async def test_student_cannot_presign_course_material(client, kind, mime):
+    _, sv = await make_student(client)
+    r = await _presign(client, sv, kind, mime)
+    assert (r.status_code, r.json()["error"]["code"]) == (403, "FORBIDDEN")
 
 
 async def test_complete_without_upload(client):
     _, gv = await make_teacher(client)
     r = await _presign(client, gv)
-    done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=gv)
+    done = await _complete(client, r, gv)
     assert (done.status_code, done.json()["error"]["code"]) == (400, "UPLOAD_MISSING")
 
 
-async def test_complete_valid_pdf(client, storage):
+async def test_complete_valid_pdf_moves_staging_to_final(client, storage):
     _, gv = await make_teacher(client)
-    _, done = await _upload(client, storage, gv, PDF)
+    r, done = await _upload(client, storage, gv, PDF)
     assert done.status_code == 200
     assert done.json()["verified_at"] is not None and done.json()["size_bytes"] == len(PDF)
+    assert _staging(r) not in storage.objects
+    assert storage.objects[_final(r)] == PDF and storage.mimes[_final(r)] == "application/pdf"
+
+
+async def test_reput_after_verify_cannot_touch_final_object(client, storage):
+    _, gv = await make_teacher(client)
+    r, done = await _upload(client, storage, gv, PDF)
+    assert done.status_code == 200
+    # URL presign chỉ trỏ vào key tạm: PUT lại (ví dụ thay bằng file .exe) không chạm tới key chính thức
+    assert r.json()["put_url"].startswith(f"memory://put/{STAGING_PREFIX}")
+    storage.client_put(r.json()["put_url"], EXE, "application/pdf")
+    again = await _complete(client, r, gv)
+    assert again.status_code == 200 and again.json()["verified_at"] == done.json()["verified_at"]
+    assert storage.objects[_final(r)] == PDF
+
+
+async def test_reput_during_complete_is_verified_on_final_copy(client, storage):
+    _, gv = await make_teacher(client)
+    r = await _presign(client, gv, size=len(PDF))
+    storage.client_put(r.json()["put_url"], PDF, "application/pdf")
+    # client đổi file ở key tạm ngay sau lúc stat, trước lúc copy
+    storage.on_copy = lambda: storage.client_put(r.json()["put_url"], EXE, "application/pdf")
+    done = await _complete(client, r, gv)
+    assert (done.status_code, done.json()["error"]["code"]) == (400, "INVALID_FILE_TYPE")
+    assert _staging(r) not in storage.objects and _final(r) not in storage.objects
 
 
 async def test_complete_rejects_renamed_executable(client, storage):
     _, gv = await make_teacher(client)
     r, done = await _upload(client, storage, gv, EXE)
     assert (done.status_code, done.json()["error"]["code"]) == (400, "INVALID_FILE_TYPE")
-    assert _key(r) not in storage.objects
-    again = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=gv)
-    assert again.status_code == 404
+    assert _staging(r) not in storage.objects and _final(r) not in storage.objects
+    assert (await _complete(client, r, gv)).status_code == 404
 
 
 async def test_complete_rejects_actual_size_over_limit(client, storage):
     _, sv = await make_student(client)
-    big = b"a" * (20 * 1024 * 1024 + 1)
+    big = b"a" * (20 * MB + 1)
     r = await _presign(client, sv, kind="submission", mime="text/plain", size=100)
-    storage.objects[_key(r)] = big
-    done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=sv)
+    storage.client_put(r.json()["put_url"], big, "text/plain")
+    done = await _complete(client, r, sv)
     assert (done.status_code, done.json()["error"]["code"]) == (413, "FILE_TOO_LARGE")
+    assert _staging(r) not in storage.objects and _final(r) not in storage.objects
+    assert (await _complete(client, r, sv)).status_code == 404
 
 
 async def test_other_user_cannot_complete(client, storage):
     _, gv = await make_teacher(client)
     _, sv = await make_student(client)
     r = await _presign(client, gv)
-    storage.objects[_key(r)] = PDF
-    done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=sv)
+    storage.client_put(r.json()["put_url"], PDF, "application/pdf")
+    done = await _complete(client, r, sv)
     assert done.status_code == 404
 
 
@@ -3290,7 +3412,8 @@ async def test_attach_video_and_stream_url(client, storage):
     assert denied.status_code == 403
     await client.post(f"{API}/courses/{course['id']}/enroll", headers=sv)
     ok = await client.get(f"{API}/lessons/{lesson['id']}/video", headers=sv)
-    assert ok.status_code == 200 and ok.json()["url"] == f"memory://get/{_key(r)}"
+    assert ok.status_code == 200 and ok.json()["url"] == f"memory://get/{_final(r)}"
+    assert storage.signed_gets[_final(r)] == {"response-content-type": "video/mp4"}
 
 
 async def test_attach_pdf_as_video_is_rejected(client, storage):
@@ -3300,14 +3423,80 @@ async def test_attach_pdf_as_video_is_rejected(client, storage):
     patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
                                headers=gv)
     assert (patch.status_code, patch.json()["error"]["code"]) == (400, "INVALID_ASSET")
+
+
+async def test_attach_other_teachers_video_is_rejected(client, storage):
+    _, gv = await make_teacher(client)
+    _, gv2 = await make_teacher(client, email="gv2@x.com")
+    _, _, lesson = await make_published_course(client, gv)
+    r, done = await _upload(client, storage, gv2, MP4, kind="video", mime="video/mp4")
+    assert done.status_code == 200
+    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
+                               headers=gv)
+    assert (patch.status_code, patch.json()["error"]["code"]) == (400, "INVALID_ASSET")
+
+
+async def test_attach_unverified_video_is_rejected(client):
+    _, gv = await make_teacher(client)
+    _, _, lesson = await make_published_course(client, gv)
+    r = await _presign(client, gv, kind="video", mime="video/mp4")
+    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
+                               headers=gv)
+    assert (patch.status_code, patch.json()["error"]["code"]) == (400, "INVALID_ASSET")
+
+
+async def test_student_cannot_patch_lesson(client, storage):
+    _, gv = await make_teacher(client)
+    _, sv = await make_student(client)
+    course, _, lesson = await make_published_course(client, gv)
+    r, _ = await _upload(client, storage, gv, MP4, kind="video", mime="video/mp4")
+    await client.post(f"{API}/courses/{course['id']}/enroll", headers=sv)
+    patch = await client.patch(f"{API}/lessons/{lesson['id']}", json={"video_asset_id": r.json()["asset_id"]},
+                               headers=sv)
+    assert (patch.status_code, patch.json()["error"]["code"]) == (403, "FORBIDDEN")
 ```
 
-- [ ] **Step 8: Chạy test**
+  - `tests/test_storage.py`: ký URL bằng `MinioStorage` thật mà không cần MinIO chạy (region cố định nên ký cục bộ)
 
-Run: `uv run pytest tests/test_uploads.py -v`
-Expected: FAIL (404 vì chưa có route `/uploads/presign`)
+```python
+from urllib.parse import parse_qs, urlsplit
 
-- [ ] **Step 9: `app/modules/materials/schemas.py`**
+from app.core.config import Settings
+from app.core.storage import MinioStorage, download_headers, staging_key
+
+# Ký URL là tính toán cục bộ (region cố định), không cần MinIO chạy
+
+
+def _storage() -> MinioStorage:
+    return MinioStorage(Settings(minio_endpoint="minio:9000", minio_public_endpoint="files.example.com"))
+
+
+def test_download_headers():
+    assert download_headers("application/pdf") == {"response-content-type": "application/pdf"}
+    assert download_headers("text/plain", "bai.txt") == {
+        "response-content-type": "text/plain",
+        "response-content-disposition": 'attachment; filename="bai.txt"'}
+
+
+async def test_presign_get_signs_public_host_with_content_type():
+    url = await _storage().presign_get("video/u/a.mp4", "video/mp4")
+    parts = urlsplit(url)
+    assert parts.netloc == "files.example.com" and parts.path == "/lms/video/u/a.mp4"
+    assert parse_qs(parts.query)["response-content-type"] == ["video/mp4"]
+
+
+async def test_presign_put_targets_given_staging_key():
+    url = await _storage().presign_put(staging_key("pdf/u/a.pdf"))
+    parts = urlsplit(url)
+    assert parts.netloc == "files.example.com" and parts.path == "/lms/staging/pdf/u/a.pdf"
+```
+
+- [ ] **Step 9: Chạy test**
+
+Run: `uv run pytest tests/test_uploads.py tests/test_storage.py -v`
+Expected: `test_uploads.py` FAIL (404 vì chưa có route `/uploads/presign`); `test_storage.py` PASS (storage.py đã có từ Step 1)
+
+- [ ] **Step 10: `app/modules/materials/schemas.py`**
 
 ```python
 import uuid
@@ -3344,7 +3533,9 @@ class UrlOut(BaseModel):
     url: str
 ```
 
-- [ ] **Step 10: `app/modules/materials/assets.py`**
+- [ ] **Step 11: `app/modules/materials/assets.py`**
+  - `pdf`/`video` chỉ giảng viên đã duyệt hoặc admin được presign (`require_staff`); học viên nhận `403 FORBIDDEN`.
+  - `complete` khóa dòng asset (`FOR UPDATE`), copy `staging/<key>` sang key chính thức, rồi kiểm tra kích thước và magic bytes trên bản ở key chính thức (client không ghi được vào đó). Hỏng thì xóa cả hai object và dòng asset. Thành công thì commit rồi mới xóa key tạm.
 
 ```python
 import uuid
@@ -3352,8 +3543,9 @@ import uuid
 import filetype
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.deps import require_staff
 from app.core.errors import AppError, not_found
-from app.core.storage import Storage
+from app.core.storage import Storage, staging_key
 from app.core.time import utcnow
 from app.modules.auth.models import Role, User
 from app.modules.materials.models import Asset, AssetKind
@@ -3368,6 +3560,7 @@ ALLOWED_MIME = {
     AssetKind.submission: {"application/pdf", "text/plain"},
     AssetKind.image: {"image/png", "image/jpeg", "image/webp"},
 }
+STAFF_ONLY_KINDS = {AssetKind.pdf, AssetKind.video}  # tài liệu và video bài học chỉ giảng viên/admin upload
 EXTENSIONS = {"application/pdf": "pdf", "video/mp4": "mp4", "text/plain": "txt",
               "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 
@@ -3390,6 +3583,8 @@ def mime_matches(declared: str, head: bytes) -> bool:
 
 async def create_presigned_upload(db: AsyncSession, storage: Storage, user: User, data: PresignIn) -> PresignOut:
     kind = AssetKind(data.kind)
+    if kind in STAFF_ONLY_KINDS:
+        await require_staff(user)
     if data.mime not in ALLOWED_MIME[kind]:
         raise _invalid_type()
     if data.size > SIZE_LIMITS[kind]:
@@ -3398,32 +3593,45 @@ async def create_presigned_upload(db: AsyncSession, storage: Storage, user: User
     asset = Asset(owner_id=user.id, kind=kind, storage_key=key, mime=data.mime, size_bytes=0)
     db.add(asset)
     await db.commit()
-    return PresignOut(asset_id=asset.id, put_url=await storage.presign_put(key))
+    # Trình duyệt chỉ nhận URL ghi vào key tạm; key chính thức chỉ có server ghi sau khi kiểm tra xong.
+    return PresignOut(asset_id=asset.id, put_url=await storage.presign_put(staging_key(key)))
 
 
 async def complete_upload(db: AsyncSession, storage: Storage, user: User, asset_id: uuid.UUID) -> Asset:
-    asset = await db.get(Asset, asset_id)
+    # Khóa dòng asset để các lần complete đồng thời chạy tuần tự
+    asset = await db.get(Asset, asset_id, with_for_update=True)
     if asset is None or asset.owner_id != user.id:
         raise not_found("File")
     if asset.verified_at is not None:
         return asset
-    size = await storage.stat_size(asset.storage_key)
+    staged = staging_key(asset.storage_key)
+    size = await storage.stat_size(staged)
     if size is None:
         raise AppError("UPLOAD_MISSING", "Chưa tìm thấy file đã upload", 400)
 
-    async def reject(err: AppError) -> None:
-        await storage.remove(asset.storage_key)
+    async def reject(err: AppError, *keys: str) -> None:
+        for key in keys:
+            await storage.remove(key)
         await db.delete(asset)
         await db.commit()
         raise err
 
-    if size > SIZE_LIMITS[asset.kind]:
-        await reject(_too_large())
+    limit = SIZE_LIMITS[asset.kind]
+    if size > limit:
+        await reject(_too_large(), staged)
+    # Copy trước rồi mới kiểm tra bản ở key chính thức (client không ghi được vào đó): tránh việc client
+    # PUT lại vào key tạm giữa lúc kiểm tra và lúc copy.
+    await storage.copy(staged, asset.storage_key)
+    size = await storage.stat_size(asset.storage_key)
+    if size is None or size > limit:
+        await reject(_too_large(), staged, asset.storage_key)
     if not mime_matches(asset.mime, await storage.read_head(asset.storage_key)):
-        await reject(_invalid_type())
+        await reject(_invalid_type(), staged, asset.storage_key)
     asset.size_bytes = size
     asset.verified_at = utcnow()
     await db.commit()
+    # Xóa key tạm sau khi commit: nếu commit lỗi thì vẫn còn file tạm để complete lại
+    await storage.remove(staged)
     return asset
 
 
@@ -3435,7 +3643,7 @@ async def require_verified_asset(db: AsyncSession, asset_id: uuid.UUID, user: Us
     return asset
 ```
 
-- [ ] **Step 11: `app/modules/materials/router.py`**
+- [ ] **Step 12: `app/modules/materials/router.py`**
 
 ```python
 import uuid
@@ -3475,10 +3683,10 @@ async def lesson_video(lesson_id: uuid.UUID, user: User = Depends(get_current_us
     asset = await db.get(Asset, lesson.video_asset_id) if lesson.video_asset_id else None
     if asset is None:
         raise not_found("Video")
-    return UrlOut(url=await storage.presign_get(asset.storage_key))
+    return UrlOut(url=await storage.presign_get(asset.storage_key, asset.mime))
 ```
 
-- [ ] **Step 12: Kiểm tra video khi PATCH bài học** (`app/modules/courses/router.py`): thay hàm `update_lesson` bằng:
+- [ ] **Step 13: Kiểm tra video khi PATCH bài học** (`app/modules/courses/router.py`): thay hàm `update_lesson` bằng:
 
 ```python
 @router.patch("/lessons/{lesson_id}", response_model=LessonOut)
@@ -3493,16 +3701,16 @@ async def update_lesson(lesson_id: uuid.UUID, data: LessonUpdate, user: User = D
     return await service.update_lesson(db, lesson, data)
 ```
 
-- [ ] **Step 13: Gắn router vào `app/main.py`**
+- [ ] **Step 14: Gắn router vào `app/main.py`**
   - Import: `from app.modules.materials.router import router as materials_router`
   - Dưới `# routers`: `app.include_router(materials_router)`
 
-- [ ] **Step 14: Chạy toàn bộ test**
+- [ ] **Step 15: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 15: Commit**
+- [ ] **Step 16: Commit**
 
 ```bash
 git add . && git commit -m "feat(materials): presigned uploads with magic-byte verification, lesson video"
@@ -4787,6 +4995,8 @@ git add . && git commit -m "feat(ingestion): pdf ingestion pipeline with short-l
 
 ### Task 21: API tài liệu của bài học (gắn PDF, xem trạng thái, xem trang, xử lý lại)
 
+> Điều chỉnh sau Task 14: `upload_file` PUT qua `storage.client_put` (vào key tạm `staging/...`, kèm mime) thay vì ghi thẳng `storage.objects`, khớp storage giả mới.
+
 **Files:**
 - Create: `backend/app/modules/materials/sources.py`
 - Modify: `backend/app/modules/materials/schemas.py`, `backend/app/modules/materials/router.py`, `backend/tests/helpers.py`
@@ -4796,11 +5006,11 @@ git add . && git commit -m "feat(ingestion): pdf ingestion pipeline with short-l
 
 ```python
 async def upload_file(client, storage, headers, data: bytes, kind="pdf", mime="application/pdf") -> str:
-    """Presign → 'upload' vào storage giả → complete. Trả về asset_id."""
+    """Presign → 'upload' vào key tạm của storage giả → complete. Trả về asset_id."""
     r = await client.post(f"{API}/uploads/presign", json={"kind": kind, "mime": mime, "size": len(data)},
                           headers=headers)
     assert r.status_code == 200, r.text
-    storage.objects[r.json()["put_url"].removeprefix("memory://put/")] = data
+    storage.client_put(r.json()["put_url"], data, mime)  # vào key tạm; complete sẽ copy sang key chính thức
     done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=headers)
     assert done.status_code == 200, done.text
     return r.json()["asset_id"]
