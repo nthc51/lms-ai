@@ -149,7 +149,7 @@ git add . && git commit -m "chore: init repo with postgres/pgvector, redis, mini
 - Create: `backend/pyproject.toml`, `backend/.env.example`, `backend/app/__init__.py`, `backend/app/core/__init__.py`, `backend/app/core/config.py`, `backend/app/core/db.py`, `backend/app/core/time.py`, `backend/app/main.py`, `backend/tests/__init__.py`, `backend/tests/conftest.py`
 - Test: `backend/tests/test_health.py`
 
-- [ ] **Step 1: `backend/pyproject.toml`**
+- [x] **Step 1: `backend/pyproject.toml`**
 
 ```toml
 [project]
@@ -193,7 +193,7 @@ line-length = 110
 Run: `cd backend && uv sync`
 Expected: tạo ra `.venv/` và `uv.lock`.
 
-- [ ] **Step 2: `backend/.env.example`** (copy thành `.env` để dev)
+- [x] **Step 2: `backend/.env.example`** (copy thành `.env` để dev)
 
 ```
 DATABASE_URL=postgresql+asyncpg://lms:lms@localhost:5432/lms
@@ -212,7 +212,7 @@ VISION_PROVIDER=fake
 GEMINI_API_KEY=
 ```
 
-- [ ] **Step 3: `app/core/config.py`**
+- [x] **Step 3: `app/core/config.py`**
 
 ```python
 from functools import lru_cache
@@ -252,7 +252,7 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
-- [ ] **Step 4: `app/core/time.py`**
+- [x] **Step 4: `app/core/time.py`**
 
 ```python
 from datetime import UTC, datetime
@@ -262,7 +262,7 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 ```
 
-- [ ] **Step 5: `app/core/db.py`**
+- [x] **Step 5: `app/core/db.py`**
 
 ```python
 import uuid
@@ -305,7 +305,7 @@ async def get_db() -> AsyncIterator[AsyncSession]:
         yield session
 ```
 
-- [ ] **Step 6: Viết test hỏng trước — `tests/conftest.py` và `tests/test_health.py`**
+- [x] **Step 6: Viết test hỏng trước — `tests/conftest.py` và `tests/test_health.py`**
 
 `tests/__init__.py` để trống. `tests/conftest.py`:
 
@@ -344,12 +344,12 @@ async def test_health_ok(client):
     assert r.json() == {"status": "ok"}
 ```
 
-- [ ] **Step 7: Chạy test để thấy nó hỏng**
+- [x] **Step 7: Chạy test để thấy nó hỏng**
 
 Run: `uv run pytest tests/test_health.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.main'`
 
-- [ ] **Step 8: `app/main.py`** (`app/__init__.py` và `app/core/__init__.py` để trống)
+- [x] **Step 8: `app/main.py`** (`app/__init__.py` và `app/core/__init__.py` để trống)
 
 ```python
 from fastapi import FastAPI
@@ -369,12 +369,12 @@ def create_app() -> FastAPI:
 app = create_app()
 ```
 
-- [ ] **Step 9: Chạy lại test**
+- [x] **Step 9: Chạy lại test**
 
 Run: `uv run pytest tests/test_health.py -v`
 Expected: PASS
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add backend && git commit -m "feat(backend): project skeleton with settings, db engine, health endpoint"
