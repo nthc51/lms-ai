@@ -1725,7 +1725,7 @@ git add . && git commit -m "feat(courses): course, section, lesson models"
 - Modify: `backend/app/main.py`, `backend/tests/helpers.py`
 - Test: `backend/tests/test_courses.py`
 
-- [ ] **Step 1: Thêm vào cuối `tests/helpers.py`**
+- [x] **Step 1: Thêm vào cuối `tests/helpers.py`**
 
 ```python
 async def create_course(client, headers, title="Cấu trúc dữ liệu và Giải thuật", description="Mô tả") -> dict:
@@ -1734,7 +1734,7 @@ async def create_course(client, headers, title="Cấu trúc dữ liệu và Gi�
     return r.json()
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_courses.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_courses.py`**
 
 ```python
 from tests.helpers import API, create_course, make_admin, make_student, make_teacher
@@ -1800,12 +1800,12 @@ async def test_publish_empty_course_is_rejected(client):
     assert r.json()["error"]["code"] == "COURSE_EMPTY"
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_courses.py -v`
 Expected: FAIL (404 vì chưa có route)
 
-- [ ] **Step 4: `app/modules/courses/schemas.py`**
+- [x] **Step 4: `app/modules/courses/schemas.py`**
 
 ```python
 import uuid
@@ -1838,7 +1838,7 @@ class CourseOut(BaseModel):
     created_at: datetime
 ```
 
-- [ ] **Step 5: `app/modules/courses/service.py`**
+- [x] **Step 5: `app/modules/courses/service.py`**
 
 ```python
 import secrets
@@ -1912,7 +1912,7 @@ async def publish_course(db: AsyncSession, course: Course) -> Course:
     return course
 ```
 
-- [ ] **Step 6: `app/modules/courses/router.py`**
+- [x] **Step 6: `app/modules/courses/router.py`**
 
 ```python
 import uuid
@@ -1961,16 +1961,16 @@ async def publish_course(course_id: uuid.UUID, user: User = Depends(require_staf
     return await service.publish_course(db, course)
 ```
 
-- [ ] **Step 7: Gắn router vào `app/main.py`**
+- [x] **Step 7: Gắn router vào `app/main.py`**
   - Import: `from app.modules.courses.router import router as courses_router`
   - Dưới `# routers`: `app.include_router(courses_router)`
 
-- [ ] **Step 8: Chạy test**
+- [x] **Step 8: Chạy test**
 
 Run: `uv run pytest tests/test_courses.py -v`
 Expected: PASS cả 7 test
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add . && git commit -m "feat(courses): teacher course CRUD with ownership checks and publish guard"
