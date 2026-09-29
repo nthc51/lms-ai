@@ -17,7 +17,8 @@ from app.main import create_app  # noqa: E402
 
 
 from app.core.storage import get_storage  # noqa: E402
-from tests.fakes import InMemoryStorage  # noqa: E402
+from app.modules.jobs.queue import get_queue  # noqa: E402
+from tests.fakes import InMemoryStorage, RecordingQueue  # noqa: E402
 
 
 @pytest.fixture
@@ -26,9 +27,15 @@ def storage():
 
 
 @pytest.fixture
-async def client(storage):
+def queue():
+    return RecordingQueue()
+
+
+@pytest.fixture
+async def client(storage, queue):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
+    app.dependency_overrides[get_queue] = lambda: queue
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         yield c
 

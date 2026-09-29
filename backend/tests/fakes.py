@@ -47,3 +47,18 @@ class InMemoryStorage:
     async def remove(self, key):
         self.objects.pop(key, None)
         self.mimes.pop(key, None)
+
+
+class RecordingQueue:
+    """Queue giả. Kiểm tra luôn luật 'job phải được commit trước khi enqueue'."""
+
+    def __init__(self) -> None:
+        self.jobs: list[tuple[str, object]] = []
+
+    async def enqueue(self, job) -> None:
+        from app.core.db import SessionLocal
+        from app.modules.jobs.models import Job
+
+        async with SessionLocal() as s:
+            assert await s.get(Job, job.id) is not None, "Job phải được commit trước khi enqueue"
+        self.jobs.append((job.type, job.ref_id))
