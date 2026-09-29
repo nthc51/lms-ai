@@ -2571,7 +2571,7 @@ git add . && git commit -m "feat(enrollment): enroll in published courses, my co
 - Modify: `backend/app/modules/courses/schemas.py`, `backend/app/modules/courses/service.py`, `backend/app/modules/courses/router.py`
 - Test: `backend/tests/test_catalog.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_catalog.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_catalog.py`**
 
 ```python
 from tests.helpers import API, create_course, make_published_course, make_student, make_teacher
@@ -2651,12 +2651,12 @@ async def test_invalid_token_on_optional_auth_is_401(client):
     assert r.status_code == 401
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_catalog.py -v`
 Expected: FAIL (405 Method Not Allowed, hoặc 404 vì chưa có `GET /courses`)
 
-- [ ] **Step 3: Thêm vào cuối `app/modules/courses/schemas.py`**
+- [x] **Step 3: Thêm vào cuối `app/modules/courses/schemas.py`**
 
 ```python
 class CourseCard(BaseModel):
@@ -2699,7 +2699,7 @@ class CourseDetail(CourseOut):
     is_owner: bool
 ```
 
-- [ ] **Step 4: Thêm vào `app/modules/courses/service.py`**
+- [x] **Step 4: Thêm vào `app/modules/courses/service.py`**
   - Thêm import: `from sqlalchemy.orm import selectinload`
   - Thêm `CourseCard, CourseDetail, CourseOut, CoursePage, SectionBrief` vào dòng import schemas
   - Thêm các hàm sau vào cuối file:
@@ -2739,7 +2739,7 @@ async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> C
     )
 ```
 
-- [ ] **Step 5: Thêm vào `app/modules/courses/router.py`**
+- [x] **Step 5: Thêm vào `app/modules/courses/router.py`**
   - Sửa import fastapi thành `from fastapi import APIRouter, Depends, Query`
   - Sửa import deps thành `from app.core.deps import get_optional_user, require_staff, require_teacher_approved`
   - Thêm `CourseDetail, CoursePage` vào dòng import schemas
@@ -2758,12 +2758,12 @@ async def course_detail(slug: str, user: User | None = Depends(get_optional_user
     return await service.get_course_detail(db, slug, user)
 ```
 
-- [ ] **Step 6: Chạy toàn bộ test**
+- [x] **Step 6: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add . && git commit -m "feat(courses): public catalog with accent-insensitive search, course detail with optional auth"
