@@ -4280,7 +4280,7 @@ git add . && git commit -m "feat(materials): sources, pages, chunks with pgvecto
 - Create: `backend/app/ingestion/__init__.py`, `backend/app/ingestion/chunker.py`
 - Test: `backend/tests/test_chunker.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_chunker.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_chunker.py`**
 
 ```python
 import pytest
@@ -4390,12 +4390,12 @@ def test_oversized_table_is_split_on_row_boundaries():
         assert all(line in rows for line in c.content.split("\n") if line)
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_chunker.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ingestion'`
 
-- [ ] **Step 3: `app/ingestion/chunker.py`** (`app/ingestion/__init__.py` để trống)
+- [x] **Step 3: `app/ingestion/chunker.py`** (`app/ingestion/__init__.py` để trống)
 
 ```python
 import math
@@ -4571,12 +4571,12 @@ def chunk_pages(pages: list[PageText], max_tokens: int = 700, overlap_tokens: in
     return chunks
 ```
 
-- [ ] **Step 4: Chạy test**
+- [x] **Step 4: Chạy test**
 
 Run: `uv run pytest tests/test_chunker.py -v`
 Expected: PASS cả 7 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add . && git commit -m "feat(ingestion): markdown chunker with heading paths, overlap and hard split"
