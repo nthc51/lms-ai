@@ -1280,7 +1280,7 @@ git add . && git commit -m "feat(auth): register, login with refresh cookie, /me
 - Modify: `backend/app/modules/auth/service.py`, `backend/app/modules/auth/router.py`
 - Test: `backend/tests/test_refresh.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_refresh.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_refresh.py`**
 
 ```python
 from tests.helpers import API, register_user
@@ -1338,12 +1338,12 @@ async def test_logout_revokes_refresh_token(client):
     assert r.status_code == 401
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_refresh.py -v`
 Expected: FAIL (404 vì chưa có route refresh/logout)
 
-- [ ] **Step 3: Thêm vào `app/modules/auth/service.py`**
+- [x] **Step 3: Thêm vào `app/modules/auth/service.py`**
   - Sửa dòng import sqlalchemy thành `from sqlalchemy import select, update`
   - Thêm `hash_refresh_token` vào dòng import từ `app.core.security`
   - Thêm 2 hàm sau vào cuối file:
@@ -1378,7 +1378,7 @@ async def logout(db: AsyncSession, raw: str) -> None:
         await db.commit()
 ```
 
-- [ ] **Step 4: Thêm vào `app/modules/auth/router.py`**
+- [x] **Step 4: Thêm vào `app/modules/auth/router.py`**
   - Sửa import fastapi thành `from fastapi import APIRouter, Cookie, Depends, Response`
   - Thêm `from app.core.errors import AppError`
   - Thêm 2 route:
@@ -1403,12 +1403,12 @@ async def logout(refresh_token: str | None = Cookie(default=None), db: AsyncSess
     return resp
 ```
 
-- [ ] **Step 5: Chạy test**
+- [x] **Step 5: Chạy test**
 
 Run: `uv run pytest tests/test_refresh.py tests/test_auth.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add . && git commit -m "feat(auth): refresh token rotation with reuse detection, logout"
