@@ -2,15 +2,16 @@ import uuid
 from collections.abc import Sequence
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, not_found
 from app.modules.auth.models import User
 from app.modules.courses.models import Course, Lesson, Section
 from app.modules.courses.service import ensure_owner, get_owned_lesson
-from app.modules.jobs.models import Job
+from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.queue import JobQueue
-from app.modules.jobs.service import create_and_enqueue
+from app.modules.jobs.service import create_and_enqueue, create_job
 from app.modules.materials.assets import require_verified_asset
 from app.modules.materials.models import (
     AssetKind,
@@ -21,7 +22,7 @@ from app.modules.materials.models import (
     SourceStatus,
     SourceType,
 )
-from app.modules.materials.schemas import SourceOut
+from app.modules.materials.schemas import PageOut, SourceOut, SourcePagesPage
 
 INGEST_PDF = "ingest_pdf"  # job.type = tên hàm trong worker; job.ref_id = sources.id
 
@@ -82,9 +83,18 @@ async def attach_pdf(db: AsyncSession, queue: JobQueue, user: User, lesson_id: u
                      asset_id: uuid.UUID) -> tuple[Source, Job]:
     lesson, _ = await get_owned_lesson(db, lesson_id, user)
     asset = await require_verified_asset(db, asset_id, user, AssetKind.pdf)
-    source = Source(lesson_id=lesson.id, asset_id=asset.id, type=SourceType.pdf, status=SourceStatus.pending)
-    db.add(source)
-    await db.flush()
+    # ON CONFLICT theo uq_sources_lesson_asset: hai request gắn cùng file đồng thời thì chỉ một cái thành công
+    source_id = await db.scalar(
+        pg_insert(Source)
+        .values(id=uuid.uuid4(), lesson_id=lesson.id, asset_id=asset.id, type=SourceType.pdf,
+                status=SourceStatus.pending)
+        .on_conflict_do_nothing(constraint="uq_sources_lesson_asset")
+        .returning(Source.id)
+    )
+    if source_id is None:
+        await db.rollback()
+        raise AppError("ALREADY_ATTACHED", "File này đã được gắn vào bài học", 409)
+    source = await db.get(Source, source_id)
     job = await create_and_enqueue(db, queue, INGEST_PDF, source.id)  # commit source + job cùng lúc
     return source, job
 
@@ -96,15 +106,32 @@ async def list_lesson_sources(db: AsyncSession, user: User, lesson_id: uuid.UUID
     return await to_out_many(db, sources)
 
 
-async def list_pages(db: AsyncSession, source: Source) -> list[SourcePage]:
+async def list_pages(db: AsyncSession, source: Source, page: int, size: int) -> SourcePagesPage:
+    total = await db.scalar(select(func.count()).select_from(SourcePage)
+                            .where(SourcePage.source_id == source.id))
     rows = await db.scalars(select(SourcePage).where(SourcePage.source_id == source.id)
-                            .order_by(SourcePage.page_no))
-    return list(rows)
+                            .order_by(SourcePage.page_no).offset((page - 1) * size).limit(size))
+    return SourcePagesPage(items=[PageOut.model_validate(p) for p in rows], total=total, page=page, size=size)
+
+
+def _busy(message: str) -> AppError:
+    return AppError("INVALID_STATE", message, 409)
 
 
 async def reprocess(db: AsyncSession, queue: JobQueue, source: Source) -> Job:
-    if source.status not in (SourceStatus.ready, SourceStatus.failed):
-        raise AppError("INVALID_STATE", "Tài liệu đang được xử lý", 409)
+    if source.status == SourceStatus.pending:
+        raise _busy("Tài liệu đang chờ xử lý")
+    if source.status == SourceStatus.processing:
+        raise _busy("Tài liệu đang được xử lý")
+    # Tạo job trước: nếu vẫn còn job đang chạy (chưa được worker đánh dấu xong) thì không đụng tới source,
+    # tránh để source kẹt 'pending' mà không có job nào mới được enqueue.
+    job, created = await create_job(db, INGEST_PDF, source.id)
+    if not created:
+        waiting = job.status == JobStatus.pending  # đọc trước rollback (rollback làm hết hạn các object)
+        await db.rollback()
+        raise _busy("Tài liệu đang chờ xử lý" if waiting else "Tài liệu đang được xử lý")
     source.status = SourceStatus.pending
     source.error_msg = None
-    return await create_and_enqueue(db, queue, INGEST_PDF, source.id)
+    await db.commit()
+    await queue.enqueue(job)  # chỉ enqueue sau khi job đã commit
+    return job

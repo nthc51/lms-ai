@@ -4,7 +4,19 @@ from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, Computed, DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Computed,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,6 +64,8 @@ class ExtractionMethod(str, enum.Enum):
 
 class Source(IdMixin, TimestampMixin, Base):
     __tablename__ = "sources"
+    # Một file chỉ gắn một lần vào mỗi bài học (gắn lại thì 409 ALREADY_ATTACHED)
+    __table_args__ = (UniqueConstraint("lesson_id", "asset_id", name="uq_sources_lesson_asset"),)
 
     lesson_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), index=True)
     asset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("assets.id", ondelete="RESTRICT"))

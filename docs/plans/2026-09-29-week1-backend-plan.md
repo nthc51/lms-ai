@@ -5536,11 +5536,12 @@ git add . && git commit -m "feat(ingestion): pdf ingestion pipeline with short-l
 
 ### Task 21: API tài liệu của bài học (gắn PDF, xem trạng thái, xem trang, xử lý lại)
 
-> Điều chỉnh sau Task 14: `upload_file` PUT qua `storage.client_put` (vào key tạm `staging/...`, kèm mime) thay vì ghi thẳng `storage.objects`, khớp storage giả mới. Điều chỉnh sau Task 20 (user duyệt): `SourceOut` thêm `vision_pages` (đếm `source_pages` có `extraction_method = vision`, tính bằng truy vấn, không thêm cột; list dùng một truy vấn GROUP BY chung, không N+1) và `warning` (= `error_msg` khi `status = ready`, tức cảnh báo vượt trần trang vision; ngược lại `None`). `error_msg` giữ nguyên nghĩa cũ.
+> Điều chỉnh sau Task 14: `upload_file` PUT qua `storage.client_put` (vào key tạm `staging/...`, kèm mime) thay vì ghi thẳng `storage.objects`, khớp storage giả mới. Điều chỉnh sau Task 20 (user duyệt): `SourceOut` thêm `vision_pages` (đếm `source_pages` có `extraction_method = vision`, tính bằng truy vấn, không thêm cột; list dùng một truy vấn GROUP BY chung, không N+1) và `warning` (= `error_msg` khi `status = ready`, tức cảnh báo vượt trần trang vision; ngược lại `None`). `error_msg` giữ nguyên nghĩa cũ. Sửa sau review Task 21: `reprocess` tạo job trước, nếu vẫn còn job đang chạy thì rollback và trả `409 INVALID_STATE` mà không đổi source (tránh source kẹt `pending`); `409` khi source `pending` báo "Tài liệu đang chờ xử lý", khi `processing` báo "Tài liệu đang được xử lý"; `GET /sources/{id}/pages` phân trang `?page=&size=` (size ≤ 100) trả `{items, total, page, size}` như `GET /courses`; ràng buộc `UNIQUE (lesson_id, asset_id)` trên `sources` (migration riêng, Step 4), gắn trùng trả `409 ALREADY_ATTACHED` (INSERT ... ON CONFLICT DO NOTHING RETURNING).
 
 **Files:**
 - Create: `backend/app/modules/materials/sources.py`
-- Modify: `backend/app/modules/materials/schemas.py`, `backend/app/modules/materials/router.py`, `backend/tests/helpers.py`
+- Create: `backend/alembic/versions/59f0a33a0060_sources_unique_lesson_asset.py`
+- Modify: `backend/app/modules/materials/models.py`, `backend/app/modules/materials/schemas.py`, `backend/app/modules/materials/router.py`, `backend/tests/helpers.py`
 - Test: `backend/tests/test_sources_api.py`
 
 - [ ] **Step 1: Thêm vào cuối `tests/helpers.py`**
@@ -5562,11 +5563,14 @@ async def upload_file(client, storage, headers, data: bytes, kind="pdf", mime="a
 ```python
 import uuid
 
+from sqlalchemy import func, select
+
 from app.ai.embedder import FakeEmbedder
 from app.ai.vision import FakeVision
 from app.ingestion.pipeline import ingest_pdf_source
+from app.modules.jobs.models import Job, JobStatus
 from app.modules.materials.models import ExtractionMethod, Source, SourcePage, SourceStatus
-from tests.helpers import API, make_published_course, make_student, make_teacher, upload_file
+from tests.helpers import API, add_lesson, make_published_course, make_student, make_teacher, upload_file
 from tests.pdfs import LONG_TEXT, make_pdf
 
 
@@ -5634,10 +5638,12 @@ async def test_reprocess_only_when_finished(client, storage, queue, db):
     _, gv = await make_teacher(client)
     _, _, lesson = await make_published_course(client, gv)
     asset_id = await upload_file(client, storage, gv, make_pdf([LONG_TEXT]))
-    source_id = (await _attach(client, gv, lesson["id"], asset_id)).json()["source"]["id"]
+    attached = (await _attach(client, gv, lesson["id"], asset_id)).json()
+    source_id, first_job_id = attached["source"]["id"], attached["job_id"]
 
     busy = await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv)
     assert (busy.status_code, busy.json()["error"]["code"]) == (409, "INVALID_STATE")
+    assert busy.json()["error"]["message"] == "Tài liệu đang chờ xử lý"
 
     src = await db.get(Source, uuid.UUID(source_id))
     src.status = SourceStatus.failed
@@ -5645,12 +5651,12 @@ async def test_reprocess_only_when_finished(client, storage, queue, db):
     # job đầu vẫn 'pending' trong bảng jobs; đánh dấu xong để partial unique index cho tạo job mới
     from sqlalchemy import update
 
-    from app.modules.jobs.models import Job, JobStatus
     await db.execute(update(Job).values(status=JobStatus.failed))
     await db.commit()
 
     ok = await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv)
     assert ok.status_code == 202 and len(queue.jobs) == 2
+    assert ok.json()["job_id"] != first_job_id
     detail = (await client.get(f"{API}/sources/{source_id}", headers=gv)).json()
     assert detail["status"] == "pending" and detail["error_msg"] is None
 
@@ -5667,7 +5673,8 @@ async def test_pages_and_counts_after_processing(client, storage):
     assert detail["status"] == "ready" and detail["page_count"] == 2 and detail["chunk_count"] >= 1
     assert detail["vision_pages"] == 1 and detail["warning"] is None
     pages = (await client.get(f"{API}/sources/{source_id}/pages", headers=gv)).json()
-    assert [p["extraction_method"] for p in pages] == ["text", "vision"]
+    assert (pages["total"], pages["page"], pages["size"]) == (2, 1, 20)
+    assert [p["extraction_method"] for p in pages["items"]] == ["text", "vision"]
 
 
 async def test_vision_pages_counted_per_source_in_detail_and_list(client, storage, db):
@@ -5718,6 +5725,64 @@ async def test_ready_source_with_vision_cap_exposes_warning(client, storage):
     listed = (await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv)).json()
     listed = {s["id"]: s for s in listed}
     assert listed[source_id]["warning"] == detail["warning"]
+
+
+async def test_reprocess_processing_source_says_processing(client, storage, db):
+    _, gv = await make_teacher(client)
+    _, source_id = await _attached_source(client, storage, gv)
+    src = await db.get(Source, uuid.UUID(source_id))
+    src.status = SourceStatus.processing
+    await db.commit()
+    r = await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv)
+    assert (r.status_code, r.json()["error"]["code"]) == (409, "INVALID_STATE")
+    assert r.json()["error"]["message"] == "Tài liệu đang được xử lý"
+
+
+async def test_reprocess_with_leftover_active_job_keeps_source_failed(client, storage, queue, db):
+    _, gv = await make_teacher(client)
+    _, source_id = await _attached_source(client, storage, gv)
+    src = await db.get(Source, uuid.UUID(source_id))
+    src.status, src.error_msg = SourceStatus.failed, "Lỗi cũ"
+    await db.commit()
+    # job của lần gắn đầu vẫn 'pending' (worker chưa đánh dấu xong) → không được tạo job mới
+    assert await db.scalar(select(func.count()).select_from(Job).where(Job.status == JobStatus.pending)) == 1
+
+    r = await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv)
+    assert (r.status_code, r.json()["error"]["code"]) == (409, "INVALID_STATE")
+    fresh = await db.get(Source, uuid.UUID(source_id), populate_existing=True)
+    assert (fresh.status, fresh.error_msg) == (SourceStatus.failed, "Lỗi cũ")
+    assert len(queue.jobs) == 1
+
+
+async def test_pages_are_paginated(client, storage, db):
+    _, gv = await make_teacher(client)
+    _, source_id = await _attached_source(client, storage, gv)
+    db.add_all([SourcePage(source_id=uuid.UUID(source_id), page_no=n, extraction_method=ExtractionMethod.text,
+                           markdown=f"trang {n}") for n in (3, 1, 2)])
+    await db.commit()
+
+    r = await client.get(f"{API}/sources/{source_id}/pages", params={"page": 2, "size": 2}, headers=gv)
+    body = r.json()
+    assert (body["total"], body["page"], body["size"]) == (3, 2, 2)
+    assert [(p["page_no"], p["markdown"]) for p in body["items"]] == [(3, "trang 3")]
+    for params in ({"size": 101}, {"page": 0}):
+        bad = await client.get(f"{API}/sources/{source_id}/pages", params=params, headers=gv)
+        assert (bad.status_code, bad.json()["error"]["code"]) == (422, "VALIDATION_ERROR")
+
+
+async def test_same_asset_cannot_be_attached_twice_to_a_lesson(client, storage, queue):
+    _, gv = await make_teacher(client)
+    _, section, lesson = await make_published_course(client, gv)
+    other_lesson = await add_lesson(client, gv, section["id"], title="Bài 2")
+    asset_id = await upload_file(client, storage, gv, make_pdf([LONG_TEXT]))
+    assert (await _attach(client, gv, lesson["id"], asset_id)).status_code == 202
+
+    dup = await _attach(client, gv, lesson["id"], asset_id)
+    assert (dup.status_code, dup.json()["error"]["code"]) == (409, "ALREADY_ATTACHED")
+    listed = (await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv)).json()
+    assert len(listed) == 1 and len(queue.jobs) == 1
+    # cùng file gắn vào bài khác thì vẫn được
+    assert (await _attach(client, gv, other_lesson["id"], asset_id)).status_code == 202
 ```
 
 - [ ] **Step 3: Chạy test**
@@ -5725,7 +5790,54 @@ async def test_ready_source_with_vision_cap_exposes_warning(client, storage):
 Run: `uv run pytest tests/test_sources_api.py -v`
 Expected: FAIL (405/404 vì chưa có route `/lessons/{id}/sources`)
 
-- [ ] **Step 4: Thêm vào cuối `app/modules/materials/schemas.py`**
+- [ ] **Step 4: Ràng buộc một file chỉ gắn một lần vào mỗi bài học (migration riêng)**
+  - Trong `app/modules/materials/models.py`: thêm `UniqueConstraint` vào import từ `sqlalchemy` (ruff/isort tách thành import nhiều dòng, `Enum as SAEnum` thành dòng riêng), rồi thêm vào class `Source`, ngay dưới `__tablename__`:
+
+```python
+    # Một file chỉ gắn một lần vào mỗi bài học (gắn lại thì 409 ALREADY_ATTACHED)
+    __table_args__ = (UniqueConstraint("lesson_id", "asset_id", name="uq_sources_lesson_asset"),)
+```
+
+Run: `uv run alembic revision --autogenerate -m "sources unique lesson asset"` rồi `uv run alembic upgrade head`
+Expected: file `alembic/versions/59f0a33a0060_sources_unique_lesson_asset.py` như dưới; `uv run alembic downgrade -1 && uv run alembic upgrade head` chạy sạch; `uv run alembic check` báo `No new upgrade operations detected.`
+
+```python
+"""sources unique lesson asset
+
+Revision ID: 59f0a33a0060
+Revises: aa608bdc6a4e
+Create Date: 2026-09-29 15:17:24.971375
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+import pgvector.sqlalchemy  # noqa: F401
+
+
+# revision identifiers, used by Alembic.
+revision: str = '59f0a33a0060'
+down_revision: Union[str, Sequence[str], None] = 'aa608bdc6a4e'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.create_unique_constraint('uq_sources_lesson_asset', 'sources', ['lesson_id', 'asset_id'])
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_constraint('uq_sources_lesson_asset', 'sources', type_='unique')
+    # ### end Alembic commands ###
+```
+
+- [ ] **Step 5: Thêm vào cuối `app/modules/materials/schemas.py`**
   - Thêm import: `from app.modules.materials.models import AssetKind, ExtractionMethod, SourceStatus, SourceType` (thay dòng import `AssetKind` cũ)
 
 ```python
@@ -5761,24 +5873,32 @@ class PageOut(BaseModel):
     page_no: int
     extraction_method: ExtractionMethod
     markdown: str
+
+
+class SourcePagesPage(BaseModel):
+    items: list[PageOut]
+    total: int
+    page: int
+    size: int
 ```
 
-- [ ] **Step 5: `app/modules/materials/sources.py`**
+- [ ] **Step 6: `app/modules/materials/sources.py`**
 
 ```python
 import uuid
 from collections.abc import Sequence
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, not_found
 from app.modules.auth.models import User
 from app.modules.courses.models import Course, Lesson, Section
 from app.modules.courses.service import ensure_owner, get_owned_lesson
-from app.modules.jobs.models import Job
+from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.queue import JobQueue
-from app.modules.jobs.service import create_and_enqueue
+from app.modules.jobs.service import create_and_enqueue, create_job
 from app.modules.materials.assets import require_verified_asset
 from app.modules.materials.models import (
     AssetKind,
@@ -5789,7 +5909,7 @@ from app.modules.materials.models import (
     SourceStatus,
     SourceType,
 )
-from app.modules.materials.schemas import SourceOut
+from app.modules.materials.schemas import PageOut, SourceOut, SourcePagesPage
 
 INGEST_PDF = "ingest_pdf"  # job.type = tên hàm trong worker; job.ref_id = sources.id
 
@@ -5850,9 +5970,18 @@ async def attach_pdf(db: AsyncSession, queue: JobQueue, user: User, lesson_id: u
                      asset_id: uuid.UUID) -> tuple[Source, Job]:
     lesson, _ = await get_owned_lesson(db, lesson_id, user)
     asset = await require_verified_asset(db, asset_id, user, AssetKind.pdf)
-    source = Source(lesson_id=lesson.id, asset_id=asset.id, type=SourceType.pdf, status=SourceStatus.pending)
-    db.add(source)
-    await db.flush()
+    # ON CONFLICT theo uq_sources_lesson_asset: hai request gắn cùng file đồng thời thì chỉ một cái thành công
+    source_id = await db.scalar(
+        pg_insert(Source)
+        .values(id=uuid.uuid4(), lesson_id=lesson.id, asset_id=asset.id, type=SourceType.pdf,
+                status=SourceStatus.pending)
+        .on_conflict_do_nothing(constraint="uq_sources_lesson_asset")
+        .returning(Source.id)
+    )
+    if source_id is None:
+        await db.rollback()
+        raise AppError("ALREADY_ATTACHED", "File này đã được gắn vào bài học", 409)
+    source = await db.get(Source, source_id)
     job = await create_and_enqueue(db, queue, INGEST_PDF, source.id)  # commit source + job cùng lúc
     return source, job
 
@@ -5864,26 +5993,44 @@ async def list_lesson_sources(db: AsyncSession, user: User, lesson_id: uuid.UUID
     return await to_out_many(db, sources)
 
 
-async def list_pages(db: AsyncSession, source: Source) -> list[SourcePage]:
+async def list_pages(db: AsyncSession, source: Source, page: int, size: int) -> SourcePagesPage:
+    total = await db.scalar(select(func.count()).select_from(SourcePage)
+                            .where(SourcePage.source_id == source.id))
     rows = await db.scalars(select(SourcePage).where(SourcePage.source_id == source.id)
-                            .order_by(SourcePage.page_no))
-    return list(rows)
+                            .order_by(SourcePage.page_no).offset((page - 1) * size).limit(size))
+    return SourcePagesPage(items=[PageOut.model_validate(p) for p in rows], total=total, page=page, size=size)
+
+
+def _busy(message: str) -> AppError:
+    return AppError("INVALID_STATE", message, 409)
 
 
 async def reprocess(db: AsyncSession, queue: JobQueue, source: Source) -> Job:
-    if source.status not in (SourceStatus.ready, SourceStatus.failed):
-        raise AppError("INVALID_STATE", "Tài liệu đang được xử lý", 409)
+    if source.status == SourceStatus.pending:
+        raise _busy("Tài liệu đang chờ xử lý")
+    if source.status == SourceStatus.processing:
+        raise _busy("Tài liệu đang được xử lý")
+    # Tạo job trước: nếu vẫn còn job đang chạy (chưa được worker đánh dấu xong) thì không đụng tới source,
+    # tránh để source kẹt 'pending' mà không có job nào mới được enqueue.
+    job, created = await create_job(db, INGEST_PDF, source.id)
+    if not created:
+        waiting = job.status == JobStatus.pending  # đọc trước rollback (rollback làm hết hạn các object)
+        await db.rollback()
+        raise _busy("Tài liệu đang chờ xử lý" if waiting else "Tài liệu đang được xử lý")
     source.status = SourceStatus.pending
     source.error_msg = None
-    return await create_and_enqueue(db, queue, INGEST_PDF, source.id)
+    await db.commit()
+    await queue.enqueue(job)  # chỉ enqueue sau khi job đã commit
+    return job
 ```
 
-- [ ] **Step 6: Thêm vào `app/modules/materials/router.py`**
+- [ ] **Step 7: Thêm vào `app/modules/materials/router.py`**
   - Thêm import:
     - `from app.core.deps import get_current_user, require_staff` (thay dòng import deps cũ)
     - `from app.modules.jobs.queue import JobQueue, get_queue`
     - `from app.modules.materials import assets, sources` (thay dòng `from app.modules.materials import assets`)
-    - Thêm `JobRef, PageOut, SourceCreate, SourceCreated, SourceOut` vào dòng import schemas
+    - `from fastapi import APIRouter, Depends, Query` (thay dòng import fastapi cũ)
+    - Thêm `JobRef, SourceCreate, SourceCreated, SourceOut, SourcePagesPage` vào import schemas (ruff/isort xếp thành import nhiều dòng)
   - Thêm các route sau:
 
 ```python
@@ -5906,10 +6053,10 @@ async def source_detail(source_id: uuid.UUID, user: User = Depends(require_staff
     return await sources.to_out(db, await sources.get_owned_source(db, source_id, user))
 
 
-@router.get("/sources/{source_id}/pages", response_model=list[PageOut])
-async def source_pages(source_id: uuid.UUID, user: User = Depends(require_staff),
-                       db: AsyncSession = Depends(get_db)):
-    return await sources.list_pages(db, await sources.get_owned_source(db, source_id, user))
+@router.get("/sources/{source_id}/pages", response_model=SourcePagesPage)
+async def source_pages(source_id: uuid.UUID, page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
+                       user: User = Depends(require_staff), db: AsyncSession = Depends(get_db)):
+    return await sources.list_pages(db, await sources.get_owned_source(db, source_id, user), page, size)
 
 
 @router.post("/sources/{source_id}/reprocess", response_model=JobRef, status_code=202)
@@ -5920,12 +6067,12 @@ async def reprocess_source(source_id: uuid.UUID, user: User = Depends(require_st
     return JobRef(job_id=job.id)
 ```
 
-- [ ] **Step 7: Chạy toàn bộ test**
+- [ ] **Step 8: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add . && git commit -m "feat(materials): attach pdf sources to lessons, status, pages, reprocess"

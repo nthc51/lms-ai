@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
@@ -15,12 +15,12 @@ from app.modules.materials.models import Asset
 from app.modules.materials.schemas import (
     AssetOut,
     JobRef,
-    PageOut,
     PresignIn,
     PresignOut,
     SourceCreate,
     SourceCreated,
     SourceOut,
+    SourcePagesPage,
     UrlOut,
 )
 
@@ -68,10 +68,10 @@ async def source_detail(source_id: uuid.UUID, user: User = Depends(require_staff
     return await sources.to_out(db, await sources.get_owned_source(db, source_id, user))
 
 
-@router.get("/sources/{source_id}/pages", response_model=list[PageOut])
-async def source_pages(source_id: uuid.UUID, user: User = Depends(require_staff),
-                       db: AsyncSession = Depends(get_db)):
-    return await sources.list_pages(db, await sources.get_owned_source(db, source_id, user))
+@router.get("/sources/{source_id}/pages", response_model=SourcePagesPage)
+async def source_pages(source_id: uuid.UUID, page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
+                       user: User = Depends(require_staff), db: AsyncSession = Depends(get_db)):
+    return await sources.list_pages(db, await sources.get_owned_source(db, source_id, user), page, size)
 
 
 @router.post("/sources/{source_id}/reprocess", response_model=JobRef, status_code=202)

@@ -64,3 +64,10 @@ class PageOut(BaseModel):
     page_no: int
     extraction_method: ExtractionMethod
     markdown: str
+
+
+class SourcePagesPage(BaseModel):
+    items: list[PageOut]
+    total: int
+    page: int
+    size: int
