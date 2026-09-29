@@ -4593,7 +4593,7 @@ git add . && git commit -m "feat(ingestion): markdown chunker with heading paths
 - Modify: `backend/app/core/config.py`
 - Test: `backend/tests/test_ai_providers.py`, `backend/tests/test_ai_retry.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_ai_providers.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_ai_providers.py`**
 
 ```python
 import math
@@ -4660,7 +4660,7 @@ async def test_fake_vision_records_calls():
     assert v.calls == 1 and len(md) > 50
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_ai_retry.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_ai_retry.py`**
 
 ```python
 """Timeout + retry của GeminiEmbedder / GeminiVision (không gọi mạng, không ngủ thật)."""
@@ -4830,19 +4830,19 @@ async def test_real_sdk_client_over_mock_transport():
     assert len(seen) == 3 and all(t["read"] == 12.5 for t in seen)
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_ai_providers.py tests/test_ai_retry.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ai'`
 
-- [ ] **Step 4: Thêm timeout vào `app/core/config.py`** (thêm vào `Settings`, ngay sau `gemini_api_key`)
+- [x] **Step 4: Thêm timeout vào `app/core/config.py`** (thêm vào `Settings`, ngay sau `gemini_api_key`)
 
 ```python
     embed_timeout_s: float = 30.0
     vision_timeout_s: float = 120.0
 ```
 
-- [ ] **Step 5: `app/ai/retry.py`**
+- [x] **Step 5: `app/ai/retry.py`**
 
 ```python
 """Retry dùng chung cho các lời gọi Gemini: chỉ thử lại khi 429, 5xx hoặc timeout."""
@@ -4914,7 +4914,7 @@ async def call_with_retry[T](
         return result
 ```
 
-- [ ] **Step 6: `app/ai/embedder.py`** (`app/ai/__init__.py` để trống)
+- [x] **Step 6: `app/ai/embedder.py`** (`app/ai/__init__.py` để trống)
 
 ```python
 import asyncio
@@ -5016,7 +5016,7 @@ def get_embedder(s: Settings) -> Embedder:
     return FakeEmbedder(s.embed_dim)
 ```
 
-- [ ] **Step 7: `app/ai/vision.py`**
+- [x] **Step 7: `app/ai/vision.py`**
 
 ```python
 import asyncio
@@ -5076,12 +5076,12 @@ def get_vision(s: Settings) -> VisionExtractor:
     return FakeVision()
 ```
 
-- [ ] **Step 8: Chạy test**
+- [x] **Step 8: Chạy test**
 
 Run: `uv run pytest tests/test_ai_providers.py tests/test_ai_retry.py -v`
 Expected: PASS cả 17 test
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add backend/app/ai backend/app/core/config.py backend/tests/test_ai_providers.py backend/tests/test_ai_retry.py && git commit -m "feat(ai): embedder and vision interfaces with fake and gemini implementations"
