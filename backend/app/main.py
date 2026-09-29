@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.core.errors import register_error_handlers
 from app.core.middleware import RequestIdMiddleware
+from app.modules.auth.router import router as auth_router
 
 
 def create_app() -> FastAPI:
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     # routers
+    app.include_router(auth_router)
     return app
 
 
