@@ -221,3 +221,92 @@ async def test_late_worker_does_not_overwrite_swept_job(db):
     assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR
     assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
     assert (await db.scalars(select(Chunk).where(Chunk.source_id == source.id))).all() == []
+
+
+async def test_job_already_failed_by_sweeper_is_not_claimed(db):
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() * 2)
+    assert await sweep_stale_jobs({}) == 1
+    calls = []
+
+    async def handler(ref_id):
+        calls.append(ref_id)
+
+    await run_job(str(job.id), handler)
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert calls == []
+    assert job.status == JobStatus.failed and job.attempts == 1 and job.error_msg == STALE_JOB_ERROR
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
+
+
+def _sweep_racing_first_claim():
+    """session_factory: sweeper chạy xen vào đúng lúc worker nhận job (sau khi đọc job, trước khi ghi)."""
+    fired = False
+
+    async def sweep_once():
+        nonlocal fired
+        if not fired:
+            fired = True
+            await sweep_stale_jobs({})
+
+    @asynccontextmanager
+    async def cm():
+        async with SessionLocal() as session:
+            real_get, real_scalar, real_execute = session.get, session.scalar, session.execute
+
+            async def get(*a, **kw):
+                obj = await real_get(*a, **kw)
+                await sweep_once()  # đọc xong (không giữ lock) rồi sweeper mới chạy
+                return obj
+
+            async def scalar(*a, **kw):
+                await sweep_once()
+                return await real_scalar(*a, **kw)
+
+            async def execute(*a, **kw):
+                await sweep_once()
+                return await real_execute(*a, **kw)
+
+            session.get, session.scalar, session.execute = get, scalar, execute
+            yield session
+    return cm
+
+
+async def test_sweep_racing_the_claim_is_not_overwritten(db):
+    """arq chạy lại job của worker đã chết; sweeper đánh dấu failed ngay lúc worker mới nhận job."""
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() * 2)
+    calls = []
+
+    async def handler(ref_id):
+        calls.append(ref_id)
+
+    await run_job(str(job.id), handler, session_factory=_sweep_racing_first_claim())
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert calls == []
+    assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR and job.attempts == 1
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
+
+
+async def test_late_worker_failure_does_not_overwrite_swept_job(db):
+    """Sweeper đánh dấu failed trong lúc worker còn chạy, sau đó pipeline lỗi: giữ nguyên lỗi của sweeper."""
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+
+    class SweepThenFailEmbedder(FakeEmbedder):
+        async def embed_documents(self, texts):
+            async with SessionLocal() as s:
+                j = await s.get(Job, job.id)
+                j.started_at = utcnow() - _threshold() * 2
+                await s.commit()
+            await sweep_stale_jobs({})
+            raise RuntimeError("Embedding API lỗi")
+
+    ctx = {"storage": storage, "embedder": SweepThenFailEmbedder(768), "vision": FakeVision()}
+    await ingest_pdf(ctx, str(job.id))
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR

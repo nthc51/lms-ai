@@ -33,14 +33,17 @@ async def run_job(job_id: str, handler: Callable[[uuid.UUID], Awaitable[object]]
     Không ném lỗi ra ngoài: trạng thái lỗi nằm trong bảng jobs, arq không tự retry."""
     jid = uuid.UUID(job_id)
     async with session_factory() as db:
-        job = await db.get(Job, jid)
-        if job is None or job.status in (JobStatus.done, JobStatus.failed):
+        # Nhận job bằng một UPDATE có điều kiện (nguyên tử): job đã done/failed (kể cả vừa bị sweeper
+        # đánh dấu) thì không bao giờ bị lật lại thành processing. 'processing' vẫn nhận: arq chạy lại
+        # job của worker đã chết.
+        ref_id = await db.scalar(
+            update(Job)
+            .where(Job.id == jid, Job.status.in_((JobStatus.pending, JobStatus.processing)))
+            .values(status=JobStatus.processing, started_at=utcnow(), attempts=Job.attempts + 1)
+            .returning(Job.ref_id))
+        if ref_id is None:
             logger.warning("Bỏ qua job %s (không tồn tại hoặc đã kết thúc)", job_id)
             return
-        job.status = JobStatus.processing
-        job.attempts += 1
-        job.started_at = utcnow()
-        ref_id = job.ref_id
         await db.commit()
 
     status, error = JobStatus.done, None

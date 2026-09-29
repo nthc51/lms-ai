@@ -6082,7 +6082,7 @@ git add . && git commit -m "feat(materials): attach pdf sources to lessons, stat
 
 ### Task 22: Worker arq, Docker cho api/worker và smoke test end-to-end
 
-> Điều chỉnh (người dùng duyệt): trạng thái cuối của job (done/failed, finished_at, error_msg) được ghi **cùng transaction** với trạng thái cuối của source (ready/failed): `ingest_pdf_source` nhận thêm `job_id` (tùy chọn, test pipeline cũ không đổi), commit cuối và `_mark_failed` gọi `finish_job` (`UPDATE jobs ... WHERE status = 'processing' RETURNING`); nếu job không còn processing (đã bị sweeper đánh dấu failed) thì bỏ kết quả, không ghi đè source. Worker đánh dấu job processing + started_at + attempts khi nhận job; `run_job` chỉ tự ghi done/failed nếu handler chưa ghi (vd. source không tồn tại). `job_timeout` riêng theo loại job (spec K4): `JOB_TIMEOUTS = {"ingest_pdf": 600}` giây. Thêm cron `sweep_stale_jobs` (5 phút một lần, chạy cả lúc worker khởi động): job processing có started_at cũ hơn job_timeout + 5 phút → failed "Worker bị gián đoạn", finished_at = now; source tương ứng (ingest_pdf: job.ref_id) nếu còn pending/processing cũng failed với cùng thông báo, chung transaction, để giảng viên bấm "Xử lý lại". `ensure_bucket` chịu được race giữa API và worker (bỏ qua BucketAlreadyOwnedByYou/BucketAlreadyExists). Dockerfile: uv ghim 0.12.20, cài dependency ở layer riêng, chạy bằng user không phải root. Smoke script đặt ở `backend/scripts/` (có `__init__.py`), chạy bằng `cd backend && PYTHONUTF8=1 uv run python -m scripts.smoke_week1 [file.pdf]`; không truyền file thì tự sinh PDF 2 trang có text (không commit file PDF mẫu); email smoke dùng `@example.com` (email-validator từ chối `.local`); `/sources/{id}/pages` đã phân trang nên đọc `items`.
+> Điều chỉnh (người dùng duyệt): trạng thái cuối của job (done/failed, finished_at, error_msg) được ghi **cùng transaction** với trạng thái cuối của source (ready/failed): `ingest_pdf_source` nhận thêm `job_id` (tùy chọn, test pipeline cũ không đổi), commit cuối và `_mark_failed` gọi `finish_job` (`UPDATE jobs ... WHERE status = 'processing' RETURNING`); nếu job không còn processing (đã bị sweeper đánh dấu failed) thì bỏ kết quả, không ghi đè source (cả nhánh thành công lẫn nhánh lỗi). Worker nhận job bằng một UPDATE có điều kiện (`WHERE status IN ('pending','processing')` → processing, started_at, attempts + 1, `RETURNING ref_id`; không có dòng thì bỏ qua), nên job sweeper đã đánh dấu failed không bao giờ bị lật lại thành processing; `run_job` chỉ tự ghi done/failed nếu handler chưa ghi (vd. source không tồn tại). `job_timeout` riêng theo loại job (spec K4): `JOB_TIMEOUTS = {"ingest_pdf": 600}` giây. Thêm cron `sweep_stale_jobs` (5 phút một lần, chạy cả lúc worker khởi động): job processing có started_at cũ hơn job_timeout + 5 phút → failed "Worker bị gián đoạn", finished_at = now; source tương ứng (ingest_pdf: job.ref_id) nếu còn pending/processing cũng failed với cùng thông báo, chung transaction, để giảng viên bấm "Xử lý lại". `ensure_bucket` chịu được race giữa API và worker (bỏ qua BucketAlreadyOwnedByYou/BucketAlreadyExists). Dockerfile: uv ghim 0.12.20, cài dependency ở layer riêng, chạy bằng user không phải root. Smoke script đặt ở `backend/scripts/` (có `__init__.py`), chạy bằng `cd backend && PYTHONUTF8=1 uv run python -m scripts.smoke_week1 [file.pdf]`; không truyền file thì tự sinh PDF 2 trang có text (không commit file PDF mẫu); email smoke dùng `@example.com` (email-validator từ chối `.local`); `/sources/{id}/pages` đã phân trang nên đọc `items`.
 
 **Files:**
 - Create: `backend/app/worker/__init__.py`, `backend/app/worker/tasks.py`, `backend/app/worker/settings.py`, `backend/Dockerfile`, `backend/.dockerignore`, `backend/scripts/__init__.py`, `backend/scripts/smoke_week1.py`
@@ -6315,6 +6315,95 @@ async def test_late_worker_does_not_overwrite_swept_job(db):
     assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR
     assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
     assert (await db.scalars(select(Chunk).where(Chunk.source_id == source.id))).all() == []
+
+
+async def test_job_already_failed_by_sweeper_is_not_claimed(db):
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() * 2)
+    assert await sweep_stale_jobs({}) == 1
+    calls = []
+
+    async def handler(ref_id):
+        calls.append(ref_id)
+
+    await run_job(str(job.id), handler)
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert calls == []
+    assert job.status == JobStatus.failed and job.attempts == 1 and job.error_msg == STALE_JOB_ERROR
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
+
+
+def _sweep_racing_first_claim():
+    """session_factory: sweeper chạy xen vào đúng lúc worker nhận job (sau khi đọc job, trước khi ghi)."""
+    fired = False
+
+    async def sweep_once():
+        nonlocal fired
+        if not fired:
+            fired = True
+            await sweep_stale_jobs({})
+
+    @asynccontextmanager
+    async def cm():
+        async with SessionLocal() as session:
+            real_get, real_scalar, real_execute = session.get, session.scalar, session.execute
+
+            async def get(*a, **kw):
+                obj = await real_get(*a, **kw)
+                await sweep_once()  # đọc xong (không giữ lock) rồi sweeper mới chạy
+                return obj
+
+            async def scalar(*a, **kw):
+                await sweep_once()
+                return await real_scalar(*a, **kw)
+
+            async def execute(*a, **kw):
+                await sweep_once()
+                return await real_execute(*a, **kw)
+
+            session.get, session.scalar, session.execute = get, scalar, execute
+            yield session
+    return cm
+
+
+async def test_sweep_racing_the_claim_is_not_overwritten(db):
+    """arq chạy lại job của worker đã chết; sweeper đánh dấu failed ngay lúc worker mới nhận job."""
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() * 2)
+    calls = []
+
+    async def handler(ref_id):
+        calls.append(ref_id)
+
+    await run_job(str(job.id), handler, session_factory=_sweep_racing_first_claim())
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert calls == []
+    assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR and job.attempts == 1
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
+
+
+async def test_late_worker_failure_does_not_overwrite_swept_job(db):
+    """Sweeper đánh dấu failed trong lúc worker còn chạy, sau đó pipeline lỗi: giữ nguyên lỗi của sweeper."""
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+
+    class SweepThenFailEmbedder(FakeEmbedder):
+        async def embed_documents(self, texts):
+            async with SessionLocal() as s:
+                j = await s.get(Job, job.id)
+                j.started_at = utcnow() - _threshold() * 2
+                await s.commit()
+            await sweep_stale_jobs({})
+            raise RuntimeError("Embedding API lỗi")
+
+    ctx = {"storage": storage, "embedder": SweepThenFailEmbedder(768), "vision": FakeVision()}
+    await ingest_pdf(ctx, str(job.id))
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
 ```
 
 - [ ] **Step 2: Chạy test**
@@ -6499,14 +6588,17 @@ async def run_job(job_id: str, handler: Callable[[uuid.UUID], Awaitable[object]]
     Không ném lỗi ra ngoài: trạng thái lỗi nằm trong bảng jobs, arq không tự retry."""
     jid = uuid.UUID(job_id)
     async with session_factory() as db:
-        job = await db.get(Job, jid)
-        if job is None or job.status in (JobStatus.done, JobStatus.failed):
+        # Nhận job bằng một UPDATE có điều kiện (nguyên tử): job đã done/failed (kể cả vừa bị sweeper
+        # đánh dấu) thì không bao giờ bị lật lại thành processing. 'processing' vẫn nhận: arq chạy lại
+        # job của worker đã chết.
+        ref_id = await db.scalar(
+            update(Job)
+            .where(Job.id == jid, Job.status.in_((JobStatus.pending, JobStatus.processing)))
+            .values(status=JobStatus.processing, started_at=utcnow(), attempts=Job.attempts + 1)
+            .returning(Job.ref_id))
+        if ref_id is None:
             logger.warning("Bỏ qua job %s (không tồn tại hoặc đã kết thúc)", job_id)
             return
-        job.status = JobStatus.processing
-        job.attempts += 1
-        job.started_at = utcnow()
-        ref_id = job.ref_id
         await db.commit()
 
     status, error = JobStatus.done, None
@@ -6597,7 +6689,7 @@ class WorkerSettings:
 - [ ] **Step 7: Chạy test**
 
 Run: `uv run pytest tests/test_worker.py tests/test_pipeline.py -v`
-Expected: PASS (12 test worker/sweeper + 6 test pipeline cũ không đổi)
+Expected: PASS (15 test worker/sweeper + 6 test pipeline cũ không đổi)
 
 - [ ] **Step 8: `ensure_bucket` chịu được race giữa API và worker**
   - Thêm vào cuối `tests/test_storage.py`:
@@ -6635,7 +6727,16 @@ async def test_ensure_bucket_tolerates_concurrent_creation():
   - Sửa `MinioStorage.ensure_bucket` trong `app/core/storage.py`:
 
 ```python
-
+    async def ensure_bucket(self) -> None:
+        def run() -> None:
+            if self._internal.bucket_exists(self._bucket):
+                return
+            try:
+                self._internal.make_bucket(self._bucket)
+            except S3Error as e:  # API và worker cùng khởi động: bên kia vừa tạo xong thì bỏ qua
+                if e.code not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+                    raise
+        await asyncio.to_thread(run)
 ```
 
   - Run lại: PASS
@@ -6691,7 +6792,35 @@ scripts
 - [ ] **Step 11: Thêm `api` và `worker` vào `docker-compose.yml`** (dưới service `minio`, trong khối `services:`)
 
 ```yaml
-
+  api:
+    build: ./backend
+    env_file: ./backend/.env
+    environment: &backend_env
+      DATABASE_URL: postgresql+asyncpg://lms:lms@db:5432/lms
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_PUBLIC_ENDPOINT: localhost:9000  # host ký URL phải đúng host trình duyệt/smoke script gọi tới
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports: ["8000:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+  worker:
+    build: ./backend
+    env_file: ./backend/.env
+    environment: *backend_env
+    command: arq app.worker.settings.WorkerSettings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
 ```
 
 - [ ] **Step 12: `backend/scripts/smoke_week1.py`** (+ `backend/scripts/__init__.py` rỗng): kiểm tra end-to-end trên hệ thống thật (API, worker, MinIO, Postgres)
