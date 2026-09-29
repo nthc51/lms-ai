@@ -3726,7 +3726,7 @@ git add . && git commit -m "feat(materials): presigned uploads with magic-byte v
 - Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_jobs.py`
 - Test: `backend/tests/test_jobs.py`
 
-- [ ] **Step 1: `app/modules/jobs/models.py`**
+- [x] **Step 1: `app/modules/jobs/models.py`**
 
 ```python
 import enum
@@ -3768,7 +3768,7 @@ class Job(IdMixin, TimestampMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 ```
 
-- [ ] **Step 2: Đăng ký model và sinh migration**
+- [x] **Step 2: Đăng ký model và sinh migration**
   - Thêm vào `app/models_registry.py`: `from app.modules.jobs import models as jobs_models  # noqa: F401`
 
 Run: `uv run alembic revision --autogenerate -m "jobs"`
@@ -3776,7 +3776,7 @@ Mở file migration và kiểm tra có dòng `op.create_index('uq_active_job', .
 
 Run tiếp: `uv run alembic upgrade head`
 
-- [ ] **Step 3: `app/modules/jobs/queue.py`**
+- [x] **Step 3: `app/modules/jobs/queue.py`**
 
 ```python
 from functools import lru_cache
@@ -3810,7 +3810,7 @@ def get_queue() -> JobQueue:
     return ArqQueue(get_settings().redis_url)
 ```
 
-- [ ] **Step 4: Thêm `RecordingQueue` vào cuối `tests/fakes.py`**
+- [x] **Step 4: Thêm `RecordingQueue` vào cuối `tests/fakes.py`**
 
 ```python
 class RecordingQueue:
@@ -3828,7 +3828,7 @@ class RecordingQueue:
         self.jobs.append((job.type, job.ref_id))
 ```
 
-- [ ] **Step 5: Cập nhật `tests/conftest.py`**: thêm fixture `queue` và override trong `client`
+- [x] **Step 5: Cập nhật `tests/conftest.py`**: thêm fixture `queue` và override trong `client`
 
 ```python
 from app.modules.jobs.queue import get_queue  # noqa: E402
@@ -3852,7 +3852,7 @@ async def client(storage, queue):
         yield c
 ```
 
-- [ ] **Step 6: Viết test hỏng trước — `tests/test_jobs.py`**
+- [x] **Step 6: Viết test hỏng trước — `tests/test_jobs.py`**
 
 ```python
 import asyncio
@@ -3927,12 +3927,12 @@ async def test_get_job_endpoint(client, db):
     assert (await client.get(f"{API}/jobs/{job.id}")).status_code == 401
 ```
 
-- [ ] **Step 7: Chạy test**
+- [x] **Step 7: Chạy test**
 
 Run: `uv run pytest tests/test_jobs.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.modules.jobs.service'`
 
-- [ ] **Step 8: `app/modules/jobs/service.py`**
+- [x] **Step 8: `app/modules/jobs/service.py`**
 
 ```python
 import uuid
@@ -3981,7 +3981,7 @@ async def create_and_enqueue(db: AsyncSession, queue: JobQueue, type_: str, ref_
     return job
 ```
 
-- [ ] **Step 9: `app/modules/jobs/router.py`**
+- [x] **Step 9: `app/modules/jobs/router.py`**
 
 ```python
 import uuid
@@ -4019,16 +4019,16 @@ async def get_job(job_id: uuid.UUID, user: User = Depends(get_current_user), db:
     return job
 ```
 
-- [ ] **Step 10: Gắn router vào `app/main.py`**
+- [x] **Step 10: Gắn router vào `app/main.py`**
   - Import: `from app.modules.jobs.router import router as jobs_router`
   - Dưới `# routers`: `app.include_router(jobs_router)`
 
-- [ ] **Step 11: Chạy toàn bộ test**
+- [x] **Step 11: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết. Nếu `test_concurrent_creates_produce_one_job` báo `there is no unique or exclusion constraint matching the ON CONFLICT specification`, nghĩa là predicate trong `index_where` không khớp với index. Kiểm tra migration dùng đúng chuỗi `ACTIVE_JOB_PREDICATE`.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add . && git commit -m "feat(jobs): jobs table with partial unique index, dedup create, arq queue"
