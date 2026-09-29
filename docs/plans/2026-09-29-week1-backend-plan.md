@@ -389,18 +389,18 @@ git add backend && git commit -m "feat(backend): project skeleton with settings,
 - Modify: `backend/alembic/script.py.mako`, `backend/tests/conftest.py`
 - Test: `backend/tests/test_unaccent.py`
 
-- [ ] **Step 1: Khởi tạo alembic bằng template async**
+- [x] **Step 1: Khởi tạo alembic bằng template async**
 
 Run: `uv run alembic init -t async alembic`
 Expected: tạo ra `alembic.ini` và thư mục `alembic/`
 
-- [ ] **Step 2: `app/models_registry.py`**
+- [x] **Step 2: `app/models_registry.py`**
 
 ```python
 """Import mọi module models để Base.metadata có đủ bảng (dùng cho Alembic và test)."""
 ```
 
-- [ ] **Step 3: Thay toàn bộ nội dung `alembic/env.py`**
+- [x] **Step 3: Thay toàn bộ nội dung `alembic/env.py`**
 
 ```python
 import asyncio
@@ -445,7 +445,7 @@ else:
     asyncio.run(run_async_migrations())
 ```
 
-- [ ] **Step 4: Sửa `alembic/script.py.mako`**: ngay dưới dòng `import sqlalchemy as sa`, thêm:
+- [x] **Step 4: Sửa `alembic/script.py.mako`**: ngay dưới dòng `import sqlalchemy as sa`, thêm:
 
 ```python
 import pgvector.sqlalchemy  # noqa: F401
@@ -453,7 +453,7 @@ import pgvector.sqlalchemy  # noqa: F401
 
 (Khi autogenerate sinh cột vector, migration sẽ có dạng `pgvector.sqlalchemy.vector.VECTOR(dim=768)`, nên cần sẵn import này.)
 
-- [ ] **Step 5: `alembic/versions/0001_extensions.py`**
+- [x] **Step 5: `alembic/versions/0001_extensions.py`**
 
 ```python
 """extensions and immutable_unaccent
@@ -486,7 +486,7 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS immutable_unaccent(text)")
 ```
 
-- [ ] **Step 6: Viết test — `tests/test_unaccent.py`**
+- [x] **Step 6: Viết test — `tests/test_unaccent.py`**
 
 ```python
 from sqlalchemy import text
@@ -505,7 +505,7 @@ async def test_unaccent_function_is_immutable(db):
     assert vol == "i"
 ```
 
-- [ ] **Step 7: Thêm các fixture migrate, clean và db vào cuối `tests/conftest.py`**
+- [x] **Step 7: Thêm các fixture migrate, clean và db vào cuối `tests/conftest.py`**
 
 ```python
 import asyncio  # noqa: E402
@@ -553,18 +553,18 @@ async def db():
         yield session
 ```
 
-- [ ] **Step 8: Chạy test**
+- [x] **Step 8: Chạy test**
 
 Run: `uv run pytest -v`
 Expected: PASS cả 4 test (health + 3 test unaccent).
 Nếu `test_unaccent_handles_d_stroke` hỏng: kiểm tra `SELECT unaccent('Đđ')` trong psql. Bộ rules mặc định của image postgres có map `Đ→D`, `đ→d`. Nếu không có, **dừng lại và báo**, đừng tự sửa rules.
 
-- [ ] **Step 9: Tạo schema cho DB dev**
+- [x] **Step 9: Tạo schema cho DB dev**
 
 Run: `cp .env.example .env && uv run alembic upgrade head`
 Expected: `Running upgrade  -> 0001`
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add . && git commit -m "feat(db): alembic async setup, extensions, immutable_unaccent + tests"
