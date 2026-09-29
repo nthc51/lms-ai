@@ -50,3 +50,25 @@ async def create_course(client, headers, title="Cấu trúc dữ liệu và Gi�
     r = await client.post(f"{API}/courses", json={"title": title, "description": description}, headers=headers)
     assert r.status_code == 201, r.text
     return r.json()
+
+
+async def add_section(client, headers, course_id, title="Chương 1") -> dict:
+    r = await client.post(f"{API}/courses/{course_id}/sections", json={"title": title}, headers=headers)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+async def add_lesson(client, headers, section_id, title="Bài 1", content_md="# Nội dung") -> dict:
+    r = await client.post(f"{API}/sections/{section_id}/lessons",
+                          json={"title": title, "content_md": content_md}, headers=headers)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+async def make_published_course(client, teacher_headers, title="Cấu trúc dữ liệu") -> tuple[dict, dict, dict]:
+    course = await create_course(client, teacher_headers, title=title)
+    section = await add_section(client, teacher_headers, course["id"])
+    lesson = await add_lesson(client, teacher_headers, section["id"])
+    r = await client.post(f"{API}/courses/{course['id']}/publish", headers=teacher_headers)
+    assert r.status_code == 200, r.text
+    return r.json(), section, lesson
