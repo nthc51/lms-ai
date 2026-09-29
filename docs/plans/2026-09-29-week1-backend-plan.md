@@ -5544,7 +5544,7 @@ git add . && git commit -m "feat(ingestion): pdf ingestion pipeline with short-l
 - Modify: `backend/app/modules/materials/models.py`, `backend/app/modules/materials/schemas.py`, `backend/app/modules/materials/router.py`, `backend/tests/helpers.py`
 - Test: `backend/tests/test_sources_api.py`
 
-- [ ] **Step 1: Thêm vào cuối `tests/helpers.py`**
+- [x] **Step 1: Thêm vào cuối `tests/helpers.py`**
 
 ```python
 async def upload_file(client, storage, headers, data: bytes, kind="pdf", mime="application/pdf") -> str:
@@ -5558,7 +5558,7 @@ async def upload_file(client, storage, headers, data: bytes, kind="pdf", mime="a
     return r.json()["asset_id"]
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_sources_api.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_sources_api.py`**
 
 ```python
 import uuid
@@ -5785,12 +5785,12 @@ async def test_same_asset_cannot_be_attached_twice_to_a_lesson(client, storage, 
     assert (await _attach(client, gv, other_lesson["id"], asset_id)).status_code == 202
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_sources_api.py -v`
 Expected: FAIL (405/404 vì chưa có route `/lessons/{id}/sources`)
 
-- [ ] **Step 4: Ràng buộc một file chỉ gắn một lần vào mỗi bài học (migration riêng)**
+- [x] **Step 4: Ràng buộc một file chỉ gắn một lần vào mỗi bài học (migration riêng)**
   - Trong `app/modules/materials/models.py`: thêm `UniqueConstraint` vào import từ `sqlalchemy` (ruff/isort tách thành import nhiều dòng, `Enum as SAEnum` thành dòng riêng), rồi thêm vào class `Source`, ngay dưới `__tablename__`:
 
 ```python
@@ -5837,7 +5837,7 @@ def downgrade() -> None:
     # ### end Alembic commands ###
 ```
 
-- [ ] **Step 5: Thêm vào cuối `app/modules/materials/schemas.py`**
+- [x] **Step 5: Thêm vào cuối `app/modules/materials/schemas.py`**
   - Thêm import: `from app.modules.materials.models import AssetKind, ExtractionMethod, SourceStatus, SourceType` (thay dòng import `AssetKind` cũ)
 
 ```python
@@ -5882,7 +5882,7 @@ class SourcePagesPage(BaseModel):
     size: int
 ```
 
-- [ ] **Step 6: `app/modules/materials/sources.py`**
+- [x] **Step 6: `app/modules/materials/sources.py`**
 
 ```python
 import uuid
@@ -6024,7 +6024,7 @@ async def reprocess(db: AsyncSession, queue: JobQueue, source: Source) -> Job:
     return job
 ```
 
-- [ ] **Step 7: Thêm vào `app/modules/materials/router.py`**
+- [x] **Step 7: Thêm vào `app/modules/materials/router.py`**
   - Thêm import:
     - `from app.core.deps import get_current_user, require_staff` (thay dòng import deps cũ)
     - `from app.modules.jobs.queue import JobQueue, get_queue`
@@ -6067,12 +6067,12 @@ async def reprocess_source(source_id: uuid.UUID, user: User = Depends(require_st
     return JobRef(job_id=job.id)
 ```
 
-- [ ] **Step 8: Chạy toàn bộ test**
+- [x] **Step 8: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add . && git commit -m "feat(materials): attach pdf sources to lessons, status, pages, reprocess"
