@@ -4,14 +4,25 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_staff
 from app.core.errors import not_found
 from app.core.storage import Storage, get_storage
 from app.modules.auth.models import User
 from app.modules.enrollment.service import ensure_lesson_access
-from app.modules.materials import assets
+from app.modules.jobs.queue import JobQueue, get_queue
+from app.modules.materials import assets, sources
 from app.modules.materials.models import Asset
-from app.modules.materials.schemas import AssetOut, PresignIn, PresignOut, UrlOut
+from app.modules.materials.schemas import (
+    AssetOut,
+    JobRef,
+    PageOut,
+    PresignIn,
+    PresignOut,
+    SourceCreate,
+    SourceCreated,
+    SourceOut,
+    UrlOut,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["materials"])
 
@@ -36,3 +47,36 @@ async def lesson_video(lesson_id: uuid.UUID, user: User = Depends(get_current_us
     if asset is None:
         raise not_found("Video")
     return UrlOut(url=await storage.presign_get(asset.storage_key, asset.mime))
+
+
+@router.post("/lessons/{lesson_id}/sources", response_model=SourceCreated, status_code=202)
+async def attach_source(lesson_id: uuid.UUID, data: SourceCreate, user: User = Depends(require_staff),
+                        db: AsyncSession = Depends(get_db), queue: JobQueue = Depends(get_queue)):
+    source, job = await sources.attach_pdf(db, queue, user, lesson_id, data.asset_id)
+    return SourceCreated(source=await sources.to_out(db, source), job_id=job.id)
+
+
+@router.get("/lessons/{lesson_id}/sources", response_model=list[SourceOut])
+async def lesson_sources(lesson_id: uuid.UUID, user: User = Depends(require_staff),
+                         db: AsyncSession = Depends(get_db)):
+    return await sources.list_lesson_sources(db, user, lesson_id)
+
+
+@router.get("/sources/{source_id}", response_model=SourceOut)
+async def source_detail(source_id: uuid.UUID, user: User = Depends(require_staff),
+                        db: AsyncSession = Depends(get_db)):
+    return await sources.to_out(db, await sources.get_owned_source(db, source_id, user))
+
+
+@router.get("/sources/{source_id}/pages", response_model=list[PageOut])
+async def source_pages(source_id: uuid.UUID, user: User = Depends(require_staff),
+                       db: AsyncSession = Depends(get_db)):
+    return await sources.list_pages(db, await sources.get_owned_source(db, source_id, user))
+
+
+@router.post("/sources/{source_id}/reprocess", response_model=JobRef, status_code=202)
+async def reprocess_source(source_id: uuid.UUID, user: User = Depends(require_staff),
+                           db: AsyncSession = Depends(get_db), queue: JobQueue = Depends(get_queue)):
+    source = await sources.get_owned_source(db, source_id, user)
+    job = await sources.reprocess(db, queue, source)
+    return JobRef(job_id=job.id)

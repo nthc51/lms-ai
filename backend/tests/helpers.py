@@ -72,3 +72,14 @@ async def make_published_course(client, teacher_headers, title="Cấu trúc dữ
     r = await client.post(f"{API}/courses/{course['id']}/publish", headers=teacher_headers)
     assert r.status_code == 200, r.text
     return r.json(), section, lesson
+
+
+async def upload_file(client, storage, headers, data: bytes, kind="pdf", mime="application/pdf") -> str:
+    """Presign → 'upload' vào key tạm của storage giả → complete. Trả về asset_id."""
+    r = await client.post(f"{API}/uploads/presign", json={"kind": kind, "mime": mime, "size": len(data)},
+                          headers=headers)
+    assert r.status_code == 200, r.text
+    storage.client_put(r.json()["put_url"], data, mime)  # vào key tạm; complete sẽ copy sang key chính thức
+    done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=headers)
+    assert done.status_code == 200, done.text
+    return r.json()["asset_id"]

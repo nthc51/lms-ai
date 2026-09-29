@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.materials.models import AssetKind
+from app.modules.materials.models import AssetKind, ExtractionMethod, SourceStatus, SourceType
 
 
 class PresignIn(BaseModel):
@@ -30,3 +30,37 @@ class AssetOut(BaseModel):
 
 class UrlOut(BaseModel):
     url: str
+
+
+class SourceCreate(BaseModel):
+    asset_id: uuid.UUID
+
+
+class SourceOut(BaseModel):
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    type: SourceType
+    status: SourceStatus
+    error_msg: str | None  # failed: lý do lỗi; ready: có thể là cảnh báo (vượt trần trang vision)
+    warning: str | None  # = error_msg khi status == ready, ngược lại None
+    processed_at: datetime | None
+    page_count: int
+    vision_pages: int  # số trang trích bằng vision (source_pages.extraction_method = 'vision')
+    chunk_count: int
+
+
+class SourceCreated(BaseModel):
+    source: SourceOut
+    job_id: uuid.UUID
+
+
+class JobRef(BaseModel):
+    job_id: uuid.UUID
+
+
+class PageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    page_no: int
+    extraction_method: ExtractionMethod
+    markdown: str

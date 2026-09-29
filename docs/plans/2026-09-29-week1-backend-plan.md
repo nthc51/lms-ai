@@ -5536,7 +5536,7 @@ git add . && git commit -m "feat(ingestion): pdf ingestion pipeline with short-l
 
 ### Task 21: API tài liệu của bài học (gắn PDF, xem trạng thái, xem trang, xử lý lại)
 
-> Điều chỉnh sau Task 14: `upload_file` PUT qua `storage.client_put` (vào key tạm `staging/...`, kèm mime) thay vì ghi thẳng `storage.objects`, khớp storage giả mới.
+> Điều chỉnh sau Task 14: `upload_file` PUT qua `storage.client_put` (vào key tạm `staging/...`, kèm mime) thay vì ghi thẳng `storage.objects`, khớp storage giả mới. Điều chỉnh sau Task 20 (user duyệt): `SourceOut` thêm `vision_pages` (đếm `source_pages` có `extraction_method = vision`, tính bằng truy vấn, không thêm cột; list dùng một truy vấn GROUP BY chung, không N+1) và `warning` (= `error_msg` khi `status = ready`, tức cảnh báo vượt trần trang vision; ngược lại `None`). `error_msg` giữ nguyên nghĩa cũ.
 
 **Files:**
 - Create: `backend/app/modules/materials/sources.py`
@@ -5565,13 +5565,21 @@ import uuid
 from app.ai.embedder import FakeEmbedder
 from app.ai.vision import FakeVision
 from app.ingestion.pipeline import ingest_pdf_source
-from app.modules.materials.models import Source, SourceStatus
+from app.modules.materials.models import ExtractionMethod, Source, SourcePage, SourceStatus
 from tests.helpers import API, make_published_course, make_student, make_teacher, upload_file
 from tests.pdfs import LONG_TEXT, make_pdf
 
 
 async def _attach(client, headers, lesson_id, asset_id):
     return await client.post(f"{API}/lessons/{lesson_id}/sources", json={"asset_id": asset_id}, headers=headers)
+
+
+async def _attached_source(client, storage, headers) -> tuple[dict, str]:
+    _, _, lesson = await make_published_course(client, headers)
+    asset_id = await upload_file(client, storage, headers, make_pdf([LONG_TEXT]))
+    r = await _attach(client, headers, lesson["id"], asset_id)
+    assert r.status_code == 202, r.text
+    return lesson, r.json()["source"]["id"]
 
 
 async def test_teacher_attaches_pdf_and_job_is_enqueued(client, storage, queue):
@@ -5582,6 +5590,7 @@ async def test_teacher_attaches_pdf_and_job_is_enqueued(client, storage, queue):
     assert r.status_code == 202
     body = r.json()
     assert body["source"]["status"] == "pending"
+    assert body["source"]["vision_pages"] == 0 and body["source"]["warning"] is None
     assert queue.jobs == [("ingest_pdf", uuid.UUID(body["source"]["id"]))]
     job = await client.get(f"{API}/jobs/{body['job_id']}", headers=gv)
     assert job.json()["status"] == "pending"
@@ -5599,6 +5608,17 @@ async def test_student_and_other_teacher_cannot_attach(client, storage):
     r_gv2 = await _attach(client, gv2, lesson["id"], asset_id)
     assert (r_sv.status_code, r_sv.json()["error"]["code"]) == (403, "FORBIDDEN")
     assert r_gv2.status_code == 404
+
+
+async def test_other_teacher_gets_404_on_source_endpoints(client, storage):
+    _, gv1 = await make_teacher(client, "gv1@x.com")
+    _, gv2 = await make_teacher(client, "gv2@x.com")
+    lesson, source_id = await _attached_source(client, storage, gv1)
+    for r in (await client.get(f"{API}/sources/{source_id}", headers=gv2),
+              await client.get(f"{API}/sources/{source_id}/pages", headers=gv2),
+              await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv2),
+              await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv2)):
+        assert (r.status_code, r.json()["error"]["code"]) == (404, "NOT_FOUND")
 
 
 async def test_unverified_asset_is_rejected(client):
@@ -5631,6 +5651,8 @@ async def test_reprocess_only_when_finished(client, storage, queue, db):
 
     ok = await client.post(f"{API}/sources/{source_id}/reprocess", headers=gv)
     assert ok.status_code == 202 and len(queue.jobs) == 2
+    detail = (await client.get(f"{API}/sources/{source_id}", headers=gv)).json()
+    assert detail["status"] == "pending" and detail["error_msg"] is None
 
 
 async def test_pages_and_counts_after_processing(client, storage):
@@ -5643,8 +5665,59 @@ async def test_pages_and_counts_after_processing(client, storage):
 
     detail = (await client.get(f"{API}/sources/{source_id}", headers=gv)).json()
     assert detail["status"] == "ready" and detail["page_count"] == 2 and detail["chunk_count"] >= 1
+    assert detail["vision_pages"] == 1 and detail["warning"] is None
     pages = (await client.get(f"{API}/sources/{source_id}/pages", headers=gv)).json()
     assert [p["extraction_method"] for p in pages] == ["text", "vision"]
+
+
+async def test_vision_pages_counted_per_source_in_detail_and_list(client, storage, db):
+    _, gv = await make_teacher(client)
+    lesson, first_id = await _attached_source(client, storage, gv)
+    asset_id = await upload_file(client, storage, gv, make_pdf([LONG_TEXT]))
+    second_id = (await _attach(client, gv, lesson["id"], asset_id)).json()["source"]["id"]
+    methods = [ExtractionMethod.vision, ExtractionMethod.text, ExtractionMethod.vision]
+    db.add_all([SourcePage(source_id=uuid.UUID(first_id), page_no=i + 1, extraction_method=m, markdown="x")
+                for i, m in enumerate(methods)])
+    db.add(SourcePage(source_id=uuid.UUID(second_id), page_no=1, extraction_method=ExtractionMethod.text,
+                      markdown="y"))
+    await db.commit()
+
+    detail = (await client.get(f"{API}/sources/{first_id}", headers=gv)).json()
+    assert (detail["page_count"], detail["vision_pages"]) == (3, 2)
+    listed = (await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv)).json()
+    stats = [(s["id"], s["page_count"], s["vision_pages"]) for s in listed]
+    assert stats == [(first_id, 3, 2), (second_id, 1, 0)]
+
+
+async def test_failed_source_has_error_but_no_warning(client, storage, db):
+    _, gv = await make_teacher(client)
+    lesson, source_id = await _attached_source(client, storage, gv)
+    src = await db.get(Source, uuid.UUID(source_id))
+    src.status, src.error_msg = SourceStatus.failed, "Tài liệu không có nội dung đọc được"
+    await db.commit()
+
+    detail = (await client.get(f"{API}/sources/{source_id}", headers=gv)).json()
+    assert detail["status"] == "failed"
+    assert detail["error_msg"] == "Tài liệu không có nội dung đọc được" and detail["warning"] is None
+    listed = (await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv)).json()
+    assert listed[0]["warning"] is None
+
+
+async def test_ready_source_with_vision_cap_exposes_warning(client, storage):
+    _, gv = await make_teacher(client)
+    lesson, _ = await _attached_source(client, storage, gv)
+    asset_id = await upload_file(client, storage, gv, make_pdf(["", ""]))
+    source_id = (await _attach(client, gv, lesson["id"], asset_id)).json()["source"]["id"]
+
+    await ingest_pdf_source(uuid.UUID(source_id), storage=storage, embedder=FakeEmbedder(768),
+                            vision=FakeVision(), max_vision_pages=1)
+
+    detail = (await client.get(f"{API}/sources/{source_id}", headers=gv)).json()
+    assert detail["status"] == "ready" and detail["vision_pages"] == 1
+    assert detail["warning"] and detail["warning"] == detail["error_msg"]
+    listed = (await client.get(f"{API}/lessons/{lesson['id']}/sources", headers=gv)).json()
+    listed = {s["id"]: s for s in listed}
+    assert listed[source_id]["warning"] == detail["warning"]
 ```
 
 - [ ] **Step 3: Chạy test**
@@ -5665,9 +5738,11 @@ class SourceOut(BaseModel):
     lesson_id: uuid.UUID
     type: SourceType
     status: SourceStatus
-    error_msg: str | None
+    error_msg: str | None  # failed: lý do lỗi; ready: có thể là cảnh báo (vượt trần trang vision)
+    warning: str | None  # = error_msg khi status == ready, ngược lại None
     processed_at: datetime | None
     page_count: int
+    vision_pages: int  # số trang trích bằng vision (source_pages.extraction_method = 'vision')
     chunk_count: int
 
 
@@ -5692,6 +5767,7 @@ class PageOut(BaseModel):
 
 ```python
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5704,10 +5780,18 @@ from app.modules.jobs.models import Job
 from app.modules.jobs.queue import JobQueue
 from app.modules.jobs.service import create_and_enqueue
 from app.modules.materials.assets import require_verified_asset
-from app.modules.materials.models import AssetKind, Chunk, Source, SourcePage, SourceStatus, SourceType
+from app.modules.materials.models import (
+    AssetKind,
+    Chunk,
+    ExtractionMethod,
+    Source,
+    SourcePage,
+    SourceStatus,
+    SourceType,
+)
 from app.modules.materials.schemas import SourceOut
 
-INGEST_PDF = "ingest_pdf"
+INGEST_PDF = "ingest_pdf"  # job.type = tên hàm trong worker; job.ref_id = sources.id
 
 
 async def get_owned_source(db: AsyncSession, source_id: uuid.UUID, user: User) -> Source:
@@ -5724,12 +5808,42 @@ async def get_owned_source(db: AsyncSession, source_id: uuid.UUID, user: User) -
     return row[0]
 
 
+async def _counts(db: AsyncSession, source_ids: list[uuid.UUID]) -> tuple[dict, dict]:
+    """Đếm trang, trang vision và chunk cho nhiều source bằng các truy vấn GROUP BY (không N+1)."""
+    if not source_ids:
+        return {}, {}
+    page_rows = await db.execute(
+        select(SourcePage.source_id, func.count(),
+               func.count().filter(SourcePage.extraction_method == ExtractionMethod.vision))
+        .where(SourcePage.source_id.in_(source_ids))
+        .group_by(SourcePage.source_id)
+    )
+    chunk_rows = await db.execute(
+        select(Chunk.source_id, func.count(Chunk.id))
+        .where(Chunk.source_id.in_(source_ids))
+        .group_by(Chunk.source_id)
+    )
+    pages = {sid: (total, vision) for sid, total, vision in page_rows}
+    chunks = {sid: n for sid, n in chunk_rows}
+    return pages, chunks
+
+
+async def to_out_many(db: AsyncSession, sources: Sequence[Source]) -> list[SourceOut]:
+    pages, chunks = await _counts(db, [s.id for s in sources])
+    result = []
+    for s in sources:
+        page_count, vision_pages = pages.get(s.id, (0, 0))
+        result.append(SourceOut(
+            id=s.id, lesson_id=s.lesson_id, type=s.type, status=s.status, error_msg=s.error_msg,
+            # source ready vẫn có thể mang error_msg (cảnh báo vượt trần vision): tách riêng cho client
+            warning=s.error_msg if s.status == SourceStatus.ready else None,
+            processed_at=s.processed_at, page_count=page_count, vision_pages=vision_pages,
+            chunk_count=chunks.get(s.id, 0)))
+    return result
+
+
 async def to_out(db: AsyncSession, source: Source) -> SourceOut:
-    pages = await db.scalar(select(func.count()).select_from(SourcePage).where(SourcePage.source_id == source.id))
-    chunks = await db.scalar(select(func.count(Chunk.id)).where(Chunk.source_id == source.id))
-    return SourceOut(id=source.id, lesson_id=source.lesson_id, type=source.type, status=source.status,
-                     error_msg=source.error_msg, processed_at=source.processed_at,
-                     page_count=pages, chunk_count=chunks)
+    return (await to_out_many(db, [source]))[0]
 
 
 async def attach_pdf(db: AsyncSession, queue: JobQueue, user: User, lesson_id: uuid.UUID,
@@ -5745,8 +5859,9 @@ async def attach_pdf(db: AsyncSession, queue: JobQueue, user: User, lesson_id: u
 
 async def list_lesson_sources(db: AsyncSession, user: User, lesson_id: uuid.UUID) -> list[SourceOut]:
     await get_owned_lesson(db, lesson_id, user)
-    sources = await db.scalars(select(Source).where(Source.lesson_id == lesson_id).order_by(Source.created_at))
-    return [await to_out(db, s) for s in sources]
+    sources = (await db.scalars(select(Source).where(Source.lesson_id == lesson_id)
+                                .order_by(Source.created_at, Source.id))).all()
+    return await to_out_many(db, sources)
 
 
 async def list_pages(db: AsyncSession, source: Source) -> list[SourcePage]:
