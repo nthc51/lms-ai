@@ -34,3 +34,11 @@ pythonpath = ["."]
 
 [tool.ruff]
 line-length = 110
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency markers in defaults are the framework idiom, not a B008 bug.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Cookie"]
+
+[tool.ruff.lint.isort]
+# backend/alembic/ (migration scripts) shadows the package name; the import is the third-party library.
+known-third-party = ["alembic"]

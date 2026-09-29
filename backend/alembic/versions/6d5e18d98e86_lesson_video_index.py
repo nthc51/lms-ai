@@ -5,18 +5,16 @@ Revises: 53db5f91ec72
 Create Date: 2026-09-29 12:46:46.199146
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
-import sqlalchemy as sa
 import pgvector.sqlalchemy  # noqa: F401
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '6d5e18d98e86'
-down_revision: Union[str, Sequence[str], None] = '53db5f91ec72'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '53db5f91ec72'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -4,8 +4,12 @@ import pytest
 
 from app.core.errors import AppError
 from app.core.security import (
-    create_access_token, decode_access_token, hash_password, hash_refresh_token,
-    new_refresh_token, verify_password,
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    hash_refresh_token,
+    new_refresh_token,
+    verify_password,
 )
 
 

@@ -5,7 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security import create_access_token, hash_password, hash_refresh_token, new_refresh_token, verify_password
+from app.core.security import (
+    create_access_token,
+    hash_password,
+    hash_refresh_token,
+    new_refresh_token,
+    verify_password,
+)
 from app.core.time import utcnow
 from app.modules.auth.models import RefreshToken, Role, TeacherStatus, User
 from app.modules.auth.schemas import LoginIn, RegisterIn

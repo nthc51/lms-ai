@@ -9,9 +9,20 @@ from sqlalchemy.orm import selectinload
 from app.core.errors import AppError, not_found
 from app.modules.auth.models import Role, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
-from app.modules.courses.schemas import (CourseCard, CourseCreate, CourseDetail, CourseOut, CoursePage,
-                                          CourseUpdate, LessonCreate, LessonUpdate, ReorderIn, SectionBrief,
-                                          SectionCreate, SectionUpdate)
+from app.modules.courses.schemas import (
+    CourseCard,
+    CourseCreate,
+    CourseDetail,
+    CourseOut,
+    CoursePage,
+    CourseUpdate,
+    LessonCreate,
+    LessonUpdate,
+    ReorderIn,
+    SectionBrief,
+    SectionCreate,
+    SectionUpdate,
+)
 
 
 def make_slug(title: str) -> str:

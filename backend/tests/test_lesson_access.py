@@ -1,5 +1,11 @@
 from tests.helpers import (
-    API, add_lesson, add_section, create_course, make_published_course, make_student, make_teacher,
+    API,
+    add_lesson,
+    add_section,
+    create_course,
+    make_published_course,
+    make_student,
+    make_teacher,
 )
 
 

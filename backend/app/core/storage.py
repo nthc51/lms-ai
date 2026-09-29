@@ -42,8 +42,8 @@ class MinioStorage:
     REGION = "us-east-1"  # có sẵn region thì client không cần gọi mạng để dò region khi ký URL
 
     def __init__(self, s: Settings):
-        kw = dict(access_key=s.minio_access_key, secret_key=s.minio_secret_key,
-                  secure=s.minio_secure, region=self.REGION)
+        kw = {"access_key": s.minio_access_key, "secret_key": s.minio_secret_key,
+              "secure": s.minio_secure, "region": self.REGION}
         self._internal = Minio(s.minio_endpoint, **kw)       # API và worker gọi trong mạng Docker
         self._public = Minio(s.minio_public_endpoint, **kw)  # chỉ dùng để ký URL cho trình duyệt
         self._bucket = s.minio_bucket

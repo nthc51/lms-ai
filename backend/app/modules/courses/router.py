@@ -7,9 +7,20 @@ from app.core.db import get_db
 from app.core.deps import get_optional_user, require_staff, require_teacher_approved
 from app.modules.auth.models import User
 from app.modules.courses import service
-from app.modules.courses.schemas import (CourseCreate, CourseDetail, CourseOut, CoursePage, CourseUpdate,
-                                          LessonCreate, LessonOut, LessonUpdate, ReorderIn, SectionCreate,
-                                          SectionOut, SectionUpdate)
+from app.modules.courses.schemas import (
+    CourseCreate,
+    CourseDetail,
+    CourseOut,
+    CoursePage,
+    CourseUpdate,
+    LessonCreate,
+    LessonOut,
+    LessonUpdate,
+    ReorderIn,
+    SectionCreate,
+    SectionOut,
+    SectionUpdate,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["courses"])
 

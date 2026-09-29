@@ -9,6 +9,7 @@ from tests.helpers import make_admin, make_student, make_teacher
 
 def _app_with_probe_routes():
     app = create_app()
+    require_student = require_role(Role.student)
 
     @app.get("/probe/teacher")
     async def teacher_only(user=Depends(require_teacher_approved)):
@@ -19,7 +20,7 @@ def _app_with_probe_routes():
         return {"ok": True}
 
     @app.get("/probe/student")
-    async def student_only(user=Depends(require_role(Role.student))):
+    async def student_only(user=Depends(require_student)):
         return {"ok": True}
 
     return app

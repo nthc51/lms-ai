@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 
 from app.ingestion.chunker import PageText, chunk_pages, count_tokens
@@ -30,7 +32,7 @@ def test_long_text_splits_with_overlap():
     paragraphs = [words(20, f"p{i}") for i in range(10)]  # mỗi đoạn 28 token
     chunks = chunk_pages([PageText(1, "\n\n".join(paragraphs), "text")], max_tokens=100, overlap_tokens=30)
     assert len(chunks) > 1
-    for prev, nxt in zip(chunks, chunks[1:]):
+    for prev, nxt in itertools.pairwise(chunks):
         assert prev.content.split("\n\n")[-1] == nxt.content.split("\n\n")[0]  # có đoạn gối đầu
     for c in chunks:
         assert c.token_count <= 100 + 30

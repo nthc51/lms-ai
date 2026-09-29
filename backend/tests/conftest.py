@@ -10,15 +10,13 @@ os.environ["EMBED_PROVIDER"] = "fake"
 os.environ["VISION_PROVIDER"] = "fake"
 os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef-0123456789"
 
-import httpx  # noqa: E402
-import pytest  # noqa: E402
+import httpx
+import pytest
 
-from app.main import create_app  # noqa: E402
-
-
-from app.core.storage import get_storage  # noqa: E402
-from app.modules.jobs.queue import get_queue  # noqa: E402
-from tests.fakes import InMemoryStorage, RecordingQueue  # noqa: E402
+from app.core.storage import get_storage
+from app.main import create_app
+from app.modules.jobs.queue import get_queue
+from tests.fakes import InMemoryStorage, RecordingQueue
 
 
 @pytest.fixture
@@ -40,16 +38,16 @@ async def client(storage, queue):
         yield c
 
 
-import asyncio  # noqa: E402
+import asyncio
 
-from alembic import command  # noqa: E402
-from alembic.config import Config  # noqa: E402
-from sqlalchemy import text  # noqa: E402
-from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
-from sqlalchemy.pool import NullPool  # noqa: E402
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
-import app.models_registry  # noqa: E402,F401
-from app.core.db import Base, SessionLocal, engine  # noqa: E402
+import app.models_registry  # noqa: F401
+from app.core.db import Base, SessionLocal, engine
 
 
 @pytest.fixture(scope="session", autouse=True)

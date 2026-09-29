@@ -1,3 +1,4 @@
+import pymupdf
 import pymupdf4llm
 import pytest
 
@@ -43,7 +44,7 @@ async def test_vision_receives_png(monkeypatch):
 
 
 async def test_corrupt_pdf_raises():
-    with pytest.raises(Exception):
+    with pytest.raises(pymupdf.FileDataError):
         await extract_pages(b"not a pdf", FakeVision())
 
 
