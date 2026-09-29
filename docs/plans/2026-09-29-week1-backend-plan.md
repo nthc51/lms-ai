@@ -5099,7 +5099,7 @@ git add backend/app/ai backend/app/core/config.py backend/tests/test_ai_provider
 - Modify: `backend/app/core/config.py`, `backend/.env.example`, `backend/app/ingestion/chunker.py`
 - Test: `backend/tests/test_extract.py`
 
-- [ ] **Step 1: `tests/pdfs.py`**: tạo PDF thật trong bộ nhớ. Dùng chữ ASCII, vì font mặc định của PyMuPDF không có glyph tiếng Việt.
+- [x] **Step 1: `tests/pdfs.py`**: tạo PDF thật trong bộ nhớ. Dùng chữ ASCII, vì font mặc định của PyMuPDF không có glyph tiếng Việt.
 
 ```python
 import pymupdf
@@ -5118,7 +5118,7 @@ def make_pdf(pages: list[str]) -> bytes:
     return data
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_extract.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_extract.py`**
 
 ```python
 import pymupdf4llm
@@ -5212,12 +5212,12 @@ async def test_vision_cap_defaults_to_setting(monkeypatch):
     assert vision.calls == 1
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_extract.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ingestion.extract'`
 
-- [ ] **Step 4a: Trần số trang vision** — thêm setting, biến môi trường và cờ trên `PageText`.
+- [x] **Step 4a: Trần số trang vision** — thêm setting, biến môi trường và cờ trên `PageText`.
 
 `app/core/config.py` (trong `Settings`, sau `vision_timeout_s`):
 
@@ -5237,7 +5237,7 @@ VISION_MAX_PAGES_PER_DOC=60
     vision_skipped: bool = False  # cần vision nhưng đã chạm trần VISION_MAX_PAGES_PER_DOC → dùng text
 ```
 
-- [ ] **Step 4: `app/ingestion/extract.py`**
+- [x] **Step 4: `app/ingestion/extract.py`**
 
 ```python
 import asyncio
@@ -5307,12 +5307,12 @@ async def extract_pages(pdf_bytes: bytes, vision: VisionExtractor,
     return pages
 ```
 
-- [ ] **Step 5: Chạy test**
+- [x] **Step 5: Chạy test**
 
 Run: `uv run pytest tests/test_extract.py -v`
 Expected: PASS cả 9 test
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add . && git commit -m "feat(ingestion): pdf extraction with pymupdf4llm and vision fallback"
