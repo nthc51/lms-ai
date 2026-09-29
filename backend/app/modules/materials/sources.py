@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, not_found
+from app.core.pagination import PageParams, paginate
 from app.modules.auth.models import User
 from app.modules.courses.models import Course, Lesson, Section
 from app.modules.courses.service import ensure_owner, get_owned_lesson
@@ -130,18 +131,14 @@ async def list_lesson_sources(db: AsyncSession, user: User, lesson_id: uuid.UUID
     return await to_out_many(db, sources)
 
 
-async def list_pages(db: AsyncSession, source: Source, page: int, size: int) -> SourcePagesPage:
-    total = await db.scalar(
-        select(func.count()).select_from(SourcePage).where(SourcePage.source_id == source.id)
+async def list_pages(db: AsyncSession, source: Source, params: PageParams) -> SourcePagesPage:
+    # (source_id, page_no) là duy nhất nên page_no đủ làm thứ tự ổn định
+    stmt = select(SourcePage).where(SourcePage.source_id == source.id).order_by(SourcePage.page_no)
+    total, paged = await paginate(db, stmt, params)
+    rows = await db.scalars(paged)
+    return SourcePagesPage(
+        items=[PageOut.model_validate(p) for p in rows], total=total, page=params.page, size=params.size
     )
-    rows = await db.scalars(
-        select(SourcePage)
-        .where(SourcePage.source_id == source.id)
-        .order_by(SourcePage.page_no)
-        .offset((page - 1) * size)
-        .limit(size)
-    )
-    return SourcePagesPage(items=[PageOut.model_validate(p) for p in rows], total=total, page=page, size=size)
 
 
 def _busy(message: str) -> AppError:

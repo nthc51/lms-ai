@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.pagination import Page
 from app.modules.enrollment.models import ProgressStatus
 
 
@@ -21,6 +22,10 @@ class MyCourseOut(BaseModel):
     total_lessons: int
     done_lessons: int
     progress_pct: int
+
+
+class MyCoursePage(Page[MyCourseOut]):
+    pass
 
 
 class ProgressIn(BaseModel):

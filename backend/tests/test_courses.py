@@ -24,7 +24,8 @@ async def test_teacher_lists_only_own_courses(client):
     await create_course(client, gv1, title="Khóa của GV1")
     await create_course(client, gv2, title="Khóa của GV2")
     r = await client.get(f"{API}/teacher/courses", headers=gv1)
-    assert [c["title"] for c in r.json()] == ["Khóa của GV1"]
+    assert [c["title"] for c in r.json()["items"]] == ["Khóa của GV1"]
+    assert (r.json()["total"], r.json()["page"], r.json()["size"]) == (1, 1, 20)
 
 
 async def test_other_teacher_gets_404_but_admin_can_edit(client):

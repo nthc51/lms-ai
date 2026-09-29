@@ -1,11 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.deps import get_optional_user, require_staff, require_teacher_approved
-from app.core.pagination import MAX_PAGE
+from app.core.pagination import PageParams, page_params
 from app.modules.auth.models import User
 from app.modules.courses import service
 from app.modules.courses.schemas import (
@@ -21,6 +21,7 @@ from app.modules.courses.schemas import (
     SectionCreate,
     SectionOut,
     SectionUpdate,
+    TeacherCoursePage,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["courses"])
@@ -33,11 +34,13 @@ async def create_course(
     return await service.create_course(db, user, data)
 
 
-@router.get("/teacher/courses", response_model=list[CourseOut])
+@router.get("/teacher/courses", response_model=TeacherCoursePage)
 async def my_teaching_courses(
-    user: User = Depends(require_teacher_approved), db: AsyncSession = Depends(get_db)
+    params: PageParams = Depends(page_params),
+    user: User = Depends(require_teacher_approved),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await service.list_teacher_courses(db, user)
+    return await service.list_teacher_courses(db, user, params)
 
 
 @router.patch("/courses/{course_id}", response_model=CourseOut)
@@ -146,11 +149,10 @@ async def reorder(
 @router.get("/courses", response_model=CoursePage)
 async def catalog(
     q: str | None = None,
-    page: int = Query(1, ge=1, le=MAX_PAGE),
-    size: int = Query(20, ge=1, le=100),
+    params: PageParams = Depends(page_params),
     db: AsyncSession = Depends(get_db),
 ):
-    return await service.list_published(db, q, page, size)
+    return await service.list_published(db, q, params)
 
 
 @router.get("/courses/{slug}", response_model=CourseDetail)

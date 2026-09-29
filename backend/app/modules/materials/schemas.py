@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.pagination import Page
 from app.modules.materials.models import AssetKind, ExtractionMethod, SourceStatus, SourceType
 
 
@@ -66,8 +67,5 @@ class PageOut(BaseModel):
     markdown: str
 
 
-class SourcePagesPage(BaseModel):
-    items: list[PageOut]
-    total: int
-    page: int
-    size: int
+class SourcePagesPage(Page[PageOut]):
+    pass

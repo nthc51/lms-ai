@@ -65,7 +65,7 @@ async def test_progress_done_completes_course_and_never_downgrades(client):
     )
     assert r.status_code == 200 and r.json()["status"] == "done"
 
-    [mine] = (await client.get(f"{API}/me/courses", headers=sv)).json()
+    [mine] = (await client.get(f"{API}/me/courses", headers=sv)).json()["items"]
     assert mine["progress_pct"] == 100 and mine["completed_at"] is not None
 
     r = await client.put(

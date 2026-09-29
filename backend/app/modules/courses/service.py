@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError, not_found
+from app.core.pagination import PageParams, paginate
 from app.modules.auth.models import Role, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.courses.schemas import (
@@ -22,6 +23,7 @@ from app.modules.courses.schemas import (
     SectionBrief,
     SectionCreate,
     SectionUpdate,
+    TeacherCoursePage,
 )
 
 
@@ -57,11 +59,15 @@ async def create_course(db: AsyncSession, teacher: User, data: CourseCreate) -> 
     return course
 
 
-async def list_teacher_courses(db: AsyncSession, teacher: User) -> list[Course]:
-    rows = await db.scalars(
-        select(Course).where(Course.teacher_id == teacher.id).order_by(Course.created_at.desc())
+async def list_teacher_courses(db: AsyncSession, teacher: User, params: PageParams) -> TeacherCoursePage:
+    stmt = (
+        select(Course)
+        .where(Course.teacher_id == teacher.id)
+        .order_by(Course.created_at.desc(), Course.id.desc())
     )
-    return list(rows)
+    total, paged = await paginate(db, stmt, params)
+    items = [CourseOut.model_validate(c) for c in await db.scalars(paged)]
+    return TeacherCoursePage(items=items, total=total, page=params.page, size=params.size)
 
 
 async def update_course(db: AsyncSession, course: Course, data: CourseUpdate) -> Course:
@@ -192,7 +198,7 @@ async def reorder(db: AsyncSession, course: Course, data: ReorderIn) -> None:
     await db.commit()
 
 
-async def list_published(db: AsyncSession, q: str | None, page: int, size: int) -> CoursePage:
+async def list_published(db: AsyncSession, q: str | None, params: PageParams) -> CoursePage:
     base = (
         select(Course, User.full_name)
         .join(User, User.id == Course.teacher_id)
@@ -203,15 +209,13 @@ async def list_published(db: AsyncSession, q: str | None, page: int, size: int) 
         base = base.where(
             func.immutable_unaccent(func.lower(Course.title)).like(func.immutable_unaccent(pattern))
         )
-    total = await db.scalar(select(func.count()).select_from(base.subquery()))
-    rows = (
-        await db.execute(base.order_by(Course.created_at.desc()).offset((page - 1) * size).limit(size))
-    ).all()
+    total, paged = await paginate(db, base.order_by(Course.created_at.desc(), Course.id.desc()), params)
+    rows = (await db.execute(paged)).all()
     items = [
         CourseCard(id=c.id, title=c.title, slug=c.slug, description=c.description, teacher_name=name)
         for c, name in rows
     ]
-    return CoursePage(items=items, total=total, page=page, size=size)
+    return CoursePage(items=items, total=total, page=params.page, size=params.size)
 
 
 async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> CourseDetail:

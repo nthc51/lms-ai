@@ -41,6 +41,6 @@ async def test_my_courses_shows_progress(client):
     await client.post(f"{API}/courses/{course['id']}/enroll", headers=sv)
     r = await client.get(f"{API}/me/courses", headers=sv)
     assert r.status_code == 200
-    [item] = r.json()
+    [item] = r.json()["items"]
     assert item["course_id"] == course["id"]
     assert (item["total_lessons"], item["done_lessons"], item["progress_pct"]) == (1, 0, 0)

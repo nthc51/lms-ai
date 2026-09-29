@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.pagination import Page
 from app.modules.courses.models import CourseStatus
 
 
@@ -86,11 +87,12 @@ class CourseCard(BaseModel):
     teacher_name: str
 
 
-class CoursePage(BaseModel):
-    items: list[CourseCard]
-    total: int
-    page: int
-    size: int
+class CoursePage(Page[CourseCard]):
+    pass
+
+
+class TeacherCoursePage(Page[CourseOut]):
+    pass
 
 
 class LessonBrief(BaseModel):

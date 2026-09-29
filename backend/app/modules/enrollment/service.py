@@ -5,12 +5,20 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, forbidden, not_found
+from app.core.pagination import PageParams, paginate
 from app.core.time import utcnow
 from app.modules.auth.models import Role, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.courses.service import get_lesson_with_course
 from app.modules.enrollment.models import Enrollment, LessonProgress, ProgressStatus
-from app.modules.enrollment.schemas import EnrollmentOut, LessonDetail, MyCourseOut, ProgressIn, ProgressOut
+from app.modules.enrollment.schemas import (
+    EnrollmentOut,
+    LessonDetail,
+    MyCourseOut,
+    MyCoursePage,
+    ProgressIn,
+    ProgressOut,
+)
 
 
 async def enroll(db: AsyncSession, user: User, course_id: uuid.UUID) -> EnrollmentOut:
@@ -41,15 +49,15 @@ async def is_enrolled(db: AsyncSession, user_id: uuid.UUID, course_id: uuid.UUID
     )
 
 
-async def my_courses(db: AsyncSession, user: User) -> list[MyCourseOut]:
-    rows = (
-        await db.execute(
-            select(Enrollment, Course)
-            .join(Course, Course.id == Enrollment.course_id)
-            .where(Enrollment.user_id == user.id)
-            .order_by(Enrollment.enrolled_at.desc())
-        )
-    ).all()
+async def my_courses(db: AsyncSession, user: User, params: PageParams) -> MyCoursePage:
+    stmt = (
+        select(Enrollment, Course)
+        .join(Course, Course.id == Enrollment.course_id)
+        .where(Enrollment.user_id == user.id)
+        .order_by(Enrollment.enrolled_at.desc(), Enrollment.course_id.desc())
+    )
+    count, paged = await paginate(db, stmt, params)
+    rows = (await db.execute(paged)).all()
     course_ids = [course.id for _, course in rows]
     totals = dict(
         (
@@ -91,7 +99,7 @@ async def my_courses(db: AsyncSession, user: User) -> list[MyCourseOut]:
                 progress_pct=round(done * 100 / total) if total else 0,
             )
         )
-    return result
+    return MyCoursePage(items=result, total=count, page=params.page, size=params.size)
 
 
 async def ensure_lesson_access(db: AsyncSession, lesson_id: uuid.UUID, user: User) -> tuple[Lesson, Course]:
