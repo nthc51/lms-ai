@@ -132,6 +132,8 @@ Thanh toán, stream video HLS, ứng dụng mobile, reranker, so sánh embedding
 
 - **Luôn chạy:** `web`, `api`, `worker`, `db`, `redis`, `minio`.
 - **Chỉ bật khi dùng profile `local-ai`:** `worker-heavy`.
+- **Cổng publish:** mọi cổng (`db` 5432, `redis` 6379, `minio` 9000/9001, `api` 8000) chỉ bind loopback (`127.0.0.1`, thêm `[::1]` để `localhost` trên Windows không mất ~2 s thử IPv6). Redis chưa đặt mật khẩu; bổ sung khi deploy (S2).
+- **CORS:** `CORS_ORIGINS` (mặc định `http://localhost:3000`; env nhận JSON list hoặc chuỗi phân tách dấu phẩy), `allow_credentials` (cookie refresh), expose `x-request-id`. Origin không nằm trong danh sách không nhận header CORS nào.
 - **Image MinIO:** `pgsty/minio`, ghim tag cố định (`RELEASE.2026-08-04T00-00-00Z`). Image chính thức `minio/minio` đã bị gỡ khỏi Docker Hub (2026-09-11); `pgsty/minio` là bản fork của bên thứ ba, nên luôn ghim tag, không dùng `latest`.
 
 ### 3.2 Quyết định kiến trúc
@@ -298,7 +300,7 @@ certificates     id, user_id, course_id, code UNIQUE, asset_id, issued_at
 Mọi lời gọi LLM đều đi qua lớp này:
 
 - Timeout riêng cho từng loại lời gọi.
-- Retry khi gặp 429, 5xx hoặc timeout: tối đa 3 lần, chờ lâu dần theo cấp số nhân (exponential backoff); có header `Retry-After` thì chờ theo header. Các lỗi 4xx khác (sai key, request sai) báo lỗi ngay, không retry.
+- Retry khi gặp 429, 5xx hoặc timeout: tối đa 3 lần, chờ lâu dần theo cấp số nhân (exponential backoff); có header `Retry-After` thì chờ theo header, tối đa 60 giây (giá trị âm, không phải số hoặc không hữu hạn thì dùng backoff). Các lỗi 4xx khác (sai key, request sai) báo lỗi ngay, không retry.
 - **Đã làm ở tuần 1:** timeout và retry cho embedder và vision của Gemini (`EMBED_TIMEOUT_S`, `VISION_TIMEOUT_S`; hàm chờ inject được để test không phải ngủ thật). Phần cache `llm_cache`, log token và `prompt_version` làm cùng LLM ở tuần 2.
 - Cache theo `hash(model + prompt)` trong bảng `llm_cache`.
 - Log token, độ trễ và `prompt_version`.
@@ -309,6 +311,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 1. Chạy `pymupdf4llm` để lấy markdown của từng trang, với `use_ocr=False` (không dùng OCR của pymupdf4llm; trang scan đi qua vision).
 2. Trang có dưới 50 ký tự text (slide scan, trang toàn ảnh) hoặc có **từ 1 công thức trở lên** (chế độ layout làm mất nội dung công thức): render trang thành ảnh, gửi **Gemini vision** để lấy markdown (công thức dạng LaTeX). Ghi `extraction_method = vision`.
    - Trần `VISION_MAX_PAGES_PER_DOC` (mặc định 60) trang vision mỗi tài liệu, xét theo thứ tự trang. Vượt trần thì các trang còn lại dùng markdown text thường; source vẫn `ready` nhưng `sources.error_msg` ghi cảnh báo (API trả thêm trường `warning`).
+   - Các trang vision gọi **song song**, tối đa `VISION_CONCURRENCY` (mặc định 4) lời gọi cùng lúc trong một tài liệu. Trang nào đi vision (và trần ở trên) được quyết định theo thứ tự trang *trước* khi gọi; kết quả giữ đúng thứ tự trang. Toàn bộ phần PyMuPDF (trích text, render ảnh) chạy trong một lời gọi thread duy nhất. Một lời gọi vision lỗi thì các lời gọi còn lại bị hủy và chính lỗi đó được ném ra.
    - API trả số trang vision của từng source (`vision_pages`, đếm từ `source_pages`, không thêm cột) để đưa vào báo cáo.
 3. Chunk theo heading markdown, mỗi chunk khoảng 500–800 token, overlap khoảng 100. Giữ lại `page_no` và `heading_path`. Token ước lượng bằng 1.4 × số từ. Khối code rào bằng `` ``` `` hoặc `~~~` là một khối nguyên (không cắt ở dòng trống bên trong); chỉ cắt cứng theo ranh giới dòng khi riêng khối đó vượt `max_tokens`.
 4. Embed theo batch và lưu vào `chunks`. Cập nhật `sources.status`.
@@ -386,6 +389,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 **Worker (đã làm ở tuần 1):**
 
 - `job_timeout` của `ingest_pdf` là 600 giây.
+- **Hard timeout:** handler bị hủy ở `job_timeout − 30 giây` (570 giây với `ingest_pdf`), trước khi arq tự hủy, để worker kịp ghi job `failed` và source `failed` cùng transaction ngay lập tức với `error_msg = "Quá thời gian xử lý (N giây)"` (không phải đợi sweeper). Vẫn theo điều kiện job còn `processing` (không ghi đè job đã bị sweeper chốt). `TimeoutError` do chính handler ném (không phải deadline này) là lỗi thường.
 - Khi bắt đầu, worker nhận job bằng `UPDATE ... WHERE status IN ('pending','processing')` có điều kiện; job đã `done`/`failed` (ví dụ đã bị sweeper chốt) thì bỏ qua, không chạy lại.
 - Trạng thái cuối của job (`done`/`failed`) được ghi **cùng transaction** với trạng thái cuối của source, nên không có lúc job xong mà source còn treo. Worker đến muộn không ghi đè job đã bị sweeper đánh dấu `failed`.
 - `POST /sources/{id}/reprocess` khi đã có job đang chờ hoặc đang chạy: rollback, trả `409 INVALID_STATE`, source giữ nguyên.
@@ -397,7 +401,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 ### 6.1 Quy ước
 
 - REST + JSON, mọi endpoint có tiền tố `/api/v1`.
-- Phân trang bằng `?page=&size=` với `size ≤ 100`.
+- Phân trang bằng `?page=&size=` với `1 ≤ page ≤ 10000`, `1 ≤ size ≤ 100` (vượt → `422 VALIDATION_ERROR`); trả `{items, total, page, size}`, thứ tự ổn định (luôn kèm `id` làm tiebreaker).
 - Job chạy lâu trả về `202 {job_id}`, frontend theo dõi qua `GET /jobs/{id}`.
 
 ### 6.2 Auth
@@ -424,8 +428,8 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 | Module | Endpoint |
 |---|---|
-| Khóa học | `GET /courses` · `GET /courses/{slug}` · `POST/PATCH/DELETE /courses` · `POST /courses/{id}/publish` · CRUD sections/lessons · `PATCH /courses/{id}/reorder` · `GET /teacher/courses` (khóa của giảng viên đang đăng nhập) |
-| Học | `POST /courses/{id}/enroll` · `GET /me/courses` · `GET /lessons/{id}` (nội dung bài học) · `GET /lessons/{id}/video` (presigned GET) · `PUT /lessons/{id}/progress` |
+| Khóa học | `GET /courses` · `GET /courses/{slug}` · `POST/PATCH/DELETE /courses` · `POST /courses/{id}/publish` · CRUD sections/lessons · `PATCH /courses/{id}/reorder` · `GET /teacher/courses?page=&size=` (khóa của giảng viên đang đăng nhập, phân trang) |
+| Học | `POST /courses/{id}/enroll` · `GET /me/courses?page=&size=` (phân trang) · `GET /lessons/{id}` (nội dung bài học) · `GET /lessons/{id}/video` (presigned GET) · `PUT /lessons/{id}/progress` |
 | Tài liệu | `POST /uploads/presign` · `POST /uploads/{id}/complete` · `POST /lessons/{id}/sources` → 202 · `GET /lessons/{id}/sources` · `GET /sources/{id}` · `POST /sources/{id}/reprocess` → 202 · `GET /sources/{id}/pages?page=&size=` (`size ≤ 100`, trả `{items, total, page, size}`) |
 | Tutor | `POST /tutor/sessions` · `GET /tutor/sessions/{id}/messages` · `POST /tutor/sessions/{id}/messages` (SSE, frontend đọc bằng `fetch` + `ReadableStream`) · `POST /tutor/messages/{id}/feedback` |
 | Câu hỏi | `POST /lessons/{id}/questions/generate` → 202 · `GET /lessons/{id}/questions?review_status=` · `PATCH /questions/{id}` |
@@ -468,15 +472,21 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | 401 | `TOKEN_EXPIRED`, `INVALID_CREDENTIALS`, `INVALID_TOKEN`, `TOKEN_REUSED`, `NOT_AUTHENTICATED` |
 | 403 | `TEACHER_NOT_APPROVED`, `NOT_ENROLLED`, `ACCOUNT_LOCKED`, `FORBIDDEN` |
 | 404 | `NOT_FOUND` |
+| 405 | `METHOD_NOT_ALLOWED` (giữ header `Allow`) |
+| 4xx khác (HTTPException của framework) | `HTTP_ERROR` |
 | 409 | `QUIZ_ATTEMPT_LIMIT`, `ATTEMPT_CLOSED`, `SUBMISSION_LOCKED`, `ALREADY_ENROLLED`, `EMAIL_TAKEN`, `COURSE_EMPTY`, `INVALID_STATE`, `ALREADY_ATTACHED` |
 | 413 | `FILE_TOO_LARGE` |
 | 429 | `RATE_LIMITED` (kèm header `Retry-After`) |
+| 500 | `INTERNAL_ERROR` (message "Lỗi hệ thống", `details` rỗng) |
 | 503 | `AI_UNAVAILABLE` |
 
 **Backend:**
 
 - Các lỗi nghiệp vụ kế thừa từ `AppError(code, status, message)`, có một exception handler chung.
 - Middleware gắn `request_id` cho mỗi request. Log dạng JSON.
+- `HTTPException` của Starlette/FastAPI (route không tồn tại, sai method...) cũng trả đúng định dạng thống nhất.
+- Exception không bắt được → `500 INTERNAL_ERROR`; body **không bao giờ** chứa traceback hay nội dung exception; traceback được log kèm `request_id`. Response 500 vẫn có header `x-request-id` và header CORS.
+- Đăng ký trùng email chạy đồng thời: request thua vấp unique constraint → rollback, `409 EMAIL_TAKEN` (không 500).
 - **Chỉ đẩy job sau khi transaction đã commit.**
 
 **Frontend:**
@@ -630,3 +640,8 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-09-29 | Job kẹt `pending` (mất trong Redis): sweeper enqueue lại một lần cùng `_job_id`, ghi `jobs.requeued_at`; vẫn kẹt sau `PENDING_JOB_REQUEUE_AFTER_MIN` phút → `failed` "Không đưa được job vào hàng đợi", source còn `pending`/`processing` cũng `failed` |
 | 2026-09-29 | Thêm `jobs.created_by` (FK users, `ON DELETE SET NULL`, NULL = job hệ thống); `GET /jobs/{id}` chỉ trả cho người tạo hoặc admin, người khác `404` (thay luật cũ "chỉ cần đăng nhập") |
 | 2026-09-29 | Ruff: cấu hình `extend-immutable-calls` cho `Depends`/`Query`/`Cookie` của FastAPI thay vì tắt B008 |
+| 2026-09-29 | Cổng Docker Compose chỉ bind loopback; Redis password để tới deploy (S2); CORS theo `CORS_ORIGINS`, có credentials, expose `x-request-id` |
+| 2026-09-29 | Lỗi thống nhất cả cho `HTTPException` của framework (`METHOD_NOT_ALLOWED`, `HTTP_ERROR`) và exception không bắt được (`500 INTERNAL_ERROR`, không lộ chi tiết, vẫn có `x-request-id`); đăng ký trùng email đồng thời → `409 EMAIL_TAKEN` |
+| 2026-09-29 | Phân trang: `page ≤ 10000`; `GET /teacher/courses` và `GET /me/courses` trả `{items, total, page, size}`; mọi danh sách phân trang có `id` làm tiebreaker |
+| 2026-09-29 | Vision gọi song song tối đa `VISION_CONCURRENCY = 4`; worker hard timeout `job_timeout − 30 giây` → job + source `failed` "Quá thời gian xử lý (N giây)" ngay; `Retry-After` tối đa 60 giây |
+| 2026-09-29 | `PATCH /lessons/{id}` với `"video_asset_id": null` gỡ video (cột nullable nhận null tường minh; trường không gửi giữ nguyên) |

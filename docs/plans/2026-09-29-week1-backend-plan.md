@@ -14,8 +14,8 @@
 
 **Ghi chú bổ sung so với spec** (cập nhật vào spec ở Task 23):
 
-- **Mã lỗi thêm mới:** `EMAIL_TAKEN`, `INVALID_TOKEN`, `TOKEN_REUSED`, `NOT_AUTHENTICATED`, `FORBIDDEN`, `COURSE_EMPTY`, `INVALID_REORDER`, `UPLOAD_MISSING`, `INVALID_ASSET`, `INVALID_STATE`, `ALREADY_ATTACHED` (gắn trùng cùng asset vào cùng bài học).
-- **Endpoint thêm mới:** `GET /teacher/courses`, `GET /lessons/{id}` (nội dung bài học), `GET /lessons/{id}/video`, `GET /lessons/{id}/sources`. `GET /sources/{id}/pages` phân trang `?page=&size≤100`, trả `{items, total, page, size}`.
+- **Mã lỗi thêm mới:** `EMAIL_TAKEN`, `INVALID_TOKEN`, `TOKEN_REUSED`, `NOT_AUTHENTICATED`, `FORBIDDEN`, `COURSE_EMPTY`, `INVALID_REORDER`, `UPLOAD_MISSING`, `INVALID_ASSET`, `INVALID_STATE`, `ALREADY_ATTACHED` (gắn trùng cùng asset vào cùng bài học), `METHOD_NOT_ALLOWED` (405), `HTTP_ERROR` (4xx khác của framework), `INTERNAL_ERROR` (500, không lộ chi tiết).
+- **Endpoint thêm mới:** `GET /teacher/courses`, `GET /lessons/{id}` (nội dung bài học), `GET /lessons/{id}/video`, `GET /lessons/{id}/sources`. `GET /sources/{id}/pages` phân trang `?page=&size≤100`, trả `{items, total, page, size}`. `GET /teacher/courses` và `GET /me/courses` cũng phân trang cùng định dạng; mọi `page ≤ 10000`.
 - **Schema lệch so với spec ban đầu:** `jobs` thêm cột `ref_version` (mặc định 0) và `uq_active_job` là `(type, ref_id, ref_version)`; `sources` có UNIQUE `(lesson_id, asset_id)`; thêm index `lessons.video_asset_id`.
 - **`GET /jobs/{id}`:** chỉ người tạo job (`jobs.created_by`) hoặc admin xem được; người khác, kể cả với job hệ thống (`created_by` NULL) nếu không phải admin, nhận `404 NOT_FOUND` giống job không tồn tại (đổi ngày 2026-09-29 sau review cuối tuần 1).
 - **Upload qua key tạm (Task 14):** URL presign chỉ cho PUT vào `staging/<storage_key>`. `POST /uploads/{id}/complete` khóa dòng asset, copy phía server sang `storage_key`, kiểm tra kích thước và magic bytes trên bản chính thức, rồi xóa key tạm; hỏng thì xóa object và dòng asset. Client không bao giờ có URL ghi vào key chính thức. Học viên không được presign `pdf`/`video` (`403 FORBIDDEN`); `presign_get` luôn ký kèm `Content-Type` của asset.
