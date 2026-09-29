@@ -2777,7 +2777,7 @@ git add . && git commit -m "feat(courses): public catalog with accent-insensitiv
 - Modify: `backend/app/modules/enrollment/schemas.py`, `backend/app/modules/enrollment/service.py`, `backend/app/modules/enrollment/router.py`
 - Test: `backend/tests/test_lesson_access.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_lesson_access.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_lesson_access.py`**
 
 ```python
 from tests.helpers import (
@@ -2854,12 +2854,12 @@ async def test_teacher_cannot_save_progress(client):
     assert (r.status_code, r.json()["error"]["code"]) == (403, "FORBIDDEN")
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_lesson_access.py -v`
 Expected: FAIL (405 Method Not Allowed cho `GET /lessons/{id}`)
 
-- [ ] **Step 3: Thêm vào cuối `app/modules/enrollment/schemas.py`**
+- [x] **Step 3: Thêm vào cuối `app/modules/enrollment/schemas.py`**
   - Thêm import: `from typing import Literal` và `from pydantic import ConfigDict, Field`
   - Thêm import: `from app.modules.enrollment.models import ProgressStatus`
 
@@ -2887,7 +2887,7 @@ class LessonDetail(BaseModel):
     progress: ProgressOut | None
 ```
 
-- [ ] **Step 4: Thêm vào `app/modules/enrollment/service.py`**
+- [x] **Step 4: Thêm vào `app/modules/enrollment/service.py`**
   - Sửa import sqlalchemy thành `from sqlalchemy import case, func, select, update`
   - Thêm import: `from app.core.errors import forbidden` (gộp vào dòng import errors có sẵn)
   - Thêm import: `from app.core.time import utcnow`
@@ -2957,7 +2957,7 @@ async def update_progress(db: AsyncSession, lesson_id: uuid.UUID, user: User, da
     return ProgressOut.model_validate(progress)
 ```
 
-- [ ] **Step 5: Thêm vào `app/modules/enrollment/router.py`**
+- [x] **Step 5: Thêm vào `app/modules/enrollment/router.py`**
   - Sửa import deps thành `from app.core.deps import get_current_user, require_role`
   - Thêm `LessonDetail, ProgressIn, ProgressOut` vào dòng import schemas
   - Thêm 2 route:
@@ -2975,12 +2975,12 @@ async def save_progress(lesson_id: uuid.UUID, data: ProgressIn, user: User = Dep
     return await service.update_progress(db, lesson_id, user, data)
 ```
 
-- [ ] **Step 6: Chạy toàn bộ test**
+- [x] **Step 6: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add . && git commit -m "feat(enrollment): lesson access rules, progress upsert, course completion"
