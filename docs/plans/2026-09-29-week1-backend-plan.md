@@ -1635,7 +1635,7 @@ git add . && git commit -m "feat(auth): role dependencies, admin seed and teache
 - Modify: `backend/app/models_registry.py`
 - Create (sinh bằng lệnh): `backend/alembic/versions/<rev>_courses.py`
 
-- [ ] **Step 1: `app/modules/courses/models.py`**
+- [x] **Step 1: `app/modules/courses/models.py`**
 
 ```python
 import enum
@@ -1694,23 +1694,23 @@ class Lesson(IdMixin, TimestampMixin, Base):
 
 Quy ước với async: **không bao giờ để quan hệ tự lazy-load**. Cần đọc `sections` hay `lessons` thì dùng `selectinload(...)`. Xóa thì dùng câu `delete()` và để DB tự `ON DELETE CASCADE`.
 
-- [ ] **Step 2: Đăng ký vào `app/models_registry.py`**: thêm dòng:
+- [x] **Step 2: Đăng ký vào `app/models_registry.py`**: thêm dòng:
 
 ```python
 from app.modules.courses import models as courses_models  # noqa: F401
 ```
 
-- [ ] **Step 3: Sinh migration và upgrade**
+- [x] **Step 3: Sinh migration và upgrade**
 
 Run: `uv run alembic revision --autogenerate -m "courses"` rồi `uv run alembic upgrade head`
 Expected: migration tạo 3 bảng `courses`, `sections`, `lessons` và enum `course_status`
 
-- [ ] **Step 4: Chạy toàn bộ test**
+- [x] **Step 4: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add . && git commit -m "feat(courses): course, section, lesson models"
