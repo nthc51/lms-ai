@@ -1,0 +1,36 @@
+[project]
+name = "lms-ai-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy[asyncio]>=2.0.30",
+  "asyncpg>=0.29",
+  "alembic>=1.13",
+  "pydantic-settings>=2.3",
+  "email-validator>=2.1",
+  "pwdlib[argon2]>=0.2",
+  "pyjwt>=2.8",
+  "minio>=7.2",
+  "filetype>=1.2",
+  "arq>=0.26",
+  "pymupdf>=1.24",
+  "pymupdf4llm>=0.0.17",
+  "pgvector>=0.3",
+  "python-slugify>=8.0",
+  "google-genai>=1.0",
+  "httpx>=0.27",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.5"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110
