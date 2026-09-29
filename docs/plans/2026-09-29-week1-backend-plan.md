@@ -579,7 +579,7 @@ git add . && git commit -m "feat(db): alembic async setup, extensions, immutable
 - Modify: `backend/app/main.py`
 - Test: `backend/tests/test_errors.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_errors.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_errors.py`**
 
 ```python
 import httpx
@@ -640,12 +640,12 @@ async def test_app_error_can_set_headers():
     assert r.headers["retry-after"] == "30"
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_errors.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.core.errors'`
 
-- [ ] **Step 3: `app/core/errors.py`**
+- [x] **Step 3: `app/core/errors.py`**
 
 ```python
 from fastapi import FastAPI, Request
@@ -690,7 +690,7 @@ def register_error_handlers(app: FastAPI) -> None:
                             status_code=422)
 ```
 
-- [ ] **Step 4: `app/core/middleware.py`**: middleware ASGI thuần. Không dùng `BaseHTTPMiddleware`, vì loại đó can thiệp vào luồng streaming mà ta sẽ cần cho SSE.
+- [x] **Step 4: `app/core/middleware.py`**: middleware ASGI thuần. Không dùng `BaseHTTPMiddleware`, vì loại đó can thiệp vào luồng streaming mà ta sẽ cần cho SSE.
 
 ```python
 import uuid
@@ -715,7 +715,7 @@ class RequestIdMiddleware:
         await self.app(scope, receive, send_with_header)
 ```
 
-- [ ] **Step 5: Thay `app/main.py`**
+- [x] **Step 5: Thay `app/main.py`**
 
 ```python
 from fastapi import FastAPI
@@ -740,12 +740,12 @@ def create_app() -> FastAPI:
 app = create_app()
 ```
 
-- [ ] **Step 6: Chạy toàn bộ test**
+- [x] **Step 6: Chạy toàn bộ test**
 
 Run: `uv run pytest -v`
 Expected: PASS hết
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add . && git commit -m "feat(core): unified error format and request id middleware"
