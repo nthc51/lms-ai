@@ -8,7 +8,7 @@ assert os.environ["DATABASE_URL"].rsplit("/", 1)[-1].endswith("_test"), "Test ch
 os.environ["DB_NULL_POOL"] = "true"
 os.environ["EMBED_PROVIDER"] = "fake"
 os.environ["VISION_PROVIDER"] = "fake"
-os.environ["JWT_SECRET"] = "test-secret"
+os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef-0123456789"
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
