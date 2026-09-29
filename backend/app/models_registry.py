@@ -1,1 +1,4 @@
 """Import mọi module models để Base.metadata có đủ bảng (dùng cho Alembic và test)."""
+
+from app.modules.auth import models as auth_models  # noqa: F401
+
