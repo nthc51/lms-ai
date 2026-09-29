@@ -5,18 +5,36 @@ from functools import lru_cache
 from typing import Protocol
 
 from minio import Minio
+from minio.commonconfig import CopySource
 from minio.error import S3Error
 
 from app.core.config import Settings, get_settings
 
+STAGING_PREFIX = "staging/"
+
+
+def staging_key(key: str) -> str:
+    """Key tạm mà trình duyệt được PUT vào. Key chính thức chỉ server ghi (copy sau khi kiểm tra)."""
+    return STAGING_PREFIX + key
+
+
+def download_headers(mime: str, download_name: str | None = None) -> dict[str, str]:
+    """Header response ký kèm presigned GET: luôn trả đúng Content-Type, thêm attachment nếu có tên file."""
+    headers = {"response-content-type": mime}
+    if download_name:
+        headers["response-content-disposition"] = f'attachment; filename="{download_name}"'
+    return headers
+
 
 class Storage(Protocol):
     async def presign_put(self, key: str, expires_s: int = 900) -> str: ...
-    async def presign_get(self, key: str, expires_s: int = 3600, download_name: str | None = None) -> str: ...
+    async def presign_get(self, key: str, mime: str, expires_s: int = 3600,
+                          download_name: str | None = None) -> str: ...
     async def stat_size(self, key: str) -> int | None: ...
     async def read_head(self, key: str, n: int = 2048) -> bytes: ...
     async def read_all(self, key: str) -> bytes: ...
     async def put(self, key: str, data: bytes, mime: str) -> None: ...
+    async def copy(self, src_key: str, dst_key: str) -> None: ...
     async def remove(self, key: str) -> None: ...
 
 
@@ -40,9 +58,9 @@ class MinioStorage:
         return await asyncio.to_thread(self._public.presigned_put_object, self._bucket, key,
                                        timedelta(seconds=expires_s))
 
-    async def presign_get(self, key: str, expires_s: int = 3600, download_name: str | None = None) -> str:
-        headers = ({"response-content-disposition": f'attachment; filename="{download_name}"'}
-                   if download_name else None)
+    async def presign_get(self, key: str, mime: str, expires_s: int = 3600,
+                          download_name: str | None = None) -> str:
+        headers = download_headers(mime, download_name)
         return await asyncio.to_thread(lambda: self._public.presigned_get_object(
             self._bucket, key, expires=timedelta(seconds=expires_s), response_headers=headers))
 
@@ -79,6 +97,11 @@ class MinioStorage:
     async def put(self, key: str, data: bytes, mime: str) -> None:
         await asyncio.to_thread(self._internal.put_object, self._bucket, key, io.BytesIO(data), len(data),
                                 content_type=mime)
+
+    async def copy(self, src_key: str, dst_key: str) -> None:
+        # copy phía server, giữ nguyên metadata (Content-Type) của object nguồn
+        await asyncio.to_thread(self._internal.copy_object, self._bucket, dst_key,
+                                CopySource(self._bucket, src_key))
 
     async def remove(self, key: str) -> None:
         await asyncio.to_thread(self._internal.remove_object, self._bucket, key)

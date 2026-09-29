@@ -35,4 +35,4 @@ async def lesson_video(lesson_id: uuid.UUID, user: User = Depends(get_current_us
     asset = await db.get(Asset, lesson.video_asset_id) if lesson.video_asset_id else None
     if asset is None:
         raise not_found("Video")
-    return UrlOut(url=await storage.presign_get(asset.storage_key))
+    return UrlOut(url=await storage.presign_get(asset.storage_key, asset.mime))

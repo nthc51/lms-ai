@@ -3,8 +3,9 @@ import uuid
 import filetype
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.deps import require_staff
 from app.core.errors import AppError, not_found
-from app.core.storage import Storage
+from app.core.storage import Storage, staging_key
 from app.core.time import utcnow
 from app.modules.auth.models import Role, User
 from app.modules.materials.models import Asset, AssetKind
@@ -19,6 +20,7 @@ ALLOWED_MIME = {
     AssetKind.submission: {"application/pdf", "text/plain"},
     AssetKind.image: {"image/png", "image/jpeg", "image/webp"},
 }
+STAFF_ONLY_KINDS = {AssetKind.pdf, AssetKind.video}  # tài liệu và video bài học chỉ giảng viên/admin upload
 EXTENSIONS = {"application/pdf": "pdf", "video/mp4": "mp4", "text/plain": "txt",
               "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 
@@ -41,6 +43,8 @@ def mime_matches(declared: str, head: bytes) -> bool:
 
 async def create_presigned_upload(db: AsyncSession, storage: Storage, user: User, data: PresignIn) -> PresignOut:
     kind = AssetKind(data.kind)
+    if kind in STAFF_ONLY_KINDS:
+        await require_staff(user)
     if data.mime not in ALLOWED_MIME[kind]:
         raise _invalid_type()
     if data.size > SIZE_LIMITS[kind]:
@@ -49,32 +53,45 @@ async def create_presigned_upload(db: AsyncSession, storage: Storage, user: User
     asset = Asset(owner_id=user.id, kind=kind, storage_key=key, mime=data.mime, size_bytes=0)
     db.add(asset)
     await db.commit()
-    return PresignOut(asset_id=asset.id, put_url=await storage.presign_put(key))
+    # Trình duyệt chỉ nhận URL ghi vào key tạm; key chính thức chỉ có server ghi sau khi kiểm tra xong.
+    return PresignOut(asset_id=asset.id, put_url=await storage.presign_put(staging_key(key)))
 
 
 async def complete_upload(db: AsyncSession, storage: Storage, user: User, asset_id: uuid.UUID) -> Asset:
-    asset = await db.get(Asset, asset_id)
+    # Khóa dòng asset để các lần complete đồng thời chạy tuần tự
+    asset = await db.get(Asset, asset_id, with_for_update=True)
     if asset is None or asset.owner_id != user.id:
         raise not_found("File")
     if asset.verified_at is not None:
         return asset
-    size = await storage.stat_size(asset.storage_key)
+    staged = staging_key(asset.storage_key)
+    size = await storage.stat_size(staged)
     if size is None:
         raise AppError("UPLOAD_MISSING", "Chưa tìm thấy file đã upload", 400)
 
-    async def reject(err: AppError) -> None:
-        await storage.remove(asset.storage_key)
+    async def reject(err: AppError, *keys: str) -> None:
+        for key in keys:
+            await storage.remove(key)
         await db.delete(asset)
         await db.commit()
         raise err
 
-    if size > SIZE_LIMITS[asset.kind]:
-        await reject(_too_large())
+    limit = SIZE_LIMITS[asset.kind]
+    if size > limit:
+        await reject(_too_large(), staged)
+    # Copy trước rồi mới kiểm tra bản ở key chính thức (client không ghi được vào đó): tránh việc client
+    # PUT lại vào key tạm giữa lúc kiểm tra và lúc copy.
+    await storage.copy(staged, asset.storage_key)
+    size = await storage.stat_size(asset.storage_key)
+    if size is None or size > limit:
+        await reject(_too_large(), staged, asset.storage_key)
     if not mime_matches(asset.mime, await storage.read_head(asset.storage_key)):
-        await reject(_invalid_type())
+        await reject(_invalid_type(), staged, asset.storage_key)
     asset.size_bytes = size
     asset.verified_at = utcnow()
     await db.commit()
+    # Xóa key tạm sau khi commit: nếu commit lỗi thì vẫn còn file tạm để complete lại
+    await storage.remove(staged)
     return asset
 
 

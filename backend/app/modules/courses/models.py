@@ -48,6 +48,7 @@ class Lesson(IdMixin, TimestampMixin, Base):
     position: Mapped[int] = mapped_column(Integer)
     content_md: Mapped[str] = mapped_column(Text, default="")
     duration_sec: Mapped[int | None] = mapped_column(Integer)
-    video_asset_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"))
+    video_asset_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"),
+                                                            index=True)
 
     section: Mapped[Section] = relationship(back_populates="lessons")
