@@ -1,3 +1,5 @@
+import asyncio
+
 import pymupdf
 import pymupdf4llm
 import pytest
@@ -92,3 +94,103 @@ async def test_vision_cap_defaults_to_setting(monkeypatch):
     pages = await extract_pages(make_pdf(["", ""]), vision)
     assert [(p.method, p.vision_skipped) for p in pages] == [("vision", False), ("text", True)]
     assert vision.calls == 1
+
+
+# ---- vision song song (VISION_CONCURRENCY) ----
+
+
+class InFlightVision:
+    """Vision giả đếm số lời gọi đang chạy cùng lúc; PNG giả mang số trang (xem _numbered_pngs)."""
+
+    def __init__(self, delay: float = 0.01, fail_on: int | None = None):
+        self.delay, self.fail_on = delay, fail_on
+        self.in_flight = self.max_in_flight = self.calls = 0
+        self.cancelled = 0
+
+    async def page_to_markdown(self, png: bytes) -> str:
+        page_no = int(png.removeprefix(b"page-"))
+        self.calls += 1
+        self.in_flight += 1
+        self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        try:
+            if page_no == self.fail_on:
+                await asyncio.sleep(0)
+                raise VisionBoom(f"trang {page_no} lỗi")
+            # trang sau xong trước → kiểm tra kết quả vẫn theo thứ tự trang
+            await asyncio.sleep(self.delay * (10 - page_no) if self.fail_on is None else 10)
+            return f"  md trang {page_no}  "
+        except asyncio.CancelledError:
+            self.cancelled += 1
+            raise
+        finally:
+            self.in_flight -= 1
+
+
+class VisionBoom(Exception):
+    pass
+
+
+@pytest.fixture
+def _numbered_pngs(monkeypatch):
+    """Thay PNG thật bằng b"page-<n>" để vision giả biết đang đọc trang nào (trang trắng render giống nhau)."""
+    real = extract._plan_pages
+
+    def plan(pdf_bytes, max_vision_pages):
+        planned, pngs = real(pdf_bytes, max_vision_pages)
+        assert all(png.startswith(b"\x89PNG") for png in pngs.values())
+        return planned, {n: f"page-{n}".encode() for n in pngs}
+
+    monkeypatch.setattr(extract, "_plan_pages", plan)
+
+
+async def test_vision_pages_run_concurrently_bounded_by_default_4(_numbered_pngs):
+    assert Settings(_env_file=None).vision_concurrency == 4
+    vision = InFlightVision()
+    pages = await extract_pages(make_pdf([""] * 8), vision)
+    assert vision.calls == 8
+    assert 1 < vision.max_in_flight <= 4
+    assert [(p.page_no, p.method, p.markdown) for p in pages] == [
+        (n, "vision", f"md trang {n}") for n in range(1, 9)
+    ]
+
+
+async def test_vision_concurrency_argument_is_respected(_numbered_pngs):
+    vision = InFlightVision()
+    await extract_pages(make_pdf([""] * 6), vision, concurrency=2)
+    assert vision.max_in_flight == 2
+
+
+async def test_vision_cap_decided_in_page_order_before_calls(_numbered_pngs):
+    vision = InFlightVision()
+    pages = await extract_pages(make_pdf(["", LONG_TEXT, "", "", "", ""]), vision, max_vision_pages=3)
+    assert [(p.page_no, p.method, p.vision_skipped) for p in pages] == [
+        (1, "vision", False),
+        (2, "text", False),
+        (3, "vision", False),
+        (4, "vision", False),
+        (5, "text", True),
+        (6, "text", True),
+    ]
+    assert vision.calls == 3
+    assert [p.markdown for p in pages if p.method == "vision"] == ["md trang 1", "md trang 3", "md trang 4"]
+
+
+async def test_vision_failure_cancels_others_and_propagates_original_exception(_numbered_pngs):
+    vision = InFlightVision(fail_on=2)
+    with pytest.raises(VisionBoom, match="trang 2 lỗi"):
+        await extract_pages(make_pdf([""] * 8), vision)
+    assert vision.cancelled >= 1 and vision.in_flight == 0
+    assert vision.calls < 8  # các trang còn chờ semaphore bị hủy trước khi được gọi
+
+
+async def test_pymupdf_runs_in_a_single_thread_call(monkeypatch):
+    calls = []
+    real_to_thread = asyncio.to_thread
+
+    async def spy(fn, *args, **kwargs):
+        calls.append(fn.__name__)
+        return await real_to_thread(fn, *args, **kwargs)
+
+    monkeypatch.setattr(extract.asyncio, "to_thread", spy)
+    await extract_pages(make_pdf([LONG_TEXT, "", ""]), FakeVision())
+    assert calls == ["_plan_pages"]

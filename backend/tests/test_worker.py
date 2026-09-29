@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -13,13 +14,16 @@ from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.service import create_job
 from app.modules.materials.models import Chunk, Source, SourceStatus
 from app.worker.tasks import (
+    JOB_TIMEOUT_MARGIN_S,
     JOB_TIMEOUTS,
     PENDING_JOB_ERROR,
     STALE_GRACE,
     STALE_JOB_ERROR,
+    handler_timeout,
     ingest_pdf,
     run_job,
     sweep_stale_jobs,
+    timeout_error,
 )
 from tests.factories import make_lesson, make_pdf_source, make_user
 from tests.fakes import InMemoryStorage
@@ -421,3 +425,90 @@ async def test_failed_requeue_leaves_job_for_next_sweep(db):
     assert redis.calls == [("ingest_pdf", (str(job.id),), str(job.id))]
     job = await db.get(Job, job.id, populate_existing=True)
     assert job.requeued_at is not None
+
+
+# ---- hard timeout của handler (job_timeout − JOB_TIMEOUT_MARGIN_S) ----
+
+
+def test_handler_timeout_leaves_margin_before_arq_job_timeout(monkeypatch):
+    assert handler_timeout("ingest_pdf") == JOB_TIMEOUTS["ingest_pdf"] - JOB_TIMEOUT_MARGIN_S == 570
+    monkeypatch.setitem(JOB_TIMEOUTS, "ingest_pdf", 40)
+    assert handler_timeout("ingest_pdf") == 20  # job_timeout nhỏ: vẫn dương và trước arq
+    assert timeout_error(570) == "Quá thời gian xử lý (570 giây)"
+
+
+async def test_handler_timeout_fails_job_and_source_in_one_commit(db):
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+    rec = CommitRecorder(job.id, source.id)
+    never = asyncio.Event()
+
+    async def handler(ref_id):
+        await never.wait()
+
+    await run_job(str(job.id), handler, session_factory=rec, timeout_s=0.05)
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    msg = "Quá thời gian xử lý (0.05 giây)"
+    assert job.status == JobStatus.failed and job.error_msg == msg and job.finished_at is not None
+    assert source.status == SourceStatus.failed and source.error_msg == msg
+    assert rec.states[-1] == (JobStatus.failed, SourceStatus.failed)
+    assert _consistent(rec.states), rec.states
+
+
+async def test_ingest_pdf_hard_timeout_cancels_blocked_vision(db, monkeypatch):
+    """End-to-end: pipeline kẹt ở lời gọi vision → bị hủy ở deadline, job + source failed ngay."""
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, make_pdf(["", ""]))
+    monkeypatch.setitem(JOB_TIMEOUTS, "ingest_pdf", 4)  # handler_timeout = 2 s (nửa job_timeout)
+    cancelled = []
+
+    class StuckVision(FakeVision):
+        async def page_to_markdown(self, png):
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled.append(True)
+                raise
+
+    ctx = {"storage": storage, "embedder": FakeEmbedder(768), "vision": StuckVision()}
+    await ingest_pdf(ctx, str(job.id))
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert cancelled == [True, True]
+    assert job.status == JobStatus.failed and job.error_msg == "Quá thời gian xử lý (2 giây)"
+    assert source.status == SourceStatus.failed and source.error_msg == job.error_msg
+
+
+async def test_timeout_error_raised_by_handler_itself_is_a_normal_failure(db):
+    job, _ = await create_job(db, "quiz_gen", uuid.uuid4(), created_by=None)
+    await db.commit()
+
+    async def handler(ref_id):
+        raise TimeoutError("API bên ngoài quá hạn")
+
+    await run_job(str(job.id), handler, timeout_s=60)
+    job = await db.get(Job, job.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg == "API bên ngoài quá hạn"
+
+
+async def test_timeout_does_not_overwrite_job_already_swept(db):
+    """Sweeper đã đánh dấu failed trong lúc handler còn chạy; hết deadline không ghi đè lỗi/source."""
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+
+    async def handler(ref_id):
+        async with SessionLocal() as s:
+            j = await s.get(Job, job.id)
+            j.status, j.error_msg = JobStatus.failed, STALE_JOB_ERROR
+            src = await s.get(Source, source.id)
+            src.status = SourceStatus.processing  # giả lập source vẫn đang được một lần xử lý khác giữ
+            await s.commit()
+        await asyncio.Event().wait()
+
+    # deadline đủ rộng để handler kịp commit phần "sweeper" trước khi bị hủy
+    await run_job(str(job.id), handler, timeout_s=1)
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR
+    assert source.status == SourceStatus.processing

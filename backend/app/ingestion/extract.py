@@ -24,47 +24,81 @@ def needs_vision(markdown: str, formula_count: int = 0) -> bool:
     )
 
 
-def _extract_text_pages(pdf_bytes: bytes) -> list[tuple[int, str, int]]:
+def _extract_text_pages(doc: pymupdf.Document) -> list[tuple[int, str, int]]:
+    if doc.page_count > MAX_PAGES:
+        raise ValueError(f"PDF quá dài (tối đa {MAX_PAGES} trang)")
+    # use_ocr=False: không dùng OCR của pymupdf4llm (Tesseract/RapidOCR); trang scan đi qua vision
+    parts = pymupdf4llm.to_markdown(doc, page_chunks=True, use_ocr=False, show_progress=False)
+    return [
+        (i + 1, part["text"], sum(1 for b in part.get("page_boxes") or [] if b.get("class") == "formula"))
+        for i, part in enumerate(parts)
+    ]
+
+
+def _plan_pages(
+    pdf_bytes: bytes, max_vision_pages: int, dpi: int = 150
+) -> tuple[list[tuple[int, str, str]], dict[int, bytes]]:
+    """Toàn bộ phần PyMuPDF trong một lời gọi đồng bộ (chạy trong một thread; PyMuPDF không an toàn khi
+    dùng song song nhiều thread): trích text từng trang, chọn trang gửi vision theo thứ tự trang (trần
+    max_vision_pages quyết định TRƯỚC khi gọi vision, không phụ thuộc thứ tự hoàn thành) và render PNG
+    cho các trang đó. Trả về [(page_no, markdown, method)] với method ∈ text|skipped|vision và {page_no: png}."""
     doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     try:
-        if doc.page_count > MAX_PAGES:
-            raise ValueError(f"PDF quá dài (tối đa {MAX_PAGES} trang)")
-        # use_ocr=False: không dùng OCR của pymupdf4llm (Tesseract/RapidOCR); trang scan đi qua vision
-        parts = pymupdf4llm.to_markdown(doc, page_chunks=True, use_ocr=False, show_progress=False)
-        return [
-            (i + 1, part["text"], sum(1 for b in part.get("page_boxes") or [] if b.get("class") == "formula"))
-            for i, part in enumerate(parts)
-        ]
+        planned: list[tuple[int, str, str]] = []
+        vision_used = 0
+        for page_no, markdown, formula_count in _extract_text_pages(doc):
+            if not needs_vision(markdown, formula_count):
+                method = "text"
+            elif vision_used >= max_vision_pages:
+                method = "skipped"
+            else:
+                vision_used += 1
+                method = "vision"
+            planned.append((page_no, markdown, method))
+        pngs = {n: doc[n - 1].get_pixmap(dpi=dpi).tobytes("png") for n, _, m in planned if m == "vision"}
+        return planned, pngs
     finally:
         doc.close()
 
 
-def _render_png(pdf_bytes: bytes, page_no: int, dpi: int = 150) -> bytes:
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+async def _vision_all(vision: VisionExtractor, pngs: dict[int, bytes], concurrency: int) -> dict[int, str]:
+    """Gọi vision song song, tối đa `concurrency` lời gọi cùng lúc. Một lời gọi lỗi → hủy các lời gọi còn
+    lại (TaskGroup) và ném lại chính exception đó (không bọc ExceptionGroup, để retry/error_text dùng được)."""
+    sem = asyncio.Semaphore(max(1, concurrency))
+
+    async def one(png: bytes) -> str:
+        async with sem:
+            return (await vision.page_to_markdown(png)).strip()
+
     try:
-        return doc[page_no - 1].get_pixmap(dpi=dpi).tobytes("png")
-    finally:
-        doc.close()
+        async with asyncio.TaskGroup() as tg:
+            tasks = {n: tg.create_task(one(png)) for n, png in pngs.items()}
+    except ExceptionGroup as eg:
+        raise eg.exceptions[0] from None
+    return {n: t.result() for n, t in tasks.items()}
 
 
 async def extract_pages(
-    pdf_bytes: bytes, vision: VisionExtractor, max_vision_pages: int | None = None
+    pdf_bytes: bytes,
+    vision: VisionExtractor,
+    max_vision_pages: int | None = None,
+    concurrency: int | None = None,
 ) -> list[PageText]:
     """Trích từng trang. Tối đa max_vision_pages trang gửi vision (mặc định VISION_MAX_PAGES_PER_DOC),
-    xét theo thứ tự trang; vượt trần thì dùng text và đánh dấu vision_skipped=True."""
+    xét theo thứ tự trang; vượt trần thì dùng text và đánh dấu vision_skipped=True.
+    Các trang vision được gọi song song, tối đa `concurrency` (mặc định VISION_CONCURRENCY) lời gọi cùng lúc;
+    kết quả vẫn theo đúng thứ tự trang."""
+    settings = get_settings()
     if max_vision_pages is None:
-        max_vision_pages = get_settings().vision_max_pages_per_doc
-    # PyMuPDF là code đồng bộ, nặng CPU → chạy trong thread để không chặn event loop của worker
-    raw = await asyncio.to_thread(_extract_text_pages, pdf_bytes)
-    pages: list[PageText] = []
-    vision_used = 0
-    for page_no, markdown, formula_count in raw:
-        if not needs_vision(markdown, formula_count):
-            pages.append(PageText(page_no, markdown.strip(), "text"))
-        elif vision_used >= max_vision_pages:
-            pages.append(PageText(page_no, markdown.strip(), "text", vision_skipped=True))
-        else:
-            vision_used += 1
-            png = await asyncio.to_thread(_render_png, pdf_bytes, page_no)
-            pages.append(PageText(page_no, (await vision.page_to_markdown(png)).strip(), "vision"))
-    return pages
+        max_vision_pages = settings.vision_max_pages_per_doc
+    if concurrency is None:
+        concurrency = settings.vision_concurrency
+    # PyMuPDF là code đồng bộ, nặng CPU → chạy trong (một) thread để không chặn event loop của worker
+    planned, pngs = await asyncio.to_thread(_plan_pages, pdf_bytes, max_vision_pages)
+    vision_md = await _vision_all(vision, pngs, concurrency)
+    return [
+        PageText(page_no, vision_md[page_no], "vision")
+        if method == "vision"
+        else PageText(page_no, markdown.strip(), "text", vision_skipped=method == "skipped")
+        for page_no, markdown, method in planned
+    ]

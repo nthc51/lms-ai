@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     embed_timeout_s: float = 30.0
     vision_timeout_s: float = 120.0
     vision_max_pages_per_doc: int = 60  # trần số trang gửi vision mỗi tài liệu (chi phí API)
+    vision_concurrency: int = 4  # số lời gọi vision chạy song song tối đa trong một tài liệu
     # Job 'pending' quá số phút này (Redis mất job) → sweeper enqueue lại một lần; quá thêm lần nữa → failed
     pending_job_requeue_after_min: int = 10
 

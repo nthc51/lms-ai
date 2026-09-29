@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
@@ -19,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 # job_timeout riêng cho từng loại job (spec K4), đơn vị giây. arq hủy job chạy quá thời gian này.
 JOB_TIMEOUTS: dict[str, int] = {"ingest_pdf": 600}
+# Handler bị hủy sớm hơn job_timeout của arq một khoảng này, để run_job kịp ghi job + source failed
+# ngay (arq hủy ở đúng job_timeout thì không còn cơ hội ghi, phải đợi sweeper).
+JOB_TIMEOUT_MARGIN_S = 30
 # Job 'processing' quá job_timeout + STALE_GRACE coi như worker đã chết giữa chừng
 STALE_GRACE = timedelta(minutes=5)
 STALE_JOB_ERROR = "Worker bị gián đoạn"
@@ -28,15 +32,29 @@ PENDING_JOB_ERROR = "Không đưa được job vào hàng đợi"
 SOURCE_JOB_TYPES = frozenset({"ingest_pdf"})
 
 
+def handler_timeout(job_type: str) -> float:
+    """Thời gian tối đa cho handler của một loại job: job_timeout của arq trừ JOB_TIMEOUT_MARGIN_S.
+    job_timeout không lớn hơn hẳn margin thì dùng một nửa job_timeout (luôn dương, luôn trước arq)."""
+    timeout = JOB_TIMEOUTS[job_type]
+    return timeout - JOB_TIMEOUT_MARGIN_S if timeout > 2 * JOB_TIMEOUT_MARGIN_S else timeout / 2
+
+
+def timeout_error(timeout_s: float) -> str:
+    return f"Quá thời gian xử lý ({timeout_s:g} giây)"
+
+
 async def run_job(
     job_id: str,
     handler: Callable[[uuid.UUID], Awaitable[object]],
     session_factory: async_sessionmaker = SessionLocal,
+    timeout_s: float | None = None,
 ) -> None:
     """Chạy một job: đánh dấu processing, gọi handler(ref_id), ghi done/failed.
 
     Handler có thể tự ghi trạng thái cuối của job trong cùng transaction với đối tượng nó xử lý
     (ingest_pdf làm vậy); nếu job vẫn còn processing sau handler thì ghi ở đây.
+    timeout_s: handler chạy quá thời gian này thì bị hủy; job (và source nếu là job ingest_*) chuyển
+    failed "Quá thời gian xử lý (N giây)" ngay trong cùng transaction.
     Không ném lỗi ra ngoài: trạng thái lỗi nằm trong bảng jobs, arq không tự retry."""
     jid = uuid.UUID(job_id)
     async with session_factory() as db:
@@ -55,9 +73,25 @@ async def run_job(
         await db.commit()
 
     status, error = JobStatus.done, None
+    deadline = asyncio.timeout(timeout_s)
     try:
-        await handler(ref_id)
+        async with deadline:
+            await handler(ref_id)
     except Exception as e:  # mọi lỗi đều phải được ghi vào job
+        # Chỉ coi là quá hạn khi chính deadline của run_job đã hết (TimeoutError do handler tự ném,
+        # vd. asyncio.wait_for bên trong, là lỗi thường → nhánh dưới).
+        if deadline.expired():
+            logger.error("Job %s quá thời gian xử lý (%s giây), đã hủy", job_id, timeout_s)
+            async with session_factory() as db:
+                # Cùng điều kiện với finish_job (chỉ job còn processing); source ingest_* failed cùng transaction
+                if await _fail_jobs(
+                    db,
+                    (Job.id == jid, Job.status == JobStatus.processing),
+                    timeout_error(timeout_s),
+                    utcnow(),
+                ):
+                    await db.commit()
+            return
         logger.exception("Job %s thất bại", job_id)
         status, error = JobStatus.failed, error_text(e)
 
@@ -79,7 +113,7 @@ async def ingest_pdf(ctx: dict, job_id: str) -> None:
             job_id=uuid.UUID(job_id),
         )
 
-    await run_job(job_id, handler, session_factory)
+    await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("ingest_pdf"))
 
 
 async def _fail_jobs(db, jobs_where, error: str, now) -> int:
