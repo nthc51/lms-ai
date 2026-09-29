@@ -4,11 +4,13 @@ import uuid
 from slugify import slugify
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError, not_found
 from app.modules.auth.models import Role, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
-from app.modules.courses.schemas import (CourseCreate, CourseUpdate, LessonCreate, LessonUpdate, ReorderIn,
+from app.modules.courses.schemas import (CourseCard, CourseCreate, CourseDetail, CourseOut, CoursePage,
+                                          CourseUpdate, LessonCreate, LessonUpdate, ReorderIn, SectionBrief,
                                           SectionCreate, SectionUpdate)
 
 
@@ -155,3 +157,37 @@ async def reorder(db: AsyncSession, course: Course, data: ReorderIn) -> None:
             lessons[lesson_id].section_id = item.id
             lessons[lesson_id].position = l_pos
     await db.commit()
+
+
+async def list_published(db: AsyncSession, q: str | None, page: int, size: int) -> CoursePage:
+    base = (select(Course, User.full_name).join(User, User.id == Course.teacher_id)
+            .where(Course.status == CourseStatus.published))
+    if q and q.strip():
+        pattern = f"%{q.strip().lower()}%"
+        base = base.where(func.immutable_unaccent(func.lower(Course.title)).like(func.immutable_unaccent(pattern)))
+    total = await db.scalar(select(func.count()).select_from(base.subquery()))
+    rows = (await db.execute(base.order_by(Course.created_at.desc()).offset((page - 1) * size).limit(size))).all()
+    items = [CourseCard(id=c.id, title=c.title, slug=c.slug, description=c.description, teacher_name=name)
+             for c, name in rows]
+    return CoursePage(items=items, total=total, page=page, size=size)
+
+
+async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> CourseDetail:
+    from app.modules.enrollment.service import is_enrolled  # import trong hàm để tránh vòng import
+
+    course = await db.scalar(select(Course).where(Course.slug == slug)
+                             .options(selectinload(Course.sections).selectinload(Section.lessons)))
+    if course is None:
+        raise not_found("Khóa học")
+    is_owner = user is not None and (user.role == Role.admin or course.teacher_id == user.id)
+    if course.status != CourseStatus.published and not is_owner:
+        raise not_found("Khóa học")
+    teacher_name = await db.scalar(select(User.full_name).where(User.id == course.teacher_id))
+    enrolled = user is not None and await is_enrolled(db, user.id, course.id)
+    return CourseDetail(
+        **CourseOut.model_validate(course).model_dump(),
+        teacher_name=teacher_name,
+        sections=[SectionBrief.model_validate(s) for s in course.sections],
+        is_enrolled=enrolled,
+        is_owner=is_owner,
+    )

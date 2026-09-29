@@ -74,3 +74,43 @@ class ReorderSection(BaseModel):
 
 class ReorderIn(BaseModel):
     sections: list[ReorderSection]
+
+
+class CourseCard(BaseModel):
+    id: uuid.UUID
+    title: str
+    slug: str
+    description: str
+    teacher_name: str
+
+
+class CoursePage(BaseModel):
+    items: list[CourseCard]
+    total: int
+    page: int
+    size: int
+
+
+class LessonBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    position: int
+    duration_sec: int | None
+
+
+class SectionBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    position: int
+    lessons: list[LessonBrief]
+
+
+class CourseDetail(CourseOut):
+    teacher_name: str
+    sections: list[SectionBrief]
+    is_enrolled: bool
+    is_owner: bool

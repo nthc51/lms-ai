@@ -1,14 +1,15 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.deps import require_staff, require_teacher_approved
+from app.core.deps import get_optional_user, require_staff, require_teacher_approved
 from app.modules.auth.models import User
 from app.modules.courses import service
-from app.modules.courses.schemas import (CourseCreate, CourseOut, CourseUpdate, LessonCreate, LessonOut,
-                                          LessonUpdate, ReorderIn, SectionCreate, SectionOut, SectionUpdate)
+from app.modules.courses.schemas import (CourseCreate, CourseDetail, CourseOut, CoursePage, CourseUpdate,
+                                          LessonCreate, LessonOut, LessonUpdate, ReorderIn, SectionCreate,
+                                          SectionOut, SectionUpdate)
 
 router = APIRouter(prefix="/api/v1", tags=["courses"])
 
@@ -92,3 +93,15 @@ async def reorder(course_id: uuid.UUID, data: ReorderIn, user: User = Depends(re
                   db: AsyncSession = Depends(get_db)) -> None:
     course = await service.get_owned_course(db, course_id, user)
     await service.reorder(db, course, data)
+
+
+@router.get("/courses", response_model=CoursePage)
+async def catalog(q: str | None = None, page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=100),
+                  db: AsyncSession = Depends(get_db)):
+    return await service.list_published(db, q, page, size)
+
+
+@router.get("/courses/{slug}", response_model=CourseDetail)
+async def course_detail(slug: str, user: User | None = Depends(get_optional_user),
+                        db: AsyncSession = Depends(get_db)):
+    return await service.get_course_detail(db, slug, user)
