@@ -6953,23 +6953,23 @@ git commit -m "feat(worker): arq worker for pdf ingestion, dockerized api/worker
 **Files:**
 - Modify: `docs/specs/2026-09-29-lms-ai-design.md`
 
-- [ ] **Step 1: Chạy toàn bộ test và lint**
+- [x] **Step 1: Chạy toàn bộ test và lint**
 
 Run: `uv run pytest -v` rồi `uv run ruff check .`
 Expected: toàn bộ test PASS, ruff không báo lỗi (nếu có lỗi import thừa thì sửa rồi chạy lại)
 
-- [ ] **Step 2: Kiểm tra migration chạy lại từ đầu được**
+- [x] **Step 2: Kiểm tra migration chạy lại từ đầu được**
 
 Run: `uv run alembic downgrade base && uv run alembic upgrade head` (trên DB dev)
 Expected: không lỗi. Nếu `downgrade` lỗi vì enum type còn tồn tại, thêm `op.execute("DROP TYPE IF EXISTS <tên_enum>")` vào hàm `downgrade()` của migration tương ứng.
 
-- [ ] **Step 3: Cập nhật spec**
+- [x] **Step 3: Cập nhật spec**
   - **Bảng tiến độ:** A1, A2, A3, A4 chuyển thành `[~]` (backend xong, còn frontend). Dòng "Tuần hiện tại" đặt `1 / 5`.
   - **Mục 7:** thêm các mã lỗi `EMAIL_TAKEN`, `INVALID_TOKEN`, `TOKEN_REUSED`, `NOT_AUTHENTICATED`, `FORBIDDEN`, `COURSE_EMPTY`, `INVALID_REORDER`, `UPLOAD_MISSING`, `INVALID_ASSET`, `INVALID_STATE`.
   - **Mục 6.4:** thêm `GET /teacher/courses`, `GET /lessons/{id}`, `GET /lessons/{id}/video`, `GET /lessons/{id}/sources`.
   - **Mục 13 (Nhật ký quyết định):** thêm dòng `2026-xx-xx | Email lưu chữ thường, bảo đảm bằng CHECK constraint; test bắt buộc chạy trên DB *_test; token ước lượng 1.4 × số từ`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add . && git commit -m "docs: update spec progress after week-1 backend"
