@@ -5328,7 +5328,7 @@ git add . && git commit -m "feat(ingestion): pdf extraction with pymupdf4llm and
 - Create: `backend/app/ingestion/pipeline.py`
 - Test: `backend/tests/test_pipeline.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_pipeline.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_pipeline.py`**
 
 ```python
 import pytest
@@ -5419,12 +5419,12 @@ async def test_reingest_after_failure_clears_old_error(db):
     assert fresh.status == SourceStatus.ready and fresh.error_msg is None
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_pipeline.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ingestion.pipeline'`
 
-- [ ] **Step 3: `app/ingestion/pipeline.py`**
+- [x] **Step 3: `app/ingestion/pipeline.py`**
 
 ```python
 import uuid
@@ -5521,12 +5521,12 @@ async def ingest_pdf_source(source_id: uuid.UUID, *, storage: Storage, embedder:
     return len(drafts)
 ```
 
-- [ ] **Step 4: Chạy test**
+- [x] **Step 4: Chạy test**
 
 Run: `uv run pytest tests/test_pipeline.py -v`
 Expected: PASS cả 6 test
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add . && git commit -m "feat(ingestion): pdf ingestion pipeline with short-lived sessions and failure marking"
