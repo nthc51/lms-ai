@@ -6082,20 +6082,30 @@ git add . && git commit -m "feat(materials): attach pdf sources to lessons, stat
 
 ### Task 22: Worker arq, Docker cho api/worker và smoke test end-to-end
 
-**Files:**
-- Create: `backend/app/worker/__init__.py`, `backend/app/worker/tasks.py`, `backend/app/worker/settings.py`, `backend/Dockerfile`, `backend/.dockerignore`, `backend/scripts/smoke_week1.py`
-- Modify: `backend/app/main.py`, `docker-compose.yml`
-- Test: `backend/tests/test_worker.py`
+> Điều chỉnh (người dùng duyệt): trạng thái cuối của job (done/failed, finished_at, error_msg) được ghi **cùng transaction** với trạng thái cuối của source (ready/failed): `ingest_pdf_source` nhận thêm `job_id` (tùy chọn, test pipeline cũ không đổi), commit cuối và `_mark_failed` gọi `finish_job` (`UPDATE jobs ... WHERE status = 'processing' RETURNING`); nếu job không còn processing (đã bị sweeper đánh dấu failed) thì bỏ kết quả, không ghi đè source. Worker đánh dấu job processing + started_at + attempts khi nhận job; `run_job` chỉ tự ghi done/failed nếu handler chưa ghi (vd. source không tồn tại). `job_timeout` riêng theo loại job (spec K4): `JOB_TIMEOUTS = {"ingest_pdf": 600}` giây. Thêm cron `sweep_stale_jobs` (5 phút một lần, chạy cả lúc worker khởi động): job processing có started_at cũ hơn job_timeout + 5 phút → failed "Worker bị gián đoạn", finished_at = now; source tương ứng (ingest_pdf: job.ref_id) nếu còn pending/processing cũng failed với cùng thông báo, chung transaction, để giảng viên bấm "Xử lý lại". `ensure_bucket` chịu được race giữa API và worker (bỏ qua BucketAlreadyOwnedByYou/BucketAlreadyExists). Dockerfile: uv ghim 0.12.20, cài dependency ở layer riêng, chạy bằng user không phải root. Smoke script đặt ở `backend/scripts/` (có `__init__.py`), chạy bằng `cd backend && PYTHONUTF8=1 uv run python -m scripts.smoke_week1 [file.pdf]`; không truyền file thì tự sinh PDF 2 trang có text (không commit file PDF mẫu); email smoke dùng `@example.com` (email-validator từ chối `.local`); `/sources/{id}/pages` đã phân trang nên đọc `items`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_worker.py`**
+**Files:**
+- Create: `backend/app/worker/__init__.py`, `backend/app/worker/tasks.py`, `backend/app/worker/settings.py`, `backend/Dockerfile`, `backend/.dockerignore`, `backend/scripts/__init__.py`, `backend/scripts/smoke_week1.py`
+- Modify: `backend/app/modules/jobs/service.py`, `backend/app/ingestion/pipeline.py`, `backend/app/core/storage.py`, `backend/app/main.py`, `docker-compose.yml`
+- Test: `backend/tests/test_worker.py`, `backend/tests/test_storage.py`
+
+- [ ] **Step 1: Viết test hỏng trước — `tests/test_worker.py`** (worker + sweeper; `CommitRecorder` chụp trạng thái job/source sau mỗi commit để chứng minh hai trạng thái cuối nằm chung một transaction)
 
 ```python
+import uuid
+from contextlib import asynccontextmanager
+from datetime import timedelta
+
+from sqlalchemy import select
+
 from app.ai.embedder import FakeEmbedder
 from app.ai.vision import FakeVision
+from app.core.db import SessionLocal
+from app.core.time import utcnow
 from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.service import create_job
-from app.modules.materials.models import Source, SourceStatus
-from app.worker.tasks import ingest_pdf, run_job
+from app.modules.materials.models import Chunk, Source, SourceStatus
+from app.worker.tasks import JOB_TIMEOUTS, STALE_GRACE, STALE_JOB_ERROR, ingest_pdf, run_job, sweep_stale_jobs
 from tests.factories import make_lesson, make_pdf_source, make_user
 from tests.fakes import InMemoryStorage
 from tests.pdfs import LONG_TEXT, make_pdf
@@ -6110,6 +6120,41 @@ async def _job_for_new_source(db, storage, pdf):
     return source, job
 
 
+class CommitRecorder:
+    """session_factory ghi lại (job.status, source.status) đọc từ một session khác ngay sau mỗi commit,
+    để kiểm tra trạng thái cuối của job và source được ghi trong cùng một transaction."""
+
+    def __init__(self, job_id: uuid.UUID, source_id: uuid.UUID):
+        self.job_id, self.source_id = job_id, source_id
+        self.states: list[tuple[JobStatus, SourceStatus]] = []
+
+    async def _snapshot(self) -> None:
+        async with SessionLocal() as s:
+            job = await s.get(Job, self.job_id)
+            source = await s.get(Source, self.source_id)
+            self.states.append((job.status, source.status))
+
+    def __call__(self):
+        @asynccontextmanager
+        async def cm():
+            async with SessionLocal() as session:
+                real_commit = session.commit
+
+                async def commit():
+                    await real_commit()
+                    await self._snapshot()
+
+                session.commit = commit
+                yield session
+        return cm()
+
+
+def _consistent(states) -> bool:
+    final = {JobStatus.done: SourceStatus.ready, JobStatus.failed: SourceStatus.failed}
+    in_flight = (SourceStatus.pending, SourceStatus.processing)
+    return all(final[j] == s if j in final else s in in_flight for j, s in states)
+
+
 async def test_ingest_pdf_job_succeeds(db):
     storage = InMemoryStorage()
     source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
@@ -6118,16 +6163,49 @@ async def test_ingest_pdf_job_succeeds(db):
     job = await db.get(Job, job.id, populate_existing=True)
     source = await db.get(Source, source.id, populate_existing=True)
     assert job.status == JobStatus.done and job.attempts == 1 and job.finished_at is not None
+    assert job.started_at is not None and job.error_msg is None
     assert source.status == SourceStatus.ready
 
 
 async def test_failing_handler_marks_job_failed_without_raising(db):
     storage = InMemoryStorage()
-    _, job = await _job_for_new_source(db, storage, b"not a pdf")
+    source, job = await _job_for_new_source(db, storage, b"not a pdf")
     ctx = {"storage": storage, "embedder": FakeEmbedder(768), "vision": FakeVision()}
     await ingest_pdf(ctx, str(job.id))
     job = await db.get(Job, job.id, populate_existing=True)
-    assert job.status == JobStatus.failed and job.error_msg
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg and job.finished_at is not None
+    assert source.status == SourceStatus.failed and source.error_msg == job.error_msg
+
+
+async def test_success_writes_job_done_and_source_ready_in_one_commit(db):
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+    rec = CommitRecorder(job.id, source.id)
+    ctx = {"storage": storage, "embedder": FakeEmbedder(768), "vision": FakeVision(), "session_factory": rec}
+    await ingest_pdf(ctx, str(job.id))
+    assert rec.states[0] == (JobStatus.processing, SourceStatus.pending)  # worker nhận job
+    assert rec.states[-1] == (JobStatus.done, SourceStatus.ready)
+    assert _consistent(rec.states), rec.states
+
+
+async def test_pipeline_failure_writes_job_and_source_failed_in_one_commit(db):
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, b"not a pdf")
+    rec = CommitRecorder(job.id, source.id)
+    ctx = {"storage": storage, "embedder": FakeEmbedder(768), "vision": FakeVision(), "session_factory": rec}
+    await ingest_pdf(ctx, str(job.id))
+    assert rec.states[-1] == (JobStatus.failed, SourceStatus.failed)
+    assert _consistent(rec.states), rec.states
+
+
+async def test_missing_source_still_marks_job_failed(db):
+    job, _ = await create_job(db, "ingest_pdf", uuid.uuid4())
+    await db.commit()
+    ctx = {"storage": InMemoryStorage(), "embedder": FakeEmbedder(768), "vision": FakeVision()}
+    await ingest_pdf(ctx, str(job.id))
+    job = await db.get(Job, job.id, populate_existing=True)
+    assert job.status == JobStatus.failed and "không tồn tại" in job.error_msg
 
 
 async def test_finished_job_is_not_run_again(db):
@@ -6142,6 +6220,101 @@ async def test_finished_job_is_not_run_again(db):
 
     await run_job(str(job.id), handler)
     assert calls == []
+
+
+async def test_generic_handler_success_marks_done(db):
+    job, _ = await create_job(db, "quiz_gen", uuid.uuid4())
+    await db.commit()
+    calls = []
+
+    async def handler(ref_id):
+        calls.append(ref_id)
+
+    await run_job(str(job.id), handler)
+    job = await db.get(Job, job.id, populate_existing=True)
+    assert calls == [job.ref_id] and job.status == JobStatus.done and job.finished_at is not None
+
+
+# ---- dọn job bị treo (worker chết giữa chừng) ----
+
+def _threshold(type_: str = "ingest_pdf") -> timedelta:
+    return timedelta(seconds=JOB_TIMEOUTS[type_]) + STALE_GRACE
+
+
+async def _processing_job(db, storage, started_ago: timedelta, source_status=SourceStatus.processing):
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+    job.status = JobStatus.processing
+    job.attempts = 1
+    job.started_at = utcnow() - started_ago
+    source.status = source_status
+    await db.commit()
+    return source, job
+
+
+async def test_sweep_fails_stale_job_and_its_source(db):
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() + timedelta(minutes=1))
+    assert await sweep_stale_jobs({}) == 1
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR == "Worker bị gián đoạn"
+    assert job.finished_at is not None
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
+
+
+async def test_sweep_leaves_job_within_threshold(db):
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() - timedelta(minutes=1))
+    assert await sweep_stale_jobs({}) == 0
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.processing and job.finished_at is None
+    assert source.status == SourceStatus.processing
+
+
+async def test_sweep_leaves_done_job(db):
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() * 3, source_status=SourceStatus.ready)
+    job.status = JobStatus.done
+    await db.commit()
+    assert await sweep_stale_jobs({}) == 0
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.done and job.error_msg is None
+    assert source.status == SourceStatus.ready
+
+
+async def test_sweep_does_not_clobber_finished_source(db):
+    storage = InMemoryStorage()
+    source, job = await _processing_job(db, storage, _threshold() * 2, source_status=SourceStatus.ready)
+    assert await sweep_stale_jobs({}) == 1
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed
+    assert source.status == SourceStatus.ready and source.error_msg is None
+
+
+async def test_late_worker_does_not_overwrite_swept_job(db):
+    """Worker chạy quá lâu, bị sweeper đánh dấu failed: kết quả đến muộn không được ghi đè."""
+    storage = InMemoryStorage()
+    source, job = await _job_for_new_source(db, storage, make_pdf([LONG_TEXT]))
+
+    class SweepingEmbedder(FakeEmbedder):
+        async def embed_documents(self, texts):
+            async with SessionLocal() as s:  # giả lập: đã quá hạn, sweeper chạy trong lúc worker còn embed
+                j = await s.get(Job, job.id)
+                j.started_at = utcnow() - _threshold() * 2
+                await s.commit()
+            await sweep_stale_jobs({})
+            return await super().embed_documents(texts)
+
+    ctx = {"storage": storage, "embedder": SweepingEmbedder(768), "vision": FakeVision()}
+    await ingest_pdf(ctx, str(job.id))
+    job = await db.get(Job, job.id, populate_existing=True)
+    source = await db.get(Source, source.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg == STALE_JOB_ERROR
+    assert source.status == SourceStatus.failed and source.error_msg == STALE_JOB_ERROR
+    assert (await db.scalars(select(Chunk).where(Chunk.source_id == source.id))).all() == []
 ```
 
 - [ ] **Step 2: Chạy test**
@@ -6149,26 +6322,183 @@ async def test_finished_job_is_not_run_again(db):
 Run: `uv run pytest tests/test_worker.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.worker'`
 
-- [ ] **Step 3: `app/worker/tasks.py`** (`app/worker/__init__.py` để trống)
+- [ ] **Step 3: `finish_job` trong `app/modules/jobs/service.py`**
+  - Import: `from sqlalchemy import select, text, update` và `from app.core.time import utcnow`
+  - Thêm vào cuối file:
+
+```python
+async def finish_job(db: AsyncSession, job_id: uuid.UUID, status: JobStatus, error_msg: str | None = None) -> bool:
+    """Ghi trạng thái cuối (done/failed) cho job đang processing. Chưa commit — caller commit chung
+    với thay đổi của đối tượng mà job xử lý (vd. source), để hai trạng thái luôn khớp nhau.
+
+    Trả về False nếu job không còn processing (vd. đã bị sweeper đánh dấu failed): caller không được ghi kết quả.
+    """
+    new_id = await db.scalar(
+        update(Job).where(Job.id == job_id, Job.status == JobStatus.processing)
+        .values(status=status, error_msg=error_msg, finished_at=utcnow())
+        .returning(Job.id))
+    return new_id is not None
+```
+
+- [ ] **Step 4: Pipeline ghi trạng thái job cùng transaction với source — toàn bộ `app/ingestion/pipeline.py`**
+
+```python
+import logging
+import uuid
+
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
+from app.ai.embedder import Embedder
+from app.ai.vision import VisionExtractor
+from app.core.config import get_settings
+from app.core.db import SessionLocal
+from app.core.storage import Storage
+from app.core.time import utcnow
+from app.ingestion.chunker import PageText, chunk_pages
+from app.ingestion.extract import extract_pages
+from app.modules.courses.models import Lesson, Section
+from app.modules.jobs.models import JobStatus
+from app.modules.jobs.service import finish_job
+from app.modules.materials.models import Asset, Chunk, ExtractionMethod, Source, SourcePage, SourceStatus
+
+logger = logging.getLogger(__name__)
+
+
+def vision_cap_warning(pages: list[PageText], cap: int) -> str | None:
+    """Cảnh báo ghi vào sources.error_msg khi có trang cần vision nhưng đã vượt trần (source vẫn ready)."""
+    skipped = sum(1 for p in pages if p.vision_skipped)
+    if not skipped:
+        return None
+    return (f"Cảnh báo: vượt giới hạn {cap} trang vision (VISION_MAX_PAGES_PER_DOC); "
+            f"{skipped} trang cần vision đã dùng text thường.")
+
+
+def error_text(error: BaseException) -> str:
+    return (str(error) or type(error).__name__)[:500]
+
+
+async def _mark_failed(session_factory: async_sessionmaker, source_id: uuid.UUID, error: Exception,
+                       job_id: uuid.UUID | None = None) -> None:
+    """Đánh dấu source failed; có job_id thì ghi job failed trong cùng transaction.
+    Job không còn processing (đã bị sweeper xử lý) thì không đụng tới source."""
+    msg = error_text(error)
+    async with session_factory() as db:
+        if job_id is not None and not await finish_job(db, job_id, JobStatus.failed, msg):
+            logger.warning("Job %s không còn processing, bỏ qua kết quả lỗi của source %s", job_id, source_id)
+            return
+        source = await db.get(Source, source_id)
+        if source is not None:
+            source.status = SourceStatus.failed
+            source.error_msg = msg
+        await db.commit()
+
+
+async def ingest_pdf_source(source_id: uuid.UUID, *, storage: Storage, embedder: Embedder,
+                            vision: VisionExtractor, max_vision_pages: int | None = None,
+                            session_factory: async_sessionmaker = SessionLocal,
+                            job_id: uuid.UUID | None = None) -> int:
+    """Xử lý một source PDF. Trả về số chunk đã ghi.
+
+    job_id (worker truyền vào): job đang processing; trạng thái cuối của job (done/failed) được ghi trong
+    cùng transaction với trạng thái cuối của source (ready/failed). Nếu lúc ghi kết quả job đã không còn
+    processing (sweeper đã đánh dấu failed) thì bỏ kết quả, trả về 0.
+
+    Dùng các DB session ngắn: không giữ connection trong lúc tải file, gọi vision và embedding (có thể mất vài phút).
+    max_vision_pages mặc định lấy từ VISION_MAX_PAGES_PER_DOC.
+    """
+    if max_vision_pages is None:
+        max_vision_pages = get_settings().vision_max_pages_per_doc
+
+    async with session_factory() as db:
+        row = (await db.execute(
+            select(Source, Asset.storage_key, Lesson.id, Section.course_id)
+            .join(Asset, Asset.id == Source.asset_id)
+            .join(Lesson, Lesson.id == Source.lesson_id)
+            .join(Section, Section.id == Lesson.section_id)
+            .where(Source.id == source_id)
+        )).one_or_none()
+        if row is None:
+            raise ValueError(f"Source {source_id} không tồn tại")
+        source, storage_key, lesson_id, course_id = row
+        source.status = SourceStatus.processing
+        source.error_msg = None
+        await db.commit()
+
+    try:
+        pdf_bytes = await storage.read_all(storage_key)
+        pages = await extract_pages(pdf_bytes, vision, max_vision_pages=max_vision_pages)
+        drafts = chunk_pages(pages)
+        if not drafts:
+            raise ValueError("Tài liệu không có nội dung đọc được")
+        vectors = await embedder.embed_documents([d.content for d in drafts])
+    except Exception as e:
+        await _mark_failed(session_factory, source_id, e, job_id)
+        raise
+
+    try:
+        async with session_factory() as db:
+            if job_id is not None and not await finish_job(db, job_id, JobStatus.done):
+                logger.warning("Job %s không còn processing, bỏ kết quả của source %s", job_id, source_id)
+                return 0
+            await db.execute(delete(Chunk).where(Chunk.source_id == source_id))
+            await db.execute(delete(SourcePage).where(SourcePage.source_id == source_id))
+            db.add_all([SourcePage(source_id=source_id, page_no=p.page_no,
+                                   extraction_method=ExtractionMethod(p.method), markdown=p.markdown)
+                        for p in pages])
+            db.add_all([Chunk(source_id=source_id, course_id=course_id, lesson_id=lesson_id, content=d.content,
+                              heading_path=d.heading_path[:500], page_no=d.page_no, token_count=d.token_count,
+                              embedding_model=embedder.model, embedding=v)
+                        for d, v in zip(drafts, vectors, strict=True)])
+            source = await db.get(Source, source_id)
+            source.status = SourceStatus.ready
+            source.error_msg = vision_cap_warning(pages, max_vision_pages)
+            source.processed_at = utcnow()
+            await db.commit()
+    except Exception as e:  # lỗi khi ghi DB: không để source kẹt ở trạng thái processing
+        await _mark_failed(session_factory, source_id, e, job_id)
+        raise
+    return len(drafts)
+```
+
+- [ ] **Step 5: `app/worker/tasks.py`** (`app/worker/__init__.py` để trống) — `run_job`, `ingest_pdf`, sweeper `sweep_stale_jobs`
 
 ```python
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import timedelta
+
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.core.db import SessionLocal
 from app.core.time import utcnow
-from app.ingestion.pipeline import ingest_pdf_source
+from app.ingestion.pipeline import error_text, ingest_pdf_source
 from app.modules.jobs.models import Job, JobStatus
+from app.modules.jobs.service import finish_job
+from app.modules.materials.models import Source, SourceStatus
 
 logger = logging.getLogger(__name__)
 
+# job_timeout riêng cho từng loại job (spec K4), đơn vị giây. arq hủy job chạy quá thời gian này.
+JOB_TIMEOUTS: dict[str, int] = {"ingest_pdf": 600}
+# Job 'processing' quá job_timeout + STALE_GRACE coi như worker đã chết giữa chừng
+STALE_GRACE = timedelta(minutes=5)
+STALE_JOB_ERROR = "Worker bị gián đoạn"
+# Loại job có ref_id trỏ tới sources.id: sweeper đánh dấu luôn source failed để giảng viên bấm "Xử lý lại"
+SOURCE_JOB_TYPES = frozenset({"ingest_pdf"})
 
-async def run_job(job_id: str, handler: Callable[[uuid.UUID], Awaitable[object]]) -> None:
+
+async def run_job(job_id: str, handler: Callable[[uuid.UUID], Awaitable[object]],
+                  session_factory: async_sessionmaker = SessionLocal) -> None:
     """Chạy một job: đánh dấu processing, gọi handler(ref_id), ghi done/failed.
+
+    Handler có thể tự ghi trạng thái cuối của job trong cùng transaction với đối tượng nó xử lý
+    (ingest_pdf làm vậy); nếu job vẫn còn processing sau handler thì ghi ở đây.
     Không ném lỗi ra ngoài: trạng thái lỗi nằm trong bảng jobs, arq không tự retry."""
     jid = uuid.UUID(job_id)
-    async with SessionLocal() as db:
+    async with session_factory() as db:
         job = await db.get(Job, jid)
         if job is None or job.status in (JobStatus.done, JobStatus.failed):
             logger.warning("Bỏ qua job %s (không tồn tại hoặc đã kết thúc)", job_id)
@@ -6182,42 +6512,72 @@ async def run_job(job_id: str, handler: Callable[[uuid.UUID], Awaitable[object]]
     status, error = JobStatus.done, None
     try:
         await handler(ref_id)
-    except Exception as e:  # noqa: BLE001 — mọi lỗi đều phải được ghi vào job
+    except Exception as e:  # mọi lỗi đều phải được ghi vào job
         logger.exception("Job %s thất bại", job_id)
-        status, error = JobStatus.failed, (str(e) or type(e).__name__)[:500]
+        status, error = JobStatus.failed, error_text(e)
 
-    async with SessionLocal() as db:
-        job = await db.get(Job, jid)
-        job.status = status
-        job.error_msg = error
-        job.finished_at = utcnow()
-        await db.commit()
+    async with session_factory() as db:
+        if await finish_job(db, jid, status, error):
+            await db.commit()
 
 
 async def ingest_pdf(ctx: dict, job_id: str) -> None:
-    async def handler(source_id: uuid.UUID) -> None:
-        await ingest_pdf_source(source_id, storage=ctx["storage"], embedder=ctx["embedder"], vision=ctx["vision"])
+    session_factory = ctx.get("session_factory", SessionLocal)
 
-    await run_job(job_id, handler)
+    async def handler(source_id: uuid.UUID) -> None:
+        await ingest_pdf_source(source_id, storage=ctx["storage"], embedder=ctx["embedder"],
+                                vision=ctx["vision"], session_factory=session_factory,
+                                job_id=uuid.UUID(job_id))
+
+    await run_job(job_id, handler, session_factory)
+
+
+async def sweep_stale_jobs(ctx: dict) -> int:
+    """Cron: job 'processing' quá job_timeout + STALE_GRACE → failed (worker chết/bị kill giữa chừng).
+    Source tương ứng còn pending/processing cũng chuyển failed, cùng transaction. Trả về số job đã xử lý."""
+    session_factory = ctx.get("session_factory", SessionLocal)
+    now = utcnow()
+    swept = 0
+    async with session_factory() as db:
+        for type_, timeout_s in JOB_TIMEOUTS.items():
+            cutoff = now - timedelta(seconds=timeout_s) - STALE_GRACE
+            ref_ids = (await db.scalars(
+                update(Job)
+                .where(Job.type == type_, Job.status == JobStatus.processing, Job.started_at < cutoff)
+                .values(status=JobStatus.failed, error_msg=STALE_JOB_ERROR, finished_at=now)
+                .returning(Job.ref_id))).all()
+            swept += len(ref_ids)
+            if ref_ids and type_ in SOURCE_JOB_TYPES:
+                await db.execute(
+                    update(Source)
+                    .where(Source.id.in_(ref_ids),
+                           Source.status.in_((SourceStatus.pending, SourceStatus.processing)))
+                    .values(status=SourceStatus.failed, error_msg=STALE_JOB_ERROR))
+        await db.commit()
+    if swept:
+        logger.warning("Đã đánh dấu %d job bị treo là failed", swept)
+    return swept
 ```
 
-- [ ] **Step 4: `app/worker/settings.py`**
+- [ ] **Step 6: `app/worker/settings.py`** (timeout theo loại job + cron sweeper 5 phút)
 
 ```python
-from arq import func
+from typing import ClassVar
+
+from arq import cron, func
 from arq.connections import RedisSettings
 
 from app.ai.embedder import get_embedder
 from app.ai.vision import get_vision
 from app.core.config import get_settings
 from app.core.storage import MinioStorage
-from app.worker.tasks import ingest_pdf
+from app.worker.tasks import JOB_TIMEOUTS, ingest_pdf, sweep_stale_jobs
 
 
 async def startup(ctx: dict) -> None:
     s = get_settings()
     storage = MinioStorage(s)
-    await storage.ensure_bucket()
+    await storage.ensure_bucket()  # API cũng tạo bucket lúc khởi động; ensure_bucket chịu được race
     ctx["storage"] = storage
     ctx["embedder"] = get_embedder(s)
     ctx["vision"] = get_vision(s)
@@ -6225,18 +6585,62 @@ async def startup(ctx: dict) -> None:
 
 class WorkerSettings:
     # Tên hàm = job.type. timeout riêng cho từng loại job (spec K4)
-    functions = [func(ingest_pdf, name="ingest_pdf", timeout=600)]
+    functions: ClassVar = [func(ingest_pdf, name="ingest_pdf", timeout=JOB_TIMEOUTS["ingest_pdf"])]
+    # 5 phút một lần: job processing quá timeout + 5 phút → failed "Worker bị gián đoạn"
+    cron_jobs: ClassVar = [cron(sweep_stale_jobs, name="sweep_stale_jobs", minute=set(range(0, 60, 5)),
+                                 run_at_startup=True, timeout=60)]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     max_jobs = 5
 ```
 
-- [ ] **Step 5: Chạy test**
+- [ ] **Step 7: Chạy test**
 
-Run: `uv run pytest tests/test_worker.py -v`
-Expected: PASS cả 3 test
+Run: `uv run pytest tests/test_worker.py tests/test_pipeline.py -v`
+Expected: PASS (12 test worker/sweeper + 6 test pipeline cũ không đổi)
 
-- [ ] **Step 6: Tạo bucket khi API khởi động** (`app/main.py`)
+- [ ] **Step 8: `ensure_bucket` chịu được race giữa API và worker**
+  - Thêm vào cuối `tests/test_storage.py`:
+
+```python
+class _RacingMinio:
+    """bucket_exists nói chưa có, nhưng make_bucket thấy tiến trình khác (API/worker) vừa tạo xong."""
+
+    def __init__(self, code: str):
+        self.code = code
+
+    def bucket_exists(self, bucket):
+        return False
+
+    def make_bucket(self, bucket):
+        from minio.error import S3Error
+        raise S3Error(None, self.code, "race", bucket, "req", "host", bucket_name=bucket)
+
+
+async def test_ensure_bucket_tolerates_concurrent_creation():
+    import pytest
+    from minio.error import S3Error
+
+    for code in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+        s = _storage()
+        s._internal = _RacingMinio(code)
+        await s.ensure_bucket()  # không ném lỗi
+    s = _storage()
+    s._internal = _RacingMinio("AccessDenied")
+    with pytest.raises(S3Error):
+        await s.ensure_bucket()
+```
+
+  - Run: `uv run pytest tests/test_storage.py -v` → FAIL (`S3Error` bị ném ra)
+  - Sửa `MinioStorage.ensure_bucket` trong `app/core/storage.py`:
+
+```python
+
+```
+
+  - Run lại: PASS
+
+- [ ] **Step 9: Tạo bucket khi API khởi động** (`app/main.py`)
   - Thêm import: `from contextlib import asynccontextmanager` và `from app.core.storage import get_storage`
   - Thêm hàm sau ngay trên `def create_app()`:
 
@@ -6254,150 +6658,162 @@ async def lifespan(app: FastAPI):
 
 (Test dùng `httpx.ASGITransport`, không gửi sự kiện lifespan, nên không đụng tới MinIO thật.)
 
-- [ ] **Step 7: `backend/Dockerfile` và `backend/.dockerignore`**
+- [ ] **Step 10: `backend/Dockerfile` và `backend/.dockerignore`**
 
 ```dockerfile
+# Python khớp backend/.python-version (3.12)
 FROM python:3.12-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.20 /uv /usr/local/bin/uv
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PYTHONUNBUFFERED=1 PYTHONUTF8=1 UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+# Cài dependency trước (layer được cache khi chỉ sửa code)
+COPY pyproject.toml uv.lock .python-version ./
+RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
+RUN uv sync --frozen --no-dev && useradd --system --uid 1000 --create-home app
+USER app
 ENV PATH="/app/.venv/bin:$PATH"
+EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ```
 .venv
 __pycache__
+*.pyc
 .pytest_cache
 .ruff_cache
 .env
 tests
+scripts
 ```
 
-- [ ] **Step 8: Thêm `api` và `worker` vào `docker-compose.yml`** (dưới service `minio`, trong khối `services:`)
+- [ ] **Step 11: Thêm `api` và `worker` vào `docker-compose.yml`** (dưới service `minio`, trong khối `services:`)
 
 ```yaml
-  api:
-    build: ./backend
-    env_file: ./backend/.env
-    environment: &backend_env
-      DATABASE_URL: postgresql+asyncpg://lms:lms@db:5432/lms
-      REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: minio:9000
-      MINIO_PUBLIC_ENDPOINT: localhost:9000
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
-    ports: ["8000:8000"]
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_started
-  worker:
-    build: ./backend
-    env_file: ./backend/.env
-    environment: *backend_env
-    command: arq app.worker.settings.WorkerSettings
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_started
+
 ```
 
-- [ ] **Step 9: `backend/scripts/smoke_week1.py`**: kiểm tra end-to-end trên hệ thống thật (API, worker, MinIO, Postgres)
+- [ ] **Step 12: `backend/scripts/smoke_week1.py`** (+ `backend/scripts/__init__.py` rỗng): kiểm tra end-to-end trên hệ thống thật (API, worker, MinIO, Postgres)
 
 ```python
-"""Smoke test tuần 1. Cần `docker compose up -d --build` trước.
+"""Smoke test tuần 1: API, worker, MinIO, Postgres thật. Cần `docker compose up -d --build` trước.
 
-Chạy từ thư mục backend/:  uv run python scripts/smoke_week1.py duong/dan/file.pdf
+Chạy từ thư mục backend/:  PYTHONUTF8=1 uv run python -m scripts.smoke_week1 [duong/dan/file.pdf]
+Không truyền file thì tự sinh một PDF 2 trang có text.
 """
 import asyncio
 import sys
 import time
 import uuid
+from pathlib import Path
 
 import httpx
+import pymupdf
 
-from app.core.db import SessionLocal
+from app.core.db import SessionLocal, engine
 from app.modules.auth.service import approve_teacher
 
 API = "http://localhost:8000/api/v1"
+SAMPLE = [
+    "Chương 1. Tìm kiếm nhị phân\n\n" + "Tìm kiếm nhị phân chia đôi khoảng tìm kiếm trên mảng đã sắp xếp. " * 12,
+    "Chương 2. Sắp xếp trộn\n\n" + "Sắp xếp trộn chia mảng làm hai nửa, sắp xếp từng nửa rồi trộn lại. " * 12,
+]
+
+
+def sample_pdf() -> bytes:
+    doc = pymupdf.open()
+    for body in SAMPLE:
+        page = doc.new_page()
+        page.insert_textbox(pymupdf.Rect(72, 72, 540, 770), body, fontsize=11, fontname="helv")
+    data = doc.tobytes()
+    doc.close()
+    return data
 
 
 async def _approve(email: str) -> None:
     async with SessionLocal() as db:
         await approve_teacher(db, email)
+    await engine.dispose()  # asyncio.run đóng event loop: không giữ connection sang loop khác
 
 
-def main(pdf_path: str) -> int:
-    data = open(pdf_path, "rb").read()
-    email = f"smoke-{uuid.uuid4().hex[:6]}@lms.local"
+def main(pdf_path: str | None) -> int:
+    data = Path(pdf_path).read_bytes() if pdf_path else sample_pdf()
+    email = f"smoke-{uuid.uuid4().hex[:6]}@example.com"
+    h: dict[str, str] = {}
     with httpx.Client(base_url=API, timeout=30) as c:
-        c.post("/auth/register", json={"email": email, "password": "password123",
-                                       "full_name": "Smoke GV", "role": "teacher"}).raise_for_status()
+        def post(url: str, **kw) -> dict:
+            resp = c.post(url, headers=h, **kw)
+            if resp.is_error:
+                raise SystemExit(f"POST {url} → {resp.status_code}: {resp.text}")
+            return resp.json()
+
+        post("/auth/register", json={"email": email, "password": "password123",
+                                     "full_name": "Smoke GV", "role": "teacher"})
         asyncio.run(_approve(email))
-        token = c.post("/auth/login", json={"email": email, "password": "password123"}).json()["access_token"]
-        h = {"Authorization": f"Bearer {token}"}
+        h["Authorization"] = "Bearer " + post("/auth/login", json={"email": email,
+                                                                  "password": "password123"})["access_token"]
 
-        course = c.post("/courses", json={"title": "Khóa smoke test"}, headers=h).json()
-        section = c.post(f"/courses/{course['id']}/sections", json={"title": "Chương 1"}, headers=h).json()
-        lesson = c.post(f"/sections/{section['id']}/lessons", json={"title": "Bài 1"}, headers=h).json()
+        course = post("/courses", json={"title": "Khóa smoke test"})
+        section = post(f"/courses/{course['id']}/sections", json={"title": "Chương 1"})
+        lesson = post(f"/sections/{section['id']}/lessons", json={"title": "Bài 1"})
 
-        pre = c.post("/uploads/presign", json={"kind": "pdf", "mime": "application/pdf", "size": len(data)},
-                     headers=h).json()
-        httpx.put(pre["put_url"], content=data, timeout=120).raise_for_status()
-        c.post(f"/uploads/{pre['asset_id']}/complete", headers=h).raise_for_status()
+        pre = post("/uploads/presign", json={"kind": "pdf", "mime": "application/pdf", "size": len(data)})
+        httpx.put(pre["put_url"], content=data, headers={"Content-Type": "application/pdf"},
+                  timeout=120).raise_for_status()  # PUT thẳng vào MinIO (key staging) như trình duyệt
+        post(f"/uploads/{pre['asset_id']}/complete")
 
-        created = c.post(f"/lessons/{lesson['id']}/sources", json={"asset_id": pre["asset_id"]}, headers=h).json()
+        created = post(f"/lessons/{lesson['id']}/sources", json={"asset_id": pre["asset_id"]})
         job_id, source_id = created["job_id"], created["source"]["id"]
         print("Đã gắn tài liệu, job:", job_id)
 
         deadline = time.time() + 180
-        while time.time() < deadline:
+        while True:
             job = c.get(f"/jobs/{job_id}", headers=h).json()
-            if job["status"] in ("done", "failed"):
+            if job["status"] in ("done", "failed") or time.time() > deadline:
                 break
             time.sleep(2)
         print("Job:", job["status"], job.get("error_msg") or "")
         detail = c.get(f"/sources/{source_id}", headers=h).json()
-        pages = c.get(f"/sources/{source_id}/pages", headers=h).json()
+        pages = c.get(f"/sources/{source_id}/pages", params={"size": 100}, headers=h).json()["items"]
         print(f"Source: {detail['status']} · {detail['page_count']} trang · {detail['chunk_count']} chunk")
         print("Cách trích từng trang:", [p["extraction_method"] for p in pages])
-        return 0 if job["status"] == "done" and detail["chunk_count"] > 0 else 1
+        ok = job["status"] == "done" and detail["status"] == "ready" and detail["chunk_count"] > 0
+        print("SMOKE OK" if ok else "SMOKE FAILED")
+        return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1]))
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else None))
 ```
 
-- [ ] **Step 10: Chạy toàn bộ hệ thống và smoke test**
+- [ ] **Step 13: Chạy toàn bộ hệ thống và smoke test**
 
-Run: `docker compose up -d --build` rồi `docker compose logs -f worker` (mở ở cửa sổ khác)
-Run: `uv run python scripts/smoke_week1.py <một file PDF bài giảng có text>`
+Run (thư mục gốc repo): `docker compose up -d --build` rồi `docker compose logs -f worker` (mở ở cửa sổ khác)
+Run: `cd backend && PYTHONUTF8=1 uv run python -m scripts.smoke_week1 [một file PDF bài giảng có text]`
 Expected:
 ```
 Đã gắn tài liệu, job: <uuid>
 Job: done
 Source: ready · N trang · M chunk
 Cách trích từng trang: ['text', 'text', ...]
+SMOKE OK
 ```
+Log worker có `sweep_stale_jobs ● 0` lúc khởi động và mỗi 5 phút.
 Nếu `put_url` lỗi `SignatureDoesNotMatch`: kiểm tra `MINIO_PUBLIC_ENDPOINT` của service `api` phải là `localhost:9000`, đúng host mà script dùng để PUT.
 
-- [ ] **Step 11 (tùy chọn, cần API key): chạy với Gemini thật**
+- [ ] **Step 14 (tùy chọn, cần API key): chạy với Gemini thật**
   - Trong `backend/.env`: đặt `EMBED_PROVIDER=gemini`, `EMBED_MODEL=gemini-embedding-001`, `VISION_PROVIDER=gemini` và `GEMINI_API_KEY=...`. Trước đó kiểm tra lại tên model hiện hành trên trang tài liệu Google AI.
   - Chạy `docker compose up -d --build worker` rồi chạy lại smoke test với một PDF có trang scan.
   - Expected: có trang mang `vision`, và chunk có `embedding_model = gemini-embedding-001`.
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 15: Chạy toàn bộ test rồi commit**
+
+Run: `uv run pytest` → PASS toàn bộ
 
 ```bash
-git add . && git commit -m "feat(worker): arq worker for pdf ingestion, dockerized api/worker, e2e smoke script"
+git add backend/app/worker backend/app/ingestion/pipeline.py backend/app/modules/jobs/service.py backend/app/core/storage.py backend/app/main.py backend/Dockerfile backend/.dockerignore backend/scripts backend/tests/test_worker.py backend/tests/test_storage.py docker-compose.yml
+git commit -m "feat(worker): arq worker for pdf ingestion, dockerized api/worker, e2e smoke script"
 ```
 
 ---

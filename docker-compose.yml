@@ -25,6 +25,35 @@ services:
     ports: ["9000:9000", "9001:9001"]
     volumes:
       - miniodata:/data
+  api:
+    build: ./backend
+    env_file: ./backend/.env
+    environment: &backend_env
+      DATABASE_URL: postgresql+asyncpg://lms:lms@db:5432/lms
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_PUBLIC_ENDPOINT: localhost:9000  # host ký URL phải đúng host trình duyệt/smoke script gọi tới
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports: ["8000:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+  worker:
+    build: ./backend
+    env_file: ./backend/.env
+    environment: *backend_env
+    command: arq app.worker.settings.WorkerSettings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
 volumes:
   pgdata:
   miniodata:

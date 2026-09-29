@@ -28,3 +28,31 @@ async def test_presign_put_targets_given_staging_key():
     url = await _storage().presign_put(staging_key("pdf/u/a.pdf"))
     parts = urlsplit(url)
     assert parts.netloc == "files.example.com" and parts.path == "/lms/staging/pdf/u/a.pdf"
+
+
+class _RacingMinio:
+    """bucket_exists nói chưa có, nhưng make_bucket thấy tiến trình khác (API/worker) vừa tạo xong."""
+
+    def __init__(self, code: str):
+        self.code = code
+
+    def bucket_exists(self, bucket):
+        return False
+
+    def make_bucket(self, bucket):
+        from minio.error import S3Error
+        raise S3Error(None, self.code, "race", bucket, "req", "host", bucket_name=bucket)
+
+
+async def test_ensure_bucket_tolerates_concurrent_creation():
+    import pytest
+    from minio.error import S3Error
+
+    for code in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+        s = _storage()
+        s._internal = _RacingMinio(code)
+        await s.ensure_bucket()  # không ném lỗi
+    s = _storage()
+    s._internal = _RacingMinio("AccessDenied")
+    with pytest.raises(S3Error):
+        await s.ensure_bucket()

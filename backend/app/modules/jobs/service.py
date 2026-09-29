@@ -1,9 +1,10 @@
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.time import utcnow
 from app.modules.jobs.models import ACTIVE_JOB_PREDICATE, Job, JobStatus
 from app.modules.jobs.queue import JobQueue
 
@@ -42,3 +43,16 @@ async def create_and_enqueue(db: AsyncSession, queue: JobQueue, type_: str, ref_
     if created:
         await queue.enqueue(job)
     return job
+
+
+async def finish_job(db: AsyncSession, job_id: uuid.UUID, status: JobStatus, error_msg: str | None = None) -> bool:
+    """Ghi trạng thái cuối (done/failed) cho job đang processing. Chưa commit — caller commit chung
+    với thay đổi của đối tượng mà job xử lý (vd. source), để hai trạng thái luôn khớp nhau.
+
+    Trả về False nếu job không còn processing (vd. đã bị sweeper đánh dấu failed): caller không được ghi kết quả.
+    """
+    new_id = await db.scalar(
+        update(Job).where(Job.id == job_id, Job.status == JobStatus.processing)
+        .values(status=status, error_msg=error_msg, finished_at=utcnow())
+        .returning(Job.id))
+    return new_id is not None

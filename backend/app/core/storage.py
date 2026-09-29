@@ -50,8 +50,13 @@ class MinioStorage:
 
     async def ensure_bucket(self) -> None:
         def run() -> None:
-            if not self._internal.bucket_exists(self._bucket):
+            if self._internal.bucket_exists(self._bucket):
+                return
+            try:
                 self._internal.make_bucket(self._bucket)
+            except S3Error as e:  # API và worker cùng khởi động: bên kia vừa tạo xong thì bỏ qua
+                if e.code not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+                    raise
         await asyncio.to_thread(run)
 
     async def presign_put(self, key: str, expires_s: int = 900) -> str:
