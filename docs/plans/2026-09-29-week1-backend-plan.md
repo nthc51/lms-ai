@@ -1984,7 +1984,7 @@ git add . && git commit -m "feat(courses): teacher course CRUD with ownership ch
 - Modify: `backend/app/modules/courses/schemas.py`, `backend/app/modules/courses/service.py`, `backend/app/modules/courses/router.py`, `backend/tests/helpers.py`
 - Test: `backend/tests/test_course_content.py`
 
-- [ ] **Step 1: Thêm vào cuối `tests/helpers.py`**
+- [x] **Step 1: Thêm vào cuối `tests/helpers.py`**
 
 ```python
 async def add_section(client, headers, course_id, title="Chương 1") -> dict:
@@ -2009,7 +2009,7 @@ async def make_published_course(client, teacher_headers, title="Cấu trúc dữ
     return r.json(), section, lesson
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_course_content.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_course_content.py`**
 
 ```python
 import uuid
@@ -2100,12 +2100,12 @@ async def test_publish_after_adding_lesson(client):
     assert r.status_code == 200 and r.json()["status"] == "published"
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_course_content.py -v`
 Expected: FAIL (404 vì chưa có route)
 
-- [ ] **Step 4: Thêm vào cuối `app/modules/courses/schemas.py`**
+- [x] **Step 4: Thêm vào cuối `app/modules/courses/schemas.py`**
 
 ```python
 class SectionCreate(BaseModel):
@@ -2156,7 +2156,7 @@ class ReorderIn(BaseModel):
     sections: list[ReorderSection]
 ```
 
-- [ ] **Step 5: Thêm vào `app/modules/courses/service.py`**
+- [x] **Step 5: Thêm vào `app/modules/courses/service.py`**
   - Sửa dòng import schemas thành:
     `from app.modules.courses.schemas import (CourseCreate, CourseUpdate, LessonCreate, LessonUpdate, ReorderIn, SectionCreate, SectionUpdate)`
   - Thêm các hàm sau vào cuối file:
@@ -2251,7 +2251,7 @@ async def reorder(db: AsyncSession, course: Course, data: ReorderIn) -> None:
 
 (`sorted` trên danh sách có trùng phần tử thì kết quả vẫn khác, nên trường hợp gửi trùng ID cũng bị chặn.)
 
-- [ ] **Step 6: Thêm vào `app/modules/courses/router.py`**
+- [x] **Step 6: Thêm vào `app/modules/courses/router.py`**
   - Sửa import schemas thành:
     `from app.modules.courses.schemas import (CourseCreate, CourseOut, CourseUpdate, LessonCreate, LessonOut, LessonUpdate, ReorderIn, SectionCreate, SectionOut, SectionUpdate)`
   - Thêm các route sau:
@@ -2306,12 +2306,12 @@ async def reorder(course_id: uuid.UUID, data: ReorderIn, user: User = Depends(re
     await service.reorder(db, course, data)
 ```
 
-- [ ] **Step 7: Chạy test**
+- [x] **Step 7: Chạy test**
 
 Run: `uv run pytest tests/test_course_content.py tests/test_courses.py -v`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add . && git commit -m "feat(courses): sections, lessons, reorder and publish"
