@@ -4586,9 +4586,12 @@ git add . && git commit -m "feat(ingestion): markdown chunker with heading paths
 
 ### Task 18: Embedder và Vision (interface + bản giả + bản Gemini)
 
+> Điều chỉnh (người dùng duyệt, spec mục 5.0): timeout theo từng lời gọi, retry tối đa 3 lần với backoff lũy thừa chỉ cho 429/5xx/timeout (4xx khác fail ngay), tôn trọng Retry-After, hàm sleep truyền vào được; helper dùng chung ở app/ai/retry.py.
+
 **Files:**
-- Create: `backend/app/ai/__init__.py`, `backend/app/ai/embedder.py`, `backend/app/ai/vision.py`
-- Test: `backend/tests/test_ai_providers.py`
+- Create: `backend/app/ai/__init__.py`, `backend/app/ai/embedder.py`, `backend/app/ai/vision.py`, `backend/app/ai/retry.py`
+- Modify: `backend/app/core/config.py`
+- Test: `backend/tests/test_ai_providers.py`, `backend/tests/test_ai_retry.py`
 
 - [ ] **Step 1: Viết test hỏng trước — `tests/test_ai_providers.py`**
 
@@ -4657,20 +4660,271 @@ async def test_fake_vision_records_calls():
     assert v.calls == 1 and len(md) > 50
 ```
 
-- [ ] **Step 2: Chạy test**
-
-Run: `uv run pytest tests/test_ai_providers.py -v`
-Expected: FAIL với `ModuleNotFoundError: No module named 'app.ai'`
-
-- [ ] **Step 3: `app/ai/embedder.py`** (`app/ai/__init__.py` để trống)
+- [ ] **Step 2: Viết test hỏng trước — `tests/test_ai_retry.py`**
 
 ```python
+"""Timeout + retry của GeminiEmbedder / GeminiVision (không gọi mạng, không ngủ thật)."""
+from types import SimpleNamespace
+
+import httpx
+import pytest
+from google.genai import errors
+
+from app.ai.embedder import GeminiEmbedder
+from app.ai.vision import GeminiVision
+
+
+def api_error(code: int, headers: dict | None = None) -> errors.APIError:
+    cls = errors.ClientError if code < 500 else errors.ServerError
+    body = {"error": {"code": code, "message": "boom", "status": "X"}}
+    return cls(code, body, httpx.Response(code, headers=headers or {}))
+
+
+class Sleeps:
+    def __init__(self):
+        self.delays: list[float] = []
+
+    async def __call__(self, delay: float) -> None:
+        self.delays.append(delay)
+
+
+class ScriptedModels:
+    """Mỗi lần gọi lấy phần tử kế tiếp trong script: exception thì raise, còn lại coi là thành công."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+        self.configs = []
+
+    def _next(self, config):
+        self.calls += 1
+        self.configs.append(config)
+        item = self.script.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+
+    async def embed_content(self, model, contents, config):
+        self._next(config)
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=[3.0, 4.0]) for _ in contents])
+
+    async def generate_content(self, model, contents, config=None):
+        self._next(config)
+        return SimpleNamespace(text="  # Trang 1  ")
+
+
+def embedder(script, sleep, **kw):
+    models = ScriptedModels(script)
+    client = SimpleNamespace(aio=SimpleNamespace(models=models))
+    return GeminiEmbedder("x", "gemini-embedding-001", 2, client=client, sleep=sleep, **kw), models
+
+
+def vision(script, sleep, **kw):
+    models = ScriptedModels(script)
+    client = SimpleNamespace(aio=SimpleNamespace(models=models))
+    return GeminiVision("x", "gemini-2.5-flash", client=client, sleep=sleep, **kw), models
+
+
+async def test_429_twice_then_success_backs_off_exponentially():
+    sleep = Sleeps()
+    e, models = embedder([api_error(429), api_error(429), None], sleep)
+    assert await e.embed_query("q") == [0.6, 0.8]
+    assert models.calls == 3
+    assert len(sleep.delays) == 2 and sleep.delays[1] > sleep.delays[0] > 0
+    assert sleep.delays == [1.0, 2.0]
+
+
+async def test_503_then_success():
+    sleep = Sleeps()
+    v, models = vision([api_error(503), None], sleep)
+    assert await v.page_to_markdown(b"png") == "# Trang 1"
+    assert models.calls == 2 and sleep.delays == [1.0]
+
+
+async def test_timeout_then_success():
+    sleep = Sleeps()
+    e, models = embedder([httpx.ReadTimeout("slow"), None], sleep)
+    assert await e.embed_query("q") == [0.6, 0.8]
+    assert models.calls == 2 and sleep.delays == [1.0]
+
+
+async def test_asyncio_timeout_is_retried_too():
+    sleep = Sleeps()
+    v, models = vision([TimeoutError(), None], sleep)
+    assert await v.page_to_markdown(b"png") == "# Trang 1"
+    assert models.calls == 2
+
+
+@pytest.mark.parametrize("code", [400, 401, 403, 404])
+async def test_other_4xx_fails_immediately(code):
+    sleep = Sleeps()
+    e, models = embedder([api_error(code), None], sleep)
+    with pytest.raises(errors.ClientError) as exc:
+        await e.embed_query("q")
+    assert exc.value.code == code
+    assert models.calls == 1 and sleep.delays == []
+
+
+async def test_vision_401_fails_immediately():
+    sleep = Sleeps()
+    v, models = vision([api_error(401), None], sleep)
+    with pytest.raises(errors.ClientError):
+        await v.page_to_markdown(b"png")
+    assert models.calls == 1 and sleep.delays == []
+
+
+async def test_retry_after_header_overrides_backoff():
+    sleep = Sleeps()
+    e, _ = embedder([api_error(429, {"Retry-After": "7"}), None], sleep)
+    await e.embed_query("q")
+    assert sleep.delays == [7.0]
+
+
+async def test_unparseable_retry_after_falls_back_to_backoff():
+    sleep = Sleeps()
+    e, _ = embedder([api_error(429, {"Retry-After": "soon"}), None], sleep)
+    await e.embed_query("q")
+    assert sleep.delays == [1.0]
+
+
+async def test_gives_up_after_three_retries():
+    sleep = Sleeps()
+    e, models = embedder([api_error(429)] * 4 + [None], sleep)
+    with pytest.raises(errors.ClientError) as exc:
+        await e.embed_query("q")
+    assert exc.value.code == 429
+    assert models.calls == 4 and sleep.delays == [1.0, 2.0, 4.0]
+
+
+async def test_timeout_is_passed_to_each_request():
+    e, em = embedder([None], Sleeps(), timeout_s=12.5)
+    await e.embed_query("q")
+    assert em.configs[0].http_options.timeout == 12500
+    v, vm = vision([None], Sleeps(), timeout_s=30)
+    await v.page_to_markdown(b"png")
+    assert vm.configs[0].http_options.timeout == 30000
+
+
+async def test_real_sdk_client_over_mock_transport():
+    """Đi qua google-genai thật (không mạng): 429 + Retry-After → ClientError có header; ReadTimeout
+    thô được thử lại; timeout truyền xuống từng request; SDK không tự retry thêm."""
+    from google import genai
+    from google.genai import types
+
+    seen = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req.extensions.get("timeout"))
+        if len(seen) == 1:
+            return httpx.Response(429, headers={"Retry-After": "7"},
+                                  json={"error": {"code": 429, "message": "q", "status": "RESOURCE_EXHAUSTED"}})
+        if len(seen) == 2:
+            raise httpx.ReadTimeout("slow", request=req)
+        return httpx.Response(200, json={"embeddings": [{"values": [3.0, 4.0]}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        client = genai.Client(api_key="x", http_options=types.HttpOptions(httpx_async_client=http))
+        sleep = Sleeps()
+        e = GeminiEmbedder("x", "gemini-embedding-001", 2, client=client, timeout_s=12.5, sleep=sleep)
+        assert await e.embed_query("q") == [0.6, 0.8]
+    assert sleep.delays == [7.0, 2.0]
+    assert len(seen) == 3 and all(t["read"] == 12.5 for t in seen)
+```
+
+- [ ] **Step 3: Chạy test**
+
+Run: `uv run pytest tests/test_ai_providers.py tests/test_ai_retry.py -v`
+Expected: FAIL với `ModuleNotFoundError: No module named 'app.ai'`
+
+- [ ] **Step 4: Thêm timeout vào `app/core/config.py`** (thêm vào `Settings`, ngay sau `gemini_api_key`)
+
+```python
+    embed_timeout_s: float = 30.0
+    vision_timeout_s: float = 120.0
+```
+
+- [ ] **Step 5: `app/ai/retry.py`**
+
+```python
+"""Retry dùng chung cho các lời gọi Gemini: chỉ thử lại khi 429, 5xx hoặc timeout."""
+import asyncio
+import logging
+import time
+from collections.abc import Awaitable, Callable
+
+import httpx
+
+logger = logging.getLogger("app.ai")
+
+Sleep = Callable[[float], Awaitable[None]]
+
+MAX_RETRIES = 3
+BASE_DELAY_S = 1.0
+
+
+def _status_code(exc: BaseException) -> int | None:
+    from google.genai import errors
+
+    return exc.code if isinstance(exc, errors.APIError) else None
+
+
+def is_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+        return True
+    code = _status_code(exc)
+    return code is not None and (code == 429 or 500 <= code <= 599)
+
+
+def retry_after_s(exc: BaseException) -> float | None:
+    """Giây chờ từ header Retry-After của response lỗi (APIError.response là httpx.Response)."""
+    headers = getattr(getattr(exc, "response", None), "headers", None)
+    value = headers.get("retry-after") if headers is not None else None
+    try:
+        delay = float(value) if value is not None else None
+    except ValueError:
+        return None
+    return delay if delay is not None and delay >= 0 else None
+
+
+async def call_with_retry[T](
+    op: str,
+    fn: Callable[[], Awaitable[T]],
+    *,
+    sleep: Sleep = asyncio.sleep,
+    max_retries: int = MAX_RETRIES,
+    base_delay_s: float = BASE_DELAY_S,
+) -> T:
+    start = time.perf_counter()
+    attempt = 0
+    while True:
+        try:
+            result = await fn()
+        except Exception as exc:
+            if not is_retryable(exc) or attempt >= max_retries:
+                logger.warning("ai_call op=%s status=error attempts=%d latency_ms=%d error=%r",
+                               op, attempt + 1, (time.perf_counter() - start) * 1000, exc)
+                raise
+            delay = retry_after_s(exc)
+            if delay is None:
+                delay = base_delay_s * 2 ** attempt
+            attempt += 1
+            await sleep(delay)
+            continue
+        logger.info("ai_call op=%s status=ok attempts=%d latency_ms=%d",
+                    op, attempt + 1, (time.perf_counter() - start) * 1000)
+        return result
+```
+
+- [ ] **Step 6: `app/ai/embedder.py`** (`app/ai/__init__.py` để trống)
+
+```python
+import asyncio
 import hashlib
 import math
 import re
 import unicodedata
 from typing import Protocol
 
+from app.ai.retry import Sleep, call_with_retry
 from app.core.config import Settings
 
 
@@ -4719,22 +4973,31 @@ class FakeEmbedder:
 class GeminiEmbedder:
     BATCH = 100
 
-    def __init__(self, api_key: str, model: str, dim: int, client=None):
+    def __init__(self, api_key: str, model: str, dim: int, client=None, *,
+                 timeout_s: float = 30.0, sleep: Sleep = asyncio.sleep):
         if client is None:
             from google import genai
             client = genai.Client(api_key=api_key)
         self._client = client
+        self._timeout_ms = int(timeout_s * 1000)
+        self._sleep = sleep
         self.model = model
         self.dim = dim
 
     async def _embed(self, texts: list[str], task_type: str) -> list[list[float]]:
         from google.genai import types
 
+        config = types.EmbedContentConfig(
+            task_type=task_type, output_dimensionality=self.dim,
+            http_options=types.HttpOptions(timeout=self._timeout_ms),
+        )
         out: list[list[float]] = []
         for i in range(0, len(texts), self.BATCH):
-            resp = await self._client.aio.models.embed_content(
-                model=self.model, contents=texts[i:i + self.BATCH],
-                config=types.EmbedContentConfig(task_type=task_type, output_dimensionality=self.dim),
+            batch = texts[i:i + self.BATCH]
+            resp = await call_with_retry(
+                "embed",
+                lambda b=batch: self._client.aio.models.embed_content(model=self.model, contents=b, config=config),
+                sleep=self._sleep,
             )
             # Khi giảm số chiều, vector trả về không còn chuẩn hóa → tự chuẩn hóa để dùng cosine
             out.extend(_normalize(list(e.values)) for e in resp.embeddings)
@@ -4749,15 +5012,17 @@ class GeminiEmbedder:
 
 def get_embedder(s: Settings) -> Embedder:
     if s.embed_provider == "gemini":
-        return GeminiEmbedder(s.gemini_api_key, s.embed_model, s.embed_dim)
+        return GeminiEmbedder(s.gemini_api_key, s.embed_model, s.embed_dim, timeout_s=s.embed_timeout_s)
     return FakeEmbedder(s.embed_dim)
 ```
 
-- [ ] **Step 4: `app/ai/vision.py`**
+- [ ] **Step 7: `app/ai/vision.py`**
 
 ```python
+import asyncio
 from typing import Protocol
 
+from app.ai.retry import Sleep, call_with_retry
 from app.core.config import Settings
 
 VISION_PROMPT = (
@@ -4782,38 +5047,44 @@ class FakeVision:
 
 
 class GeminiVision:
-    def __init__(self, api_key: str, model: str, client=None):
+    def __init__(self, api_key: str, model: str, client=None, *,
+                 timeout_s: float = 120.0, sleep: Sleep = asyncio.sleep):
         if client is None:
             from google import genai
             client = genai.Client(api_key=api_key)
         self._client = client
         self._model = model
+        self._timeout_ms = int(timeout_s * 1000)
+        self._sleep = sleep
 
     async def page_to_markdown(self, png: bytes) -> str:
         from google.genai import types
 
-        resp = await self._client.aio.models.generate_content(
-            model=self._model,
-            contents=[types.Part.from_bytes(data=png, mime_type="image/png"), VISION_PROMPT],
+        contents = [types.Part.from_bytes(data=png, mime_type="image/png"), VISION_PROMPT]
+        config = types.GenerateContentConfig(http_options=types.HttpOptions(timeout=self._timeout_ms))
+        resp = await call_with_retry(
+            "vision",
+            lambda: self._client.aio.models.generate_content(model=self._model, contents=contents, config=config),
+            sleep=self._sleep,
         )
         return (resp.text or "").strip()
 
 
 def get_vision(s: Settings) -> VisionExtractor:
     if s.vision_provider == "gemini":
-        return GeminiVision(s.gemini_api_key, s.vision_model)
+        return GeminiVision(s.gemini_api_key, s.vision_model, timeout_s=s.vision_timeout_s)
     return FakeVision()
 ```
 
-- [ ] **Step 5: Chạy test**
+- [ ] **Step 8: Chạy test**
 
-Run: `uv run pytest tests/test_ai_providers.py -v`
-Expected: PASS cả 6 test
+Run: `uv run pytest tests/test_ai_providers.py tests/test_ai_retry.py -v`
+Expected: PASS cả 17 test
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add . && git commit -m "feat(ai): embedder and vision interfaces with fake and gemini implementations"
+git add backend/app/ai backend/app/core/config.py backend/tests/test_ai_providers.py backend/tests/test_ai_retry.py && git commit -m "feat(ai): embedder and vision interfaces with fake and gemini implementations"
 ```
 
 ---
