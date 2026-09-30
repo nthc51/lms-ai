@@ -1818,7 +1818,7 @@ git add backend/app/modules/tutor backend/app/models_registry.py backend/alembic
   - Settings mới: `tutor_refuse_threshold: float = 0.3`, `tutor_top_k: int = 6`.
   - Factories: `make_pdf_source(..., status=SourceStatus.pending)`; `add_chunk(..., *, embedding_model="fake-768", page_no=1, heading_path="", token_count=None)`.
 
-- [ ] **Step 1: Setting và factories**
+- [x] **Step 1: Setting và factories**
 
 Thêm vào `app/core/config.py` (sau `llm_cache_enabled`):
 
@@ -1890,7 +1890,7 @@ async def add_chunk(
     return chunk
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_retrieval.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_retrieval.py`**
 
 ```python
 import uuid
@@ -2003,12 +2003,12 @@ def test_should_refuse():
     assert not should_refuse(RetrievalResult([chunk], 0.25, has_fulltext_match=True), 0.3)
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_retrieval.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ai.retrieval'`
 
-- [ ] **Step 4: `app/ai/retrieval.py`**
+- [x] **Step 4: `app/ai/retrieval.py`**
 
 ```python
 """Tìm đoạn tài liệu cho AI Tutor.
@@ -2130,17 +2130,17 @@ def should_refuse(result: RetrievalResult, threshold: float) -> bool:
     return result.top_similarity < threshold and not result.has_fulltext_match
 ```
 
-- [ ] **Step 5: Chạy lại test**
+- [x] **Step 5: Chạy lại test**
 
 Run: `uv run pytest tests/test_retrieval.py tests/test_chunks_db.py -v`
 Expected: PASS 7 test (4 mới + 3 test chunk cũ vẫn chạy với factories đã sửa).
 
-- [ ] **Step 6: Chạy toàn bộ**
+- [x] **Step 6: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 7: Commit** (từ thư mục gốc repo)
+- [x] **Step 7: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/ai/retrieval.py backend/app/core/config.py backend/.env.example backend/tests/factories.py backend/tests/test_retrieval.py && git commit -m "feat(ai): vector-only retrieval with scope filter and refuse gate"
