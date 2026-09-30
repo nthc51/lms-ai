@@ -3,10 +3,11 @@ import hashlib
 import math
 import re
 import unicodedata
+from functools import lru_cache
 from typing import Protocol
 
 from app.ai.retry import Sleep, call_with_retry
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 
 
 class Embedder(Protocol):
@@ -107,3 +108,9 @@ def get_embedder(s: Settings) -> Embedder:
     if s.embed_provider == "gemini":
         return GeminiEmbedder(s.gemini_api_key, s.embed_model, s.embed_dim, timeout_s=s.embed_timeout_s)
     return FakeEmbedder(s.embed_dim)
+
+
+@lru_cache
+def get_api_embedder() -> Embedder:
+    """Dependency FastAPI: embed câu hỏi của Tutor bằng đúng provider/model đã dùng lúc xử lý tài liệu."""
+    return get_embedder(get_settings())

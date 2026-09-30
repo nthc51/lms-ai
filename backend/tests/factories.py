@@ -5,6 +5,7 @@ from app.core.time import utcnow
 from app.modules.auth.models import Role, TeacherStatus, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.materials.models import Asset, AssetKind, Chunk, Source, SourceStatus, SourceType
+from tests.fakes import InMemoryStorage
 
 
 async def make_user(db, role: Role = Role.teacher) -> User:
@@ -94,3 +95,49 @@ async def add_chunk(
     db.add(chunk)
     await db.commit()
     return chunk
+
+
+BINARY_SEARCH = "Tìm kiếm nhị phân chia đôi khoảng tìm kiếm trên mảng đã sắp xếp."
+# ~170 từ ≈ 240 token: đủ ngưỡng 150 token để sinh câu hỏi (spec 5.4 bước 2)
+LONG_LESSON_TEXT = (
+    "Tìm kiếm nhị phân là thuật toán tìm một giá trị trong mảng đã sắp xếp. "
+    "Mỗi bước so sánh giá trị cần tìm với phần tử ở giữa khoảng đang xét, "
+    "rồi loại bỏ một nửa khoảng không thể chứa giá trị đó. "
+) * 4
+
+
+async def seed_chunks(
+    db,
+    lesson_id: uuid.UUID,
+    contents: list[str],
+    *,
+    heading_paths: list[str] | None = None,
+    status: SourceStatus = SourceStatus.ready,
+) -> list[Chunk]:
+    """Gắn một source (mặc định ready) vào bài học rồi thêm chunk có embedding của FakeEmbedder(768) — cùng
+    model 'fake-768' mà API dùng trong test. token_count tính như pipeline thật; chunk thứ i ở trang i + 1."""
+    from app.ai.embedder import FakeEmbedder
+    from app.ingestion.chunker import count_tokens
+
+    lesson = await db.get(Lesson, lesson_id)
+    section = await db.get(Section, lesson.section_id)
+    course = await db.get(Course, section.course_id)
+    owner = await db.get(User, course.teacher_id)
+    source = await make_pdf_source(db, InMemoryStorage(), owner, lesson, b"%PDF-1.7", status=status)
+    vectors = await FakeEmbedder(768).embed_documents(contents)
+    chunks = []
+    for i, (content, vector) in enumerate(zip(contents, vectors, strict=True)):
+        chunks.append(
+            await add_chunk(
+                db,
+                source,
+                course,
+                lesson,
+                content,
+                vector,
+                page_no=i + 1,
+                heading_path=heading_paths[i] if heading_paths else "",
+                token_count=count_tokens(content),
+            )
+        )
+    return chunks
