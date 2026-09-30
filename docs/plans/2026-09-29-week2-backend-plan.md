@@ -2384,7 +2384,7 @@ git add backend/app/modules/tutor/text.py backend/tests/test_tutor_text.py && gi
   - Setting mới `tutor_rate_limit_per_hour: int = 30`
   - `InMemoryRateLimiter` (`tests/fakes.py`): `.counts: dict[str, int]`, vượt thì trả `window_s`.
 
-- [ ] **Step 1: Setting, fake**
+- [x] **Step 1: Setting, fake**
 
 Thêm vào `app/core/config.py` (sau `tutor_top_k`):
 
@@ -2412,7 +2412,7 @@ class InMemoryRateLimiter:
         return window_s if self.counts[key] > limit else None
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_ratelimit.py`** (cần Redis của docker compose)
+- [x] **Step 2: Viết test hỏng trước — `tests/test_ratelimit.py`** (cần Redis của docker compose)
 
 ```python
 import uuid
@@ -2449,12 +2449,12 @@ def test_rate_limited_error_has_retry_after_header():
     assert err.headers == {"Retry-After": "42"} and err.details == {"retry_after": 42}
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_ratelimit.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.core.ratelimit'`
 
-- [ ] **Step 4: `app/core/ratelimit.py`**
+- [x] **Step 4: `app/core/ratelimit.py`**
 
 ```python
 """Rate limit bằng Redis (spec 5.3 bước 7): cửa sổ cố định tính từ lần đếm đầu tiên, INCR + EXPIRE NX."""
@@ -2524,17 +2524,17 @@ def rate_limited(retry_after: int) -> AppError:
     )
 ```
 
-- [ ] **Step 5: Chạy lại test**
+- [x] **Step 5: Chạy lại test**
 
 Run: `uv run pytest tests/test_ratelimit.py -v`
 Expected: PASS 3 test. Nếu test đầu báo `ConnectionError`, Redis chưa chạy: `docker compose up -d redis`.
 
-- [ ] **Step 6: Chạy toàn bộ**
+- [x] **Step 6: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 7: Commit** (từ thư mục gốc repo)
+- [x] **Step 7: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/core/ratelimit.py backend/app/core/config.py backend/.env.example backend/tests/fakes.py backend/tests/test_ratelimit.py && git commit -m "feat(core): Redis fixed-window rate limiter"
