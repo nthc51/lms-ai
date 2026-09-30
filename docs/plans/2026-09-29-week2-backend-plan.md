@@ -144,7 +144,7 @@ Nguyên tắc giữ như tuần 1: `models` chỉ định nghĩa bảng, `servic
   - Biến của từng prompt: `tutor_answer(course_title, context, question)`, `tutor_rewrite(history, question)`, `quiz_generate(count, difficulties, heading, source, feedback)`, `quiz_self_check(source, stem, options)`.
   - Chuỗi mà `FakeLLMProvider` (Task 2) dựa vào: thẻ `<question>…</question>` trong `tutor_rewrite`, dòng `Số câu cần sinh: <n>` và thẻ `<source>…</source>` trong `quiz_generate`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_prompts.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_prompts.py`**
 
 ```python
 import string
@@ -205,12 +205,12 @@ def test_missing_front_matter_is_rejected(tmp_path, monkeypatch):
         load_prompt.cache_clear()
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_prompts.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ai.prompts'`
 
-- [ ] **Step 3: `app/ai/prompts/__init__.py`**
+- [x] **Step 3: `app/ai/prompts/__init__.py`**
 
 ```python
 """Prompt có đánh phiên bản (spec K8).
@@ -265,7 +265,7 @@ def load_prompt(name: str) -> PromptTemplate:
     return PromptTemplate(name=name, version=m.group(1), body=raw[m.end() :])
 ```
 
-- [ ] **Step 4: `app/ai/prompts/tutor_answer.md`**
+- [x] **Step 4: `app/ai/prompts/tutor_answer.md`**
 
 ```markdown
 ---
@@ -289,7 +289,7 @@ $question
 </question>
 ```
 
-- [ ] **Step 5: `app/ai/prompts/tutor_rewrite.md`**
+- [x] **Step 5: `app/ai/prompts/tutor_rewrite.md`**
 
 ```markdown
 ---
@@ -308,7 +308,7 @@ $question
 </question>
 ```
 
-- [ ] **Step 6: `app/ai/prompts/quiz_generate.md`**
+- [x] **Step 6: `app/ai/prompts/quiz_generate.md`**
 
 ```markdown
 ---
@@ -335,7 +335,7 @@ $source
 </source>
 ```
 
-- [ ] **Step 7: `app/ai/prompts/quiz_self_check.md`**
+- [x] **Step 7: `app/ai/prompts/quiz_self_check.md`**
 
 ```markdown
 ---
@@ -353,17 +353,17 @@ Câu hỏi: $stem
 $options
 ```
 
-- [ ] **Step 8: Chạy lại test**
+- [x] **Step 8: Chạy lại test**
 
 Run: `uv run pytest tests/test_prompts.py -v`
 Expected: PASS 4 test. Nếu `_placeholders` báo "Ký tự $ lạc chỗ", nghĩa là thân prompt có `$` không theo sau bởi tên biến: bỏ ký tự đó (hoặc viết `$$`).
 
-- [ ] **Step 9: Chạy toàn bộ**
+- [x] **Step 9: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 10: Commit** (từ thư mục gốc repo)
+- [x] **Step 10: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/ai/prompts backend/tests/test_prompts.py && git commit -m "feat(ai): versioned prompt templates (K8)"
