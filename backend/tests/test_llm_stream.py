@@ -29,7 +29,7 @@ async def test_stream_yields_pieces_and_reports_usage():
     async with client.stream(PROMPT, op="tutor_answer") as s:
         pieces = [p async for p in s]
     assert "".join(pieces) == "Tìm kiếm nhị phân [1]." == s.text
-    assert s.completed and s.cached is False
+    assert s.completed and s.cached is False and s.truncated is False
     assert s.tokens_out == count_tokens(s.text) and s.tokens_in == count_tokens(PROMPT.text)
     assert llm.calls[0].stream and llm.calls[0].timeout_s == get_settings().llm_stream_timeout_s
     assert llm.streams[0].closed
@@ -41,7 +41,7 @@ async def test_break_early_is_not_completed_estimates_tokens_and_is_not_cached(d
     async with client.stream(PROMPT, op="tutor_answer") as s:
         async for _ in s:
             break
-    assert not s.completed and s.text == "một" and s.tokens_out == count_tokens("một")
+    assert not s.completed and s.truncated and s.text == "một" and s.tokens_out == count_tokens("một")
     assert llm.streams[0].closed
     assert await cache_rows(db) == []
 
@@ -54,6 +54,7 @@ async def test_completed_stream_is_cached_and_replayed(db):
     async with client.stream(PROMPT, op="tutor_answer") as second:
         replay = [p async for p in second]
     assert "".join(replay) == "câu trả lời đầy đủ" and second.cached and second.completed
+    assert second.truncated is False
     assert len(replay) > 1  # phát lại dạng stream, không phải một cục
     assert (second.tokens_in, second.tokens_out) == (0, 0)
     assert len(llm.calls) == 1
@@ -88,8 +89,11 @@ async def test_cancelled_consumer_closes_upstream_and_is_not_cached(db, caplog):
     client = LLMClient(llm, settings(), sleep=Sleeps())
     got: list[str] = []
 
+    streams = []
+
     async def consume():
         async with client.stream(PROMPT, op="tutor_answer") as s:
+            streams.append(s)
             async for p in s:
                 got.append(p)
 
@@ -102,7 +106,7 @@ async def test_cancelled_consumer_closes_upstream_and_is_not_cached(db, caplog):
         task.cancel()  # client ngắt kết nối
         with pytest.raises(asyncio.CancelledError):
             await task
-    assert got == ["một"] and llm.streams[0].closed
+    assert got == ["một"] and llm.streams[0].closed and streams[0].truncated
     assert await cache_rows(db) == []
     line = next(m for m in caplog.messages if m.startswith("llm_call"))
     assert "status=cancelled" in line and "cached=False" in line
@@ -124,7 +128,7 @@ async def test_stream_cut_by_provider_is_not_cached(db, caplog):
     with caplog.at_level(logging.INFO, logger="app.ai"):
         async with client.stream(PROMPT, op="tutor_answer") as s:
             _ = [p async for p in s]
-    assert s.completed and s.finish_reason == "MAX_TOKENS"
+    assert s.completed and s.finish_reason == "MAX_TOKENS" and s.truncated  # chưa sinh xong
     assert await cache_rows(db) == []
     line = next(m for m in caplog.messages if m.startswith("llm_call"))
     assert "status=incomplete" in line and "finish_reason=MAX_TOKENS" in line
@@ -141,11 +145,14 @@ async def test_stream_without_finish_reason_is_cached_when_it_ends_normally(db):
 async def test_stalled_stream_hits_total_timeout_and_is_not_retried(db):
     llm = FakeLLMProvider(["một hai ba"], stream_gate=asyncio.Event())  # treo trước mảnh thứ hai
     client = LLMClient(llm, settings(), sleep=Sleeps())
-    with pytest.raises(TimeoutError):
-        async with client.stream(PROMPT, op="tutor_answer", timeout_s=0.05) as s:
-            async for _ in s:
-                pass
-    assert s.text == "một" and not s.completed
+    # gate không bao giờ được set: chặn ngoài 5 giây để lỗi ở logic deadline làm test HỎNG thay vì treo
+    # (timeout ngoài ném CancelledError qua pytest.raises nên không bị nhầm là TimeoutError mong đợi)
+    async with asyncio.timeout(5):
+        with pytest.raises(TimeoutError):
+            async with client.stream(PROMPT, op="tutor_answer", timeout_s=0.05) as s:
+                async for _ in s:
+                    pass
+    assert s.text == "một" and not s.completed and s.truncated
     assert len(llm.calls) == 1 and llm.streams[0].closed
     assert await cache_rows(db) == []
 
@@ -168,7 +175,8 @@ async def test_hanging_open_times_out_and_is_retried():
     sleeps = Sleeps()
     llm = HangOnceOpen()
     client = LLMClient(llm, settings(llm_cache_enabled=False), sleep=sleeps)
-    async with client.stream(PROMPT, op="tutor_answer", timeout_s=0.05) as s:
-        pieces = [p async for p in s]
+    async with asyncio.timeout(5):  # không treo nếu timeout lúc mở hỏng
+        async with client.stream(PROMPT, op="tutor_answer", timeout_s=0.05) as s:
+            pieces = [p async for p in s]
     assert "".join(pieces) == "xin chào" and s.completed
     assert llm.opens == 2 and sleeps.delays == [1.0]

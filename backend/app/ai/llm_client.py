@@ -159,6 +159,12 @@ class LLMStream:
             await self._upstream.aclose()
 
     @property
+    def truncated(self) -> bool:
+        """Câu trả lời chưa sinh xong: chưa nhận hết (ngắt, lỗi, bị hủy) hoặc provider dừng vì lý do khác STOP
+        (MAX_TOKENS, SAFETY...). Dùng cho chat_messages.truncated."""
+        return not self.completed or self.finish_reason not in (None, "STOP")
+
+    @property
     def cacheable(self) -> bool:
         """Chỉ cache câu trả lời đã nhận hết, không rỗng, kết thúc bình thường (STOP hoặc provider không báo)."""
         return self.completed and bool(self.text.strip()) and self.finish_reason in (None, "STOP")
