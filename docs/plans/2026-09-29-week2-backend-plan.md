@@ -2558,7 +2558,7 @@ git add backend/app/core/ratelimit.py backend/app/core/config.py backend/.env.ex
   - `app/modules/tutor/router.py`: `router` với `POST /tutor/sessions` (201), `GET /tutor/sessions?course_id=`, `GET /tutor/availability?course_id=&lesson_id=`, `GET /tutor/sessions/{id}/messages`
   - `tests/factories.py`: `BINARY_SEARCH`, `LONG_LESSON_TEXT`, `async seed_chunks(db, lesson_id, contents, *, heading_paths=None, status=SourceStatus.ready) -> list[Chunk]`
 
-- [ ] **Step 1: `get_api_embedder` và factories**
+- [x] **Step 1: `get_api_embedder` và factories**
 
 Trong `app/ai/embedder.py`: đổi `from app.core.config import Settings` thành `from app.core.config import Settings, get_settings`, thêm `from functools import lru_cache` vào nhóm import thư viện chuẩn, và thêm vào cuối file:
 
@@ -2618,7 +2618,7 @@ async def seed_chunks(
     return chunks
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_tutor_sessions.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_tutor_sessions.py`**
 
 ```python
 import uuid
@@ -2714,12 +2714,12 @@ async def test_availability_signals_when_no_ready_chunks(client, db):
     assert r.json() == {"available": True, "ready_chunks": 1, "message": None}
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_tutor_sessions.py -v`
 Expected: FAIL — các request trả `404` (`/api/v1/tutor/...` chưa có route), assert đầu tiên hỏng.
 
-- [ ] **Step 4: `app/modules/tutor/schemas.py`**
+- [x] **Step 4: `app/modules/tutor/schemas.py`**
 
 ```python
 import uuid
@@ -2791,7 +2791,7 @@ class AvailabilityOut(BaseModel):
     message: str | None  # "Tài liệu đang được xử lý" khi chưa có chunk nào (spec 5.7)
 ```
 
-- [ ] **Step 5: `app/modules/tutor/service.py`**
+- [x] **Step 5: `app/modules/tutor/service.py`**
 
 ```python
 import uuid
@@ -2893,7 +2893,7 @@ async def availability(
     return AvailabilityOut(available=n > 0, ready_chunks=n, message=None if n else NOT_READY_MESSAGE)
 ```
 
-- [ ] **Step 6: `app/modules/tutor/router.py`**
+- [x] **Step 6: `app/modules/tutor/router.py`**
 
 ```python
 import uuid
@@ -2953,17 +2953,17 @@ async def list_messages(
 
 Gắn router vào `app/main.py`: thêm import `from app.modules.tutor.router import router as tutor_router` (theo thứ tự chữ cái, sau `materials_router`) và dòng `app.include_router(tutor_router)` sau `app.include_router(jobs_router)`.
 
-- [ ] **Step 7: Chạy lại test**
+- [x] **Step 7: Chạy lại test**
 
 Run: `uv run pytest tests/test_tutor_sessions.py -v`
 Expected: PASS 6 test.
 
-- [ ] **Step 8: Chạy toàn bộ**
+- [x] **Step 8: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 9: Commit** (từ thư mục gốc repo)
+- [x] **Step 9: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/ai/embedder.py backend/app/modules/tutor backend/app/main.py backend/tests/factories.py backend/tests/test_tutor_sessions.py && git commit -m "feat(tutor): chat sessions API with enrollment checks and availability signal"
