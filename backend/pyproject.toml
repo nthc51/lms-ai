@@ -15,6 +15,7 @@ dependencies = [
   "minio>=7.2",
   "filetype>=1.2",
   "arq>=0.26",
+  "redis>=5.0",
   "pymupdf>=1.24",
   "pymupdf4llm>=0.0.17",
   "pgvector>=0.3",

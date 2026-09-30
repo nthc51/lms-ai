@@ -62,3 +62,14 @@ class RecordingQueue:
         async with SessionLocal() as s:
             assert await s.get(Job, job.id) is not None, "Job phải được commit trước khi enqueue"
         self.jobs.append((job.type, job.ref_id))
+
+
+class InMemoryRateLimiter:
+    """Rate limiter giả trong bộ nhớ, không có thời gian: vượt giới hạn thì luôn trả cả cửa sổ."""
+
+    def __init__(self) -> None:
+        self.counts: dict[str, int] = {}
+
+    async def hit(self, key: str, limit: int, window_s: int) -> int | None:
+        self.counts[key] = self.counts.get(key, 0) + 1
+        return window_s if self.counts[key] > limit else None

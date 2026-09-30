@@ -798,6 +798,7 @@ dependencies = [
     { name = "pymupdf" },
     { name = "pymupdf4llm" },
     { name = "python-slugify" },
+    { name = "redis" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -827,6 +828,7 @@ requires-dist = [
     { name = "pymupdf", specifier = ">=1.24" },
     { name = "pymupdf4llm", specifier = ">=0.0.17" },
     { name = "python-slugify", specifier = ">=8.0" },
+    { name = "redis", specifier = ">=5.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]

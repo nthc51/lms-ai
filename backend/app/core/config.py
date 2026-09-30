@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     # Giá trị tạm, sẽ chọn lại trên tập dev ở tuần 3 (spec 9.2).
     tutor_refuse_threshold: float = 0.3
     tutor_top_k: int = 6
+    tutor_rate_limit_per_hour: int = 30  # số câu hỏi Tutor mỗi học viên mỗi giờ (spec 5.3 bước 7)
 
     @field_validator("cors_origins", mode="before")
     @classmethod
