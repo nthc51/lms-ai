@@ -266,3 +266,23 @@ async def test_gemini_generate_maps_finish_reason_name():
 async def test_fake_finish_reason_defaults_to_stop_and_is_configurable():
     assert (await _gen(FakeLLMProvider())).finish_reason == "STOP"
     assert (await _gen(FakeLLMProvider(finish_reason="MAX_TOKENS"))).finish_reason == "MAX_TOKENS"
+
+
+async def test_streams_report_finish_reason_at_end():
+    fake = await FakeLLMProvider(["a b"], finish_reason="MAX_TOKENS").open_stream(
+        "p", op="tutor_answer", model="m", timeout_s=1
+    )
+    assert fake.finish_reason is None
+    _ = [p async for p in fake]
+    assert fake.finish_reason == "MAX_TOKENS"
+
+    last = SimpleNamespace(
+        text="b",
+        usage_metadata=None,
+        candidates=[SimpleNamespace(finish_reason=types.FinishReason.MAX_TOKENS)],
+    )
+    stream = await _gemini(_Models([SimpleNamespace(text="a", usage_metadata=None), last])).open_stream(
+        "p", op="tutor_answer", model="m", timeout_s=1
+    )
+    assert await _drain(stream) == ["a", "b"] and stream.finish_reason == "MAX_TOKENS"
+    await stream.aclose()

@@ -5,6 +5,7 @@
 - retry khi 429/5xx/timeout qua call_with_retry (tối đa 3 lần, Retry-After tối đa 60 giây);
 - cache trong bảng llm_cache theo hash(provider + model + prompt [+ JSON schema]); chỉ cache output hợp lệ;
 - log token, độ trễ, prompt_version;
+- stream (LLMClient.stream): retry chỉ lúc mở, luôn đóng upstream khi thoát khối, cache khi nhận hết;
 - output có cấu trúc: gửi JSON schema cho provider rồi validate lại bằng Pydantic."""
 
 import asyncio
@@ -13,21 +14,24 @@ import json
 import logging
 import re
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterable, AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 
+import anyio
 from pydantic import BaseModel
 from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.ai.llm import LLMProvider, ProviderResult, get_llm_provider
+from app.ai.llm import LLMProvider, ProviderResult, ProviderStream, get_llm_provider, split_pieces
 from app.ai.models import LLMCache
 from app.ai.prompts import RenderedPrompt
 from app.ai.retry import Sleep, call_with_retry
 from app.core.config import Settings, get_settings
 from app.core.db import SessionLocal
+from app.ingestion.chunker import count_tokens
 
 logger = logging.getLogger("app.ai")
 
@@ -73,6 +77,97 @@ def strip_json_fence(text: str) -> str:
 
 def _ms(start: float) -> int:
     return int((time.perf_counter() - start) * 1000)
+
+
+class LLMStream:
+    """Câu trả lời đang stream (dùng qua `async with LLMClient.stream(...)`).
+
+    text/parts: phần đã nhận; completed: upstream đã chạy hết bình thường; cached: phát lại từ llm_cache.
+    tokens_*: số provider báo (thường chỉ có khi stream chạy hết); không có thì ước lượng 1.4 × số từ, để lúc
+    bị ngắt giữa chừng vẫn lưu được số token đã tiêu (spec 5.3 bước 6). Câu trả lời lấy từ cache: 0 token.
+    Mỗi lần đọc upstream chịu chung một hạn chót (deadline, giờ của event loop) nên stream bị treo giữa chừng
+    ném TimeoutError; lỗi giữa chừng không được retry."""
+
+    def __init__(
+        self,
+        pieces: AsyncIterable[str],
+        prompt: RenderedPrompt,
+        upstream: ProviderStream | None,
+        *,
+        deadline: float | None = None,
+    ):
+        self._it = aiter(pieces)
+        self._prompt = prompt
+        self._upstream = upstream
+        self._deadline = deadline
+        self._done = False
+        self.cached = upstream is None
+        self.parts: list[str] = []
+        self.completed = False
+
+    @property
+    def text(self) -> str:
+        return "".join(self.parts)
+
+    @property
+    def finish_reason(self) -> str | None:
+        return None if self._upstream is None else self._upstream.finish_reason
+
+    @property
+    def tokens_in(self) -> int:
+        if self._upstream is None:
+            return 0
+        reported = self._upstream.tokens_in
+        return reported if reported is not None else count_tokens(self._prompt.text)
+
+    @property
+    def tokens_out(self) -> int:
+        if self._upstream is None:
+            return 0
+        reported = self._upstream.tokens_out
+        return reported if reported is not None else count_tokens(self.text)
+
+    def __aiter__(self) -> "LLMStream":
+        return self
+
+    async def __anext__(self) -> str:
+        if self._done:
+            raise StopAsyncIteration
+        try:
+            if self._deadline is None:
+                piece = await anext(self._it)
+            else:
+                async with asyncio.timeout_at(self._deadline):
+                    piece = await anext(self._it)
+        except StopAsyncIteration:
+            self._done = True
+            self.completed = True
+            raise
+        except BaseException:
+            self._done = True
+            raise
+        self.parts.append(piece)
+        return piece
+
+    async def aclose(self) -> None:
+        """Đóng iterator và stream upstream. Gọi lại nhiều lần an toàn."""
+        self._done = True
+        close = getattr(self._it, "aclose", None)
+        if close is not None:
+            await close()
+        if self._upstream is not None:
+            await self._upstream.aclose()
+
+    @property
+    def cacheable(self) -> bool:
+        """Chỉ cache câu trả lời đã nhận hết, không rỗng, kết thúc bình thường (STOP hoặc provider không báo)."""
+        return self.completed and bool(self.text.strip()) and self.finish_reason in (None, "STOP")
+
+
+async def _replay(text: str) -> AsyncIterator[str]:
+    for piece in split_pieces(text):
+        await asyncio.sleep(0)
+        yield piece
 
 
 class LLMClient:
@@ -274,6 +369,79 @@ class LLMClient:
             parse=lambda text: schema.model_validate_json(strip_json_fence(text)),
             use_cache=use_cache,
         )
+
+    async def _open_stream(
+        self, prompt: RenderedPrompt, *, op: str, model: str, timeout_s: float
+    ) -> tuple[ProviderStream, float]:
+        """Một lần thử mở stream (gồm mảnh đầu). timeout_s là giới hạn tổng cho cả lần thử: phần đọc tiếp theo
+        dùng chung hạn chót đó."""
+        deadline = asyncio.get_running_loop().time() + timeout_s
+        async with asyncio.timeout_at(deadline):
+            upstream = await self.provider.open_stream(prompt.text, op=op, model=model, timeout_s=timeout_s)
+        return upstream, deadline
+
+    @asynccontextmanager
+    async def stream(
+        self,
+        prompt: RenderedPrompt,
+        *,
+        op: str,
+        model: str | None = None,
+        timeout_s: float | None = None,
+        use_cache: bool = True,
+    ) -> AsyncIterator[LLMStream]:
+        """Stream câu trả lời trong `async with` (spec 5.3 bước 6): thoát khỏi khối theo bất kỳ cách nào
+        (xong, break khi client ngắt, lỗi, bị hủy) đều đóng stream upstream. Retry chỉ áp dụng lúc mở
+        stream (trước token đầu); lỗi giữa chừng ném ra cho caller. Chỉ ghi cache khi đã nhận hết, không rỗng,
+        finish_reason là STOP/None và khối `async with` kết thúc không lỗi. Cache hit được phát lại dạng stream."""
+        model = model or self._settings.llm_model
+        timeout_s = timeout_s or self.timeout_for(op)
+        caching = self._caching(use_cache)
+        key = cache_key(self.provider.name, model, prompt.text)
+        start = time.perf_counter()
+        hit = await self._cache_get(key) if caching else None
+        if hit is not None:
+            self._log(op, prompt, model, "ok", cached=True, tokens_in=0, tokens_out=0, latency_ms=_ms(start))
+            replay = LLMStream(_replay(hit), prompt, None)
+            try:
+                yield replay
+            finally:
+                await replay.aclose()
+            return
+        upstream, deadline = await call_with_retry(
+            op,
+            lambda: self._open_stream(prompt, op=op, model=model, timeout_s=timeout_s),
+            sleep=self._sleep,
+        )
+        stream = LLMStream(upstream, prompt, upstream, deadline=deadline)
+        status = "error"
+        try:
+            yield stream
+            if not stream.completed:
+                status = "truncated"
+            elif stream.finish_reason in (None, "STOP"):
+                status = "ok"
+            else:
+                status = "incomplete"
+        except asyncio.CancelledError:
+            status = "cancelled"
+            raise
+        finally:
+            with anyio.CancelScope(shield=True):  # bị hủy (client ngắt) vẫn đóng được upstream
+                await stream.aclose()
+            self._log(
+                op,
+                prompt,
+                model,
+                status,
+                cached=False,
+                tokens_in=stream.tokens_in,
+                tokens_out=stream.tokens_out,
+                latency_ms=_ms(start),
+                finish_reason=stream.finish_reason,
+            )
+        if caching and stream.cacheable:
+            await self._cache_put(key, model, stream.text)
 
 
 @lru_cache

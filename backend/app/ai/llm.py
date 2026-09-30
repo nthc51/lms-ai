@@ -33,10 +33,12 @@ class ProviderResult:
 
 class ProviderStream(Protocol):
     """Stream đã mở: request đã gửi, lỗi kết nối/429/5xx đã ném ra lúc mở. tokens_*: None cho tới khi provider
-    báo usage (thường ở mảnh cuối; stream bị dừng giữa chừng thì không có)."""
+    báo usage (thường ở mảnh cuối; stream bị dừng giữa chừng thì không có). finish_reason: như ProviderResult,
+    None nếu provider chưa/không báo."""
 
     tokens_in: int | None
     tokens_out: int | None
+    finish_reason: str | None
 
     def __aiter__(self) -> AsyncIterator[str]: ...
     async def aclose(self) -> None: ...
@@ -116,8 +118,11 @@ class FakeStream:
         tokens_in: int,
         gate: asyncio.Event | None,
         error: tuple[int, BaseException] | None,
+        finish_reason: str | None = "STOP",
     ):
         self._pieces = split_pieces(text)
+        self._finish_reason = finish_reason
+        self.finish_reason: str | None = None
         self._text = text
         self._tokens_in = tokens_in
         self._gate = gate
@@ -140,6 +145,7 @@ class FakeStream:
         # như Gemini: usage chỉ có ở mảnh cuối
         self.tokens_in = self._tokens_in
         self.tokens_out = count_tokens(self._text)
+        self.finish_reason = self._finish_reason
 
     async def aclose(self) -> None:
         self.closed = True
@@ -151,7 +157,7 @@ class FakeLLMProvider:
     replies: trả lời theo thứ tự gọi — chuỗi, exception (bị ném ra) hoặc hàm nhận FakeCall. Hết danh sách
     thì dùng reply_for (mặc định default_reply). stream_gate: stream dừng trước mảnh thứ hai cho tới khi
     event được set. stream_error=(i, exc): stream ném exc ngay trước mảnh thứ i. finish_reason: lý do dừng
-    mà generate() báo (mặc định "STOP"), để test output bị cắt."""
+    mà generate() và stream (ở mảnh cuối) báo (mặc định "STOP"), để test output bị cắt."""
 
     name = "fake"
 
@@ -193,7 +199,11 @@ class FakeLLMProvider:
     async def open_stream(self, prompt: str, *, op: str, model: str, timeout_s: float) -> FakeStream:
         text = self._reply(FakeCall(op, prompt, model, timeout_s, None, stream=True))
         stream = FakeStream(
-            text, tokens_in=count_tokens(prompt), gate=self.stream_gate, error=self.stream_error
+            text,
+            tokens_in=count_tokens(prompt),
+            gate=self.stream_gate,
+            error=self.stream_error,
+            finish_reason=self.finish_reason,
         )
         self.streams.append(stream)
         return stream
@@ -214,6 +224,7 @@ class _GeminiStream:
         self._rest = rest
         self.tokens_in: int | None = None
         self.tokens_out: int | None = None
+        self.finish_reason: str | None = None
         self._queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
         self._first: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         self._finished = False
@@ -256,6 +267,7 @@ class _GeminiStream:
         if usage is not None:
             self.tokens_in = usage.prompt_token_count or self.tokens_in
             self.tokens_out = usage.candidates_token_count or self.tokens_out
+        self.finish_reason = _finish_reason(chunk) or self.finish_reason
 
     def __aiter__(self) -> AsyncIterator[str]:
         return self._gen()
