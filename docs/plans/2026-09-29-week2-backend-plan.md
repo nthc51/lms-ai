@@ -390,7 +390,7 @@ git add backend/app/ai/prompts backend/tests/test_prompts.py && git commit -m "f
   - `GeminiLLM(api_key, client=None)`; `get_llm_provider(s: Settings) -> LLMProvider`
   - Settings mới: `llm_provider="fake"`, `llm_model="gemini-2.5-flash"`, `llm_cheap_model="gemini-2.5-flash-lite"`, `llm_timeout_s=60.0`, `llm_stream_timeout_s=120.0`, `llm_rewrite_timeout_s=15.0`, `llm_cache_enabled=True`.
 
-- [ ] **Step 1: Thêm setting vào `app/core/config.py`** (ngay sau dòng `pending_job_requeue_after_min: int = 10`)
+- [x] **Step 1: Thêm setting vào `app/core/config.py`** (ngay sau dòng `pending_job_requeue_after_min: int = 10`)
 
 ```python
     llm_provider: str = "fake"  # fake | gemini
@@ -411,7 +411,7 @@ LLM_CACHE_ENABLED=true
 # (kiểm tra lại tên model hiện hành trên trang Google AI; GEMINI_API_KEY dùng chung với embedder/vision)
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_llm_providers.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_llm_providers.py`**
 
 ```python
 import asyncio
@@ -542,12 +542,12 @@ def test_factory_picks_fake_by_default():
     assert isinstance(get_llm_provider(Settings(llm_provider="gemini", gemini_api_key="x")), GeminiLLM)
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_llm_providers.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ai.llm'`
 
-- [ ] **Step 4: `app/ai/llm.py`**
+- [x] **Step 4: `app/ai/llm.py`**
 
 ```python
 """LLMProvider (spec K6): interface + bản giả tất định + bản Gemini.
@@ -832,17 +832,17 @@ def get_llm_provider(s: Settings) -> LLMProvider:
     return FakeLLMProvider()
 ```
 
-- [ ] **Step 5: Chạy lại test**
+- [x] **Step 5: Chạy lại test**
 
 Run: `uv run pytest tests/test_llm_providers.py -v`
 Expected: PASS 8 test.
 
-- [ ] **Step 6: Chạy toàn bộ**
+- [x] **Step 6: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 7: Commit** (từ thư mục gốc repo)
+- [x] **Step 7: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/ai/llm.py backend/app/core/config.py backend/.env.example backend/tests/test_llm_providers.py && git commit -m "feat(ai): LLMProvider interface with fake and Gemini providers"
