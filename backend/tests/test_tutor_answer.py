@@ -327,13 +327,25 @@ async def test_answer_is_saved_after_the_already_committed_question(db):
     assert msg.created_at > question.created_at
 
 
+class Gate(asyncio.Event):
+    """stream_gate không bao giờ mở; `reached` bật khi FakeStream chờ ở gate, tức mảnh đầu đã được đọc."""
+
+    def __init__(self):
+        super().__init__()
+        self.reached = asyncio.Event()
+
+    async def wait(self):
+        self.reached.set()
+        return await super().wait()
+
+
 async def test_cancel_while_refuse_is_held_saves_refusal(db):
     # Bị hủy lúc RefuseFilter đang giữ "REFUSE" (chưa có token nào ra client): save() vẫn chốt filter
     course, lesson, session = await _setup(db)
-    provider = FakeLLMProvider(["REFUSE rồi treo"], stream_gate=asyncio.Event())  # treo trước mảnh thứ hai
+    gate = Gate()
+    provider = FakeLLMProvider(["REFUSE rồi treo"], stream_gate=gate)  # treo trước mảnh thứ hai
     s = get_settings().model_copy()
     llm = LLMClient(provider, s, sleep=Sleeps())
-    got_sources = anyio.Event()
 
     async def consume():
         stream = answer_stream(
@@ -345,15 +357,103 @@ async def test_cancel_while_refuse_is_held_saves_refusal(db):
         )
         async for e in stream:
             assert parse(e)[0] == "sources"
-            got_sources.set()
 
     with anyio.fail_after(TEST_TIMEOUT_S):
         async with anyio.create_task_group() as tg:
             tg.start_soon(consume)
-            await got_sources.wait()
-            while not provider.streams:
-                await asyncio.sleep(0.01)
-            await asyncio.sleep(0.1)  # mảnh "REFUSE" được đọc, stream dừng ở gate
+            await gate.reached.wait()  # mảnh "REFUSE" đã vào RefuseFilter, stream dừng ở gate
             tg.cancel_scope.cancel()
     msg = await _assistant(db, session)
     assert msg.refused is True and msg.content == REFUSAL_MESSAGE and msg.truncated is True
+
+
+class GatedCommitFactory:
+    """session_factory có commit dừng lại (entered) cho tới khi test mở release: để hủy đúng lúc đang commit."""
+
+    def __init__(self):
+        self.entered = asyncio.Event()
+        self.release = asyncio.Event()
+        self.commits = 0
+
+    @asynccontextmanager
+    async def _session(self):
+        async with SessionLocal() as db:
+            real_commit = db.commit
+
+            async def commit():
+                self.commits += 1
+                self.entered.set()
+                await self.release.wait()
+                await real_commit()
+
+            db.commit = commit
+            yield db
+
+    def __call__(self):
+        return self._session()
+
+
+async def _assistant_rows(db, session) -> list[ChatMessage]:
+    return list(
+        await db.scalars(
+            select(ChatMessage).where(
+                ChatMessage.session_id == session.id, ChatMessage.role == ChatRole.assistant
+            )
+        )
+    )
+
+
+async def test_cancel_during_final_save_commit_still_saves_exactly_one_row(db):
+    # Client ngắt ngay sau token cuối: Starlette hủy task group lúc save() trước `done` đang commit
+    course, lesson, session = await _setup(db)
+    provider = FakeLLMProvider(["Tìm kiếm nhị phân chia đôi [1]."])
+    s = get_settings().model_copy()
+    llm = LLMClient(provider, s, sleep=Sleeps())
+    factory = GatedCommitFactory()
+
+    async def consume():
+        stream = answer_stream(
+            _ctx(course, lesson, session),
+            llm=llm,
+            embedder=FakeEmbedder(768),
+            is_disconnected=never_disconnected,
+            session_factory=factory,
+            settings=s,
+        )
+        async for _ in stream:
+            pass
+
+    with anyio.fail_after(TEST_TIMEOUT_S):
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(consume)
+            await factory.entered.wait()
+            tg.cancel_scope.cancel()  # hủy trong lúc commit đang bị giữ
+            # mở commit sau vài vòng event loop, khi lệnh hủy đã được giao tới task đang commit
+            asyncio.get_running_loop().call_later(0.05, factory.release.set)
+    [msg] = await _assistant_rows(db, session)
+    assert msg.content == "Tìm kiếm nhị phân chia đôi [1]." and msg.truncated is False
+    assert factory.commits == 1
+
+
+async def test_aclose_after_first_token_saves_truncated_answer(db):
+    # ASGI ≥ 2.4: Starlette không hủy task mà ném ClientDisconnect lúc send; generator bị aclose() (GeneratorExit)
+    course, lesson, session = await _setup(db)
+    provider = FakeLLMProvider([" ".join(f"từ{i}" for i in range(30))])
+    s = get_settings().model_copy()
+    llm = LLMClient(provider, s, sleep=Sleeps())
+    gen = answer_stream(
+        _ctx(course, lesson, session),
+        llm=llm,
+        embedder=FakeEmbedder(768),
+        is_disconnected=never_disconnected,
+        settings=s,
+    )
+    async with asyncio.timeout(TEST_TIMEOUT_S):
+        async for e in gen:
+            if parse(e)[0] == "token":
+                break
+        await gen.aclose()
+    [msg] = await _assistant_rows(db, session)
+    assert msg.truncated is True and msg.content == "từ0"
+    assert msg.tokens_out == count_tokens("từ0")
+    assert provider.streams[0].closed

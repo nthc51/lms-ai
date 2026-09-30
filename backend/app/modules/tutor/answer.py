@@ -65,7 +65,14 @@ class _Answer:
         self.prompt_version: str | None = None
         self.extra_tokens_in = 0  # lời gọi viết lại câu hỏi
         self.extra_tokens_out = 0
-        self.saved = False
+        self.message_id = (
+            uuid.uuid4()
+        )  # cố định: lưu lại sau lỗi không thể tạo dòng thứ hai (trùng khóa chính)
+        self._saved: tuple[uuid.UUID, str, list[dict]] | None = None
+
+    @property
+    def saved(self) -> bool:
+        return self._saved is not None
 
     def elapsed_ms(self) -> int:
         return int((time.perf_counter() - self.started) * 1000)
@@ -82,8 +89,19 @@ class _Answer:
         return tail
 
     async def save(self, *, truncated: bool | None = None) -> tuple[uuid.UUID, str, list[dict]]:
-        """truncated=None: lấy theo stream (chưa nhận hết, hoặc provider cắt: MAX_TOKENS, SAFETY...)."""
-        self.saved = True
+        """Ghi tin nhắn assistant, chạy trong CancelScope(shield=True) trên mọi đường (kể cả ngay trước `done`):
+        bị hủy giữa lúc commit (client ngắt, Starlette hủy task group) vẫn ghi xong. `saved` chỉ bật sau khi
+        commit thành công; gọi lại sau khi đã lưu thì trả kết quả cũ, không ghi thêm. Lần lưu trước lỗi thì lần
+        sau dùng cùng message_id, nên không bao giờ có hai dòng.
+
+        truncated=None: lấy theo stream (chưa nhận hết, hoặc provider cắt: MAX_TOKENS, SAFETY...)."""
+        if self._saved is not None:
+            return self._saved
+        with anyio.CancelScope(shield=True):
+            self._saved = await self._write(truncated)
+        return self._saved
+
+    async def _write(self, truncated: bool | None) -> tuple[uuid.UUID, str, list[dict]]:
         self.finish_filter()  # nhả phần còn giữ (hoặc chốt REFUSE) trước khi lưu, kể cả khi lỗi/bị hủy
         if truncated is None:
             truncated = self.stream.truncated if self.stream is not None else False
@@ -93,7 +111,7 @@ class _Answer:
             content, cited = clean_citations(self.stream.text if self.stream else "", len(self.sources))
         citations = [citation_record(n, self.sources[n - 1]) for n in cited]
         message = ChatMessage(
-            id=uuid.uuid4(),
+            id=self.message_id,
             session_id=self.ctx.session_id,
             role=ChatRole.assistant,
             content=content,
@@ -143,7 +161,7 @@ async def answer_stream(
     Phần trước token đầu (viết lại + tìm tài liệu + mở stream, gồm retry) chịu chung hạn chót
     tutor_prestream_deadline_s; quá hạn → event error. Khối finally luôn lưu câu trả lời — kể cả phần dở khi
     client ngắt kết nối, khi lỗi, hoặc khi task stream bị hủy — với truncated=true và số token đã tiêu. Việc lưu
-    lúc bị hủy chạy trong CancelScope(shield=True)."""
+    lúc bị hủy/aclose() (GeneratorExit) chạy trong CancelScope(shield=True), cả ở đường lưu trước `done`."""
     s = settings or get_settings()
     answer = _Answer(ctx, session_factory)
     deadline = asyncio.get_running_loop().time() + s.tutor_prestream_deadline_s
@@ -202,8 +220,7 @@ async def answer_stream(
         yield sse("error", AI_ERROR)
     finally:
         if not answer.saved:
-            with anyio.CancelScope(shield=True):
-                try:
-                    await answer.save(truncated=True)
-                except Exception:
-                    logger.exception("Không lưu được câu trả lời (session %s)", ctx.session_id)
+            try:
+                await answer.save(truncated=True)  # save() tự shield
+            except Exception:
+                logger.exception("Không lưu được câu trả lời (session %s)", ctx.session_id)
