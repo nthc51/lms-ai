@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     llm_stream_timeout_s: float = 120.0  # stream câu trả lời của Tutor
     llm_rewrite_timeout_s: float = 15.0
     llm_cache_enabled: bool = True
+    # Chốt chặn Tutor (spec 5.3 bước 3): similarity cao nhất < τ thì từ chối, không gọi LLM.
+    # Giá trị tạm, sẽ chọn lại trên tập dev ở tuần 3 (spec 9.2).
+    tutor_refuse_threshold: float = 0.3
+    tutor_top_k: int = 6
 
     @field_validator("cors_origins", mode="before")
     @classmethod

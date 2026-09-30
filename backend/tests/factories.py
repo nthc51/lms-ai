@@ -4,7 +4,7 @@ from app.core.security import hash_password
 from app.core.time import utcnow
 from app.modules.auth.models import Role, TeacherStatus, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
-from app.modules.materials.models import Asset, AssetKind, Chunk, Source, SourceType
+from app.modules.materials.models import Asset, AssetKind, Chunk, Source, SourceStatus, SourceType
 
 
 async def make_user(db, role: Role = Role.teacher) -> User:
@@ -38,7 +38,9 @@ async def make_lesson(db, teacher: User) -> tuple[Course, Lesson]:
     return course, lesson
 
 
-async def make_pdf_source(db, storage, owner: User, lesson: Lesson, pdf_bytes: bytes) -> Source:
+async def make_pdf_source(
+    db, storage, owner: User, lesson: Lesson, pdf_bytes: bytes, status: SourceStatus = SourceStatus.pending
+) -> Source:
     key = f"pdf/{owner.id}/{uuid.uuid4().hex}.pdf"
     await storage.put(key, pdf_bytes, "application/pdf")
     asset = Asset(
@@ -51,7 +53,7 @@ async def make_pdf_source(db, storage, owner: User, lesson: Lesson, pdf_bytes: b
     )
     db.add(asset)
     await db.flush()
-    source = Source(lesson_id=lesson.id, asset_id=asset.id, type=SourceType.pdf)
+    source = Source(lesson_id=lesson.id, asset_id=asset.id, type=SourceType.pdf, status=status)
     db.add(source)
     await db.commit()
     return source
@@ -64,17 +66,27 @@ def unit_vector(index: int, dim: int = 768) -> list[float]:
 
 
 async def add_chunk(
-    db, source: Source, course: Course, lesson: Lesson, content: str, embedding: list[float]
+    db,
+    source: Source,
+    course: Course,
+    lesson: Lesson,
+    content: str,
+    embedding: list[float],
+    *,
+    embedding_model: str = "fake-768",
+    page_no: int | None = 1,
+    heading_path: str = "",
+    token_count: int | None = None,
 ) -> Chunk:
     chunk = Chunk(
         source_id=source.id,
         course_id=course.id,
         lesson_id=lesson.id,
         content=content,
-        heading_path="",
-        page_no=1,
-        token_count=len(content.split()),
-        embedding_model="fake-768",
+        heading_path=heading_path,
+        page_no=page_no,
+        token_count=len(content.split()) if token_count is None else token_count,
+        embedding_model=embedding_model,
         embedding=embedding,
     )
     db.add(chunk)
