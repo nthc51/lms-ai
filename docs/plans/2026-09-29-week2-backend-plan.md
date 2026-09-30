@@ -193,7 +193,7 @@ def test_missing_variable_raises():
 
 
 def test_missing_front_matter_is_rejected(tmp_path, monkeypatch):
-    import app.ai.prompts as prompts
+    from app.ai import prompts
 
     (tmp_path / "bad.md").write_text("Không có version", encoding="utf-8")
     monkeypatch.setattr(prompts, "PROMPTS_DIR", tmp_path)
@@ -6514,11 +6514,12 @@ async def test_finalize_is_atomic_against_another_finalizer(db):
     attempt = QuizAttempt(quiz_id=quiz.id, user_id=student.id, attempt_no=1, question_order=[str(question.id)])
     db.add(attempt)
     await db.commit()
-    assert await finalize_attempt(db, attempt.id, status=AttemptStatus.timed_out) is True
+    attempt_id = attempt.id  # đọc trước: rollback() làm các object ORM hết hạn
+    assert await finalize_attempt(db, attempt_id, status=AttemptStatus.timed_out) is True
     await db.commit()
-    assert await finalize_attempt(db, attempt.id) is False
+    assert await finalize_attempt(db, attempt_id) is False
     await db.rollback()
-    attempt = await db.get(QuizAttempt, attempt.id, populate_existing=True)
+    attempt = await db.get(QuizAttempt, attempt_id, populate_existing=True)
     assert attempt.status == AttemptStatus.timed_out and attempt.score == 0.0
 ```
 
