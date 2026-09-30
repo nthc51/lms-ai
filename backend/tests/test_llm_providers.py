@@ -178,17 +178,31 @@ class _EndlessSSE(httpx.AsyncByteStream):
         self.closed = True
 
 
-async def test_gemini_stream_aclose_closes_http_response_without_gc():
-    body = _EndlessSSE(ready=10)
-
+def _mock_http(body: httpx.AsyncByteStream) -> httpx.AsyncClient:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=body)
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
-        client = genai.Client(api_key="x", http_options=types.HttpOptions(httpx_async_client=http))
-        stream = await GeminiLLM("x", client=client).open_stream(
-            "p", op="tutor_answer", model="m", timeout_s=30
-        )
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+def _real_gemini(http: httpx.AsyncClient) -> GeminiLLM:
+    return GeminiLLM(
+        "x", client=genai.Client(api_key="x", http_options=types.HttpOptions(httpx_async_client=http))
+    )
+
+
+async def _drain(stream) -> list[str]:
+    # wait_for: nếu lặp lại bị treo thì test hỏng thay vì treo cả bộ test
+    async def read():
+        return [p async for p in stream]
+
+    return await asyncio.wait_for(read(), timeout=1)
+
+
+async def test_gemini_stream_aclose_closes_http_response_without_gc():
+    body = _EndlessSSE(ready=10)
+    async with _mock_http(body) as http:
+        stream = await _real_gemini(http).open_stream("p", op="tutor_answer", model="m", timeout_s=30)
         got = []
         async for piece in stream:
             got.append(piece)
@@ -198,6 +212,32 @@ async def test_gemini_stream_aclose_closes_http_response_without_gc():
         await stream.aclose()
         assert body.closed  # không gọi gc.collect(): aclose phải tự đóng response HTTP
         await stream.aclose()
+        assert await _drain(stream) == []  # lặp lại sau aclose: kết thúc ngay
+
+
+async def test_gemini_stream_aclose_right_after_open_closes_http_response():
+    body = _EndlessSSE(ready=10)
+    async with _mock_http(body) as http:
+        stream = await _real_gemini(http).open_stream("p", op="tutor_answer", model="m", timeout_s=30)
+        await stream.aclose()  # chưa đọc mảnh nào, không có await nào xen giữa
+        assert body.closed
+        assert await _drain(stream) == []
+
+
+async def test_gemini_stream_reiteration_ends_immediately():
+    chunks = [SimpleNamespace(text="a", usage_metadata=None), SimpleNamespace(text="b", usage_metadata=None)]
+    stream = await _gemini(_Models(chunks)).open_stream("p", op="tutor_answer", model="m", timeout_s=30)
+    assert await _drain(stream) == ["a", "b"]
+    assert await _drain(stream) == []  # đã đọc hết: lặp lại kết thúc ngay
+    await stream.aclose()
+    assert await _drain(stream) == []
+
+    broken = await _gemini(_Models(chunks, mid_error=api_error(503))).open_stream(
+        "p", op="tutor_answer", model="m", timeout_s=30
+    )
+    with pytest.raises(errors.ServerError):
+        await _drain(broken)
+    assert await _drain(broken) == []  # lỗi đã báo một lần; lặp lại kết thúc ngay
 
 
 def test_factory_picks_fake_by_default():

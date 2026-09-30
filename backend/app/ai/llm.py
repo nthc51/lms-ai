@@ -192,27 +192,52 @@ class FakeLLMProvider:
 
 
 class _GeminiStream:
-    """Mảnh đầu đã lấy trước; phần còn lại do một task bơm vào hàng đợi.
+    """Stream Gemini: một task bơm iterator của SDK vào hàng đợi, kể cả mảnh đầu.
 
     Đóng generator ngoài của SDK không đóng các generator lồng bên trong (response HTTP chỉ được đóng khi GC
     chạy, trong lúc đó Gemini vẫn sinh tiếp). Cancel task đang đọc mạng thì CancelledError đi qua mọi frame
-    lồng nhau, các khối finally của SDK đóng response httpx ngay."""
+    lồng nhau, các khối finally của SDK đóng response httpx ngay. Dùng `await _GeminiStream.open(rest)`:
+    hàm này chờ mảnh đầu (lỗi 429/5xx/timeout ném ra ngay lúc mở) và bảo đảm task đã chạy trước khi trả về."""
 
-    def __init__(self, first, rest):
-        self._first = first
+    def __init__(self, rest):
         self._rest = rest
         self.tokens_in: int | None = None
         self.tokens_out: int | None = None
         self._queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
+        self._first: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        self._finished = False
         self._task = asyncio.create_task(self._pump())
+
+    @classmethod
+    async def open(cls, rest) -> "_GeminiStream":
+        stream = cls(rest)
+        try:
+            await stream._first
+        except BaseException:
+            await stream.aclose()  # lỗi lúc mở, hoặc caller bị cancel/timeout trong lúc chờ mảnh đầu
+            raise
+        return stream
+
+    def _opened(self, exc: BaseException | None = None) -> bool:
+        """Báo cho open() biết đã có mảnh đầu (hoặc lỗi). Trả False nếu open() đã được báo từ trước."""
+        if self._first.done():
+            return False
+        if exc is None:
+            self._first.set_result(None)
+        else:
+            self._first.set_exception(exc)
+        return True
 
     async def _pump(self) -> None:
         try:
             async for chunk in self._rest:
                 self._queue.put_nowait(("chunk", chunk))
-        except Exception as exc:  # noqa: BLE001 — chuyển lỗi sang phía đọc stream
-            self._queue.put_nowait(("error", exc))
+                self._opened()
+        except Exception as exc:  # noqa: BLE001 — chuyển lỗi sang open() hoặc phía đọc stream
+            if not self._opened(exc):
+                self._queue.put_nowait(("error", exc))
         else:
+            self._opened()
             self._queue.put_nowait(("done", None))
 
     def _usage(self, chunk) -> None:
@@ -225,27 +250,28 @@ class _GeminiStream:
         return self._gen()
 
     async def _gen(self) -> AsyncIterator[str]:
-        if self._first is not None:
-            first, self._first = self._first, None
-            self._usage(first)
-            if first.text:
-                yield first.text
-        while True:
+        while not self._finished:
             kind, item = await self._queue.get()
+            if self._finished:  # aclose() chạy trong lúc đang chờ
+                return
             if kind == "done":
+                self._finished = True
                 return
             if kind == "error":
+                self._finished = True
                 raise item
             self._usage(item)
             if item.text:
                 yield item.text
 
     async def aclose(self) -> None:
-        """Dừng request đang chạy (đóng response HTTP ngay). Gọi lại nhiều lần / sau khi đọc hết đều an toàn."""
+        """Dừng request đang chạy (đóng response HTTP ngay). Gọi lại nhiều lần / sau khi đọc hết đều an toàn;
+        sau aclose() lặp lại stream kết thúc ngay."""
+        self._finished = True
         if not self._task.done():
             self._task.cancel()
             await asyncio.wait([self._task])  # không nuốt CancelledError của chính caller
-            self._queue.put_nowait(("done", None))  # ai còn đang đọc thì kết thúc thay vì treo
+        self._queue.put_nowait(("done", None))  # đánh thức ai đang chờ đọc
 
 
 class GeminiLLM:
@@ -293,13 +319,9 @@ class GeminiLLM:
         rest = await self._client.aio.models.generate_content_stream(
             model=model, contents=prompt, config=self._config(timeout_s)
         )
-        # Lấy trước mảnh đầu: lỗi 429/5xx/timeout ném ra ngay lúc mở (trước khi có token nào),
+        # Chờ mảnh đầu: lỗi 429/5xx/timeout ném ra ngay lúc mở (trước khi có token nào),
         # nên LLMClient retry được việc mở stream.
-        try:
-            first = await anext(rest)
-        except StopAsyncIteration:
-            first = None
-        return _GeminiStream(first, rest)
+        return await _GeminiStream.open(rest)
 
 
 def get_llm_provider(s: Settings) -> LLMProvider:
