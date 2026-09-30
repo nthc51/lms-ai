@@ -1583,7 +1583,7 @@ git add backend/app/ai/llm_client.py backend/tests/test_llm_stream.py && git com
 - Consumes: `Base`, `IdMixin`, `TimestampMixin`; `make_user`, `make_lesson` (`tests/factories.py`).
 - Produces (`app/modules/tutor/models.py`): `ChatRole(user|assistant)`; `ChatSession(id, user_id, course_id, lesson_id | None, created_at)`; `ChatMessage(id, session_id, role, content, citations: list[dict], refused, truncated, feedback: int | None, latency_ms, ttft_ms, tokens_in, tokens_out, prompt_version, created_at)`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_tutor_models.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_tutor_models.py`**
 
 ```python
 import pytest
@@ -1632,12 +1632,12 @@ async def test_deleting_course_removes_sessions_and_messages(db):
     assert (await db.scalars(select(ChatSession))).all() == []
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_tutor_models.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.modules.tutor'`
 
-- [ ] **Step 3: `app/modules/tutor/models.py`**
+- [x] **Step 3: `app/modules/tutor/models.py`**
 
 ```python
 import enum
@@ -1695,7 +1695,7 @@ Thêm vào `app/models_registry.py` (theo thứ tự chữ cái, sau dòng `mate
 from app.modules.tutor import models as tutor_models  # noqa: F401
 ```
 
-- [ ] **Step 4: Migration `alembic/versions/8a3f6d1c0b27_chat.py`**
+- [x] **Step 4: Migration `alembic/versions/8a3f6d1c0b27_chat.py`**
 
 ```python
 """chat sessions and messages
@@ -1780,17 +1780,17 @@ def downgrade() -> None:
 Run: `uv run alembic upgrade head && uv run alembic check`
 Expected: `No new upgrade operations detected.` (CHECK constraint không được autogenerate so sánh nên phải có sẵn trong migration như trên.)
 
-- [ ] **Step 5: Chạy lại test**
+- [x] **Step 5: Chạy lại test**
 
 Run: `uv run pytest tests/test_tutor_models.py -v`
 Expected: PASS 3 test.
 
-- [ ] **Step 6: Chạy toàn bộ**
+- [x] **Step 6: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 7: Commit** (từ thư mục gốc repo)
+- [x] **Step 7: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/tutor backend/app/models_registry.py backend/alembic/versions/8a3f6d1c0b27_chat.py backend/tests/test_tutor_models.py && git commit -m "feat(tutor): chat_sessions and chat_messages tables"
