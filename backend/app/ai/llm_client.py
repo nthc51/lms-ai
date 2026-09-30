@@ -31,7 +31,7 @@ from app.core.db import SessionLocal
 
 logger = logging.getLogger("app.ai")
 
-_FENCE_RE = re.compile(r"\A\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*\Z", re.DOTALL)
+_FENCE_RE = re.compile(r"\A\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*\Z", re.DOTALL | re.IGNORECASE)
 
 
 @dataclass
@@ -99,24 +99,37 @@ class LLMClient:
         return use_cache and self._settings.llm_cache_enabled
 
     async def _cache_get(self, key: str) -> str | None:
-        async with self._session_factory() as db:
-            text = await db.scalar(
-                update(LLMCache)
-                .where(LLMCache.key_hash == key)
-                .values(hit_count=LLMCache.hit_count + 1)
-                .returning(LLMCache.response)
-            )
-            await db.commit()
+        """Best-effort: DB lỗi thì coi như cache miss (ghi cảnh báo), lời gọi vẫn tiếp tục."""
+        try:
+            async with self._session_factory() as db:
+                text = await db.scalar(
+                    update(LLMCache)
+                    .where(LLMCache.key_hash == key)
+                    .values(hit_count=LLMCache.hit_count + 1)
+                    .returning(LLMCache.response)
+                )
+                await db.commit()
+        except Exception as exc:  # noqa: BLE001 — cache không được làm hỏng lời gọi LLM
+            logger.warning("llm_cache read failed key=%s error=%r", key, exc)
+            return None
         return text
 
     async def _cache_put(self, key: str, model: str, text: str) -> None:
-        async with self._session_factory() as db:
-            await db.execute(
-                pg_insert(LLMCache)
-                .values(key_hash=key, provider=self.provider.name, model=model, response=text)
-                .on_conflict_do_nothing(index_elements=["key_hash"])
-            )
-            await db.commit()
+        """Best-effort: DB lỗi thì chỉ ghi cảnh báo, không bỏ kết quả LLM đã trả tiền.
+        Trùng key (bản cũ không còn parse được) thì ghi đè response/model, giữ hit_count."""
+        stmt = pg_insert(LLMCache).values(
+            key_hash=key, provider=self.provider.name, model=model, response=text
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["key_hash"],
+            set_={"response": stmt.excluded.response, "model": stmt.excluded.model},
+        )
+        try:
+            async with self._session_factory() as db:
+                await db.execute(stmt)
+                await db.commit()
+        except Exception as exc:  # noqa: BLE001 — cache không được làm hỏng lời gọi LLM
+            logger.warning("llm_cache write failed key=%s error=%r", key, exc)
 
     @staticmethod
     def _log(
@@ -129,10 +142,11 @@ class LLMClient:
         tokens_in: int,
         tokens_out: int,
         latency_ms: int,
+        finish_reason: str | None = None,
     ) -> None:
         logger.info(
             "llm_call op=%s model=%s prompt_version=%s status=%s cached=%s tokens_in=%d tokens_out=%d "
-            "latency_ms=%d",
+            "latency_ms=%d finish_reason=%s",
             op,
             model,
             prompt.prompt_version,
@@ -141,6 +155,7 @@ class LLMClient:
             tokens_in,
             tokens_out,
             latency_ms,
+            finish_reason,
         )
 
     async def _attempt(
@@ -194,31 +209,35 @@ class LLMClient:
         result = LLMResult(
             res.text, model, prompt.prompt_version, res.tokens_in, res.tokens_out, _ms(start), cached=False
         )
-        try:
-            parsed = parse(res.text)
-        except ValueError as e:  # pydantic.ValidationError là ValueError
+        finish_reason = res.finish_reason
+
+        def log(status: str) -> None:
             self._log(
                 op,
                 prompt,
                 model,
-                "invalid_output",
+                status,
                 cached=False,
                 tokens_in=res.tokens_in,
                 tokens_out=res.tokens_out,
                 latency_ms=result.latency_ms,
+                finish_reason=finish_reason,
             )
+
+        # Output rỗng (bị chặn an toàn, hết token trước khi có chữ...) không bao giờ là câu trả lời hợp lệ.
+        # Ném sau call_with_retry nên không bị retry; caller quyết định.
+        if not res.text.strip():
+            log("empty_output")
+            raise LLMOutputError(op, res.text, f"output rỗng (finish_reason={finish_reason})", result)
+        try:
+            parsed = parse(res.text)
+        except ValueError as e:  # pydantic.ValidationError là ValueError
+            log("invalid_output")
             raise LLMOutputError(op, res.text, str(e)[:1000], result) from None
-        self._log(
-            op,
-            prompt,
-            model,
-            "ok",
-            cached=False,
-            tokens_in=res.tokens_in,
-            tokens_out=res.tokens_out,
-            latency_ms=result.latency_ms,
-        )
-        if caching:
+        # Chỉ cache output kết thúc bình thường; bị cắt (MAX_TOKENS, SAFETY...) vẫn trả về nhưng không cache.
+        complete = finish_reason in (None, "STOP")
+        log("ok" if complete else "incomplete")
+        if caching and complete:
             await self._cache_put(key, model, res.text)
         return parsed, result
 

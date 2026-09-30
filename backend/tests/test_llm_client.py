@@ -145,3 +145,71 @@ async def test_invalid_json_raises_and_is_not_cached(db):
     assert parsed.answer_option_id == "C" and len(llm.calls) == 2
     [row] = (await db.scalars(select(LLMCache))).all()
     assert row.response == '{"answer_option_id": "C"}'
+
+
+async def test_empty_output_raises_and_is_not_cached(db):
+    llm = FakeLLMProvider(["  ", "ok"])
+    client = LLMClient(llm, settings(), sleep=Sleeps())
+    with pytest.raises(LLMOutputError) as exc:
+        await client.generate(PROMPT, op="x")
+    assert exc.value.raw == "  " and len(llm.calls) == 1  # không retry
+    assert (await db.scalars(select(LLMCache))).all() == []
+    assert (await client.generate(PROMPT, op="x")).text == "ok" and len(llm.calls) == 2
+
+
+async def test_truncated_output_is_returned_but_not_cached(db, caplog):
+    llm = FakeLLMProvider(["nửa câu", "nửa câu"], finish_reason="MAX_TOKENS")
+    client = LLMClient(llm, settings(), sleep=Sleeps())
+    with caplog.at_level(logging.INFO, logger="app.ai"):
+        first = await client.generate(PROMPT, op="x")
+    second = await client.generate(PROMPT, op="x")
+    assert (first.text, first.cached, second.cached) == ("nửa câu", False, False)
+    assert len(llm.calls) == 2
+    assert (await db.scalars(select(LLMCache))).all() == []
+    line = next(m for m in caplog.messages if m.startswith("llm_call"))
+    assert "finish_reason=MAX_TOKENS" in line and "status=incomplete" in line
+
+
+async def test_stale_cache_row_is_repaired(db):
+    key = cache_key("fake", "m", PROMPT.text, Answer.model_json_schema())
+    db.add(LLMCache(key_hash=key, provider="fake", model="m", response="không phải json"))
+    await db.commit()
+    llm = FakeLLMProvider(['{"answer_option_id": "D"}'])
+    parsed, result = await LLMClient(llm, settings(), sleep=Sleeps()).generate_json(
+        PROMPT, Answer, op="quiz_self_check", model="m"
+    )
+    assert parsed.answer_option_id == "D" and result.cached is False and len(llm.calls) == 1
+    db.expunge_all()
+    row = await db.get(LLMCache, key)
+    assert (row.response, row.hit_count) == ('{"answer_option_id": "D"}', 1)
+
+
+def _broken_session_factory():
+    raise OSError("db down")
+
+
+async def test_cache_db_errors_are_best_effort(caplog):
+    llm = FakeLLMProvider(["ok"])
+    client = LLMClient(llm, settings(), session_factory=_broken_session_factory, sleep=Sleeps())
+    with caplog.at_level(logging.WARNING, logger="app.ai"):
+        r = await client.generate(PROMPT, op="x")
+    assert r.text == "ok" and len(llm.calls) == 1
+    assert any("llm_cache read failed" in m for m in caplog.messages)
+    assert any("llm_cache write failed" in m for m in caplog.messages)
+
+
+async def test_uppercase_json_fence_is_stripped():
+    llm = FakeLLMProvider(['```JSON\n{"answer_option_id": "A"}\n```'])
+    parsed, _ = await LLMClient(llm, settings(llm_cache_enabled=False), sleep=Sleeps()).generate_json(
+        PROMPT, Answer, op="quiz_self_check"
+    )
+    assert parsed.answer_option_id == "A"
+
+
+async def test_exhausted_retries_propagate_and_nothing_is_cached(db):
+    sleeps = Sleeps()
+    llm = FakeLLMProvider([api_error(503)] * 4 + ["ok"])
+    with pytest.raises(errors.ServerError):
+        await LLMClient(llm, settings(), sleep=sleeps).generate(PROMPT, op="x")
+    assert len(llm.calls) == 4 and sleeps.delays == [1.0, 2.0, 4.0]
+    assert (await db.scalars(select(LLMCache))).all() == []

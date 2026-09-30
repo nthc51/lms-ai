@@ -26,6 +26,9 @@ class ProviderResult:
     text: str
     tokens_in: int
     tokens_out: int
+    # Lý do dừng do provider báo ("STOP", "MAX_TOKENS", "SAFETY"...); None nếu provider không báo.
+    # LLMClient chỉ cache output có finish_reason là "STOP" hoặc None.
+    finish_reason: str | None = None
 
 
 class ProviderStream(Protocol):
@@ -147,7 +150,8 @@ class FakeLLMProvider:
 
     replies: trả lời theo thứ tự gọi — chuỗi, exception (bị ném ra) hoặc hàm nhận FakeCall. Hết danh sách
     thì dùng reply_for (mặc định default_reply). stream_gate: stream dừng trước mảnh thứ hai cho tới khi
-    event được set. stream_error=(i, exc): stream ném exc ngay trước mảnh thứ i."""
+    event được set. stream_error=(i, exc): stream ném exc ngay trước mảnh thứ i. finish_reason: lý do dừng
+    mà generate() báo (mặc định "STOP"), để test output bị cắt."""
 
     name = "fake"
 
@@ -158,7 +162,9 @@ class FakeLLMProvider:
         reply_for: Callable[[FakeCall], str] | None = None,
         stream_gate: asyncio.Event | None = None,
         stream_error: tuple[int, BaseException] | None = None,
+        finish_reason: str | None = "STOP",
     ):
+        self.finish_reason = finish_reason
         self.replies: list[FakeReply] = list(replies or [])
         self.reply_for = reply_for or default_reply
         self.stream_gate = stream_gate
@@ -177,7 +183,12 @@ class FakeLLMProvider:
         self, prompt: str, *, op: str, model: str, timeout_s: float, json_schema: dict | None = None
     ) -> ProviderResult:
         text = self._reply(FakeCall(op, prompt, model, timeout_s, json_schema, stream=False))
-        return ProviderResult(text=text, tokens_in=count_tokens(prompt), tokens_out=count_tokens(text))
+        return ProviderResult(
+            text=text,
+            tokens_in=count_tokens(prompt),
+            tokens_out=count_tokens(text),
+            finish_reason=self.finish_reason,
+        )
 
     async def open_stream(self, prompt: str, *, op: str, model: str, timeout_s: float) -> FakeStream:
         text = self._reply(FakeCall(op, prompt, model, timeout_s, None, stream=True))
@@ -274,6 +285,15 @@ class _GeminiStream:
         self._queue.put_nowait(("done", None))  # đánh thức ai đang chờ đọc
 
 
+def _finish_reason(resp) -> str | None:
+    """Tên lý do dừng của candidate đầu (enum FinishReason → "STOP", "MAX_TOKENS"...); None nếu không có."""
+    candidates = getattr(resp, "candidates", None)
+    reason = getattr(candidates[0], "finish_reason", None) if candidates else None
+    if reason is None:
+        return None
+    return getattr(reason, "name", None) or str(reason)
+
+
 class GeminiLLM:
     name = "gemini"
 
@@ -313,6 +333,7 @@ class GeminiLLM:
             text=text,
             tokens_in=(usage.prompt_token_count if usage else None) or count_tokens(prompt),
             tokens_out=(usage.candidates_token_count if usage else None) or count_tokens(text),
+            finish_reason=_finish_reason(resp),
         )
 
     async def open_stream(self, prompt: str, *, op: str, model: str, timeout_s: float) -> _GeminiStream:

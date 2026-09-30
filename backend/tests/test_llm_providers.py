@@ -243,3 +243,26 @@ async def test_gemini_stream_reiteration_ends_immediately():
 def test_factory_picks_fake_by_default():
     assert isinstance(get_llm_provider(Settings(llm_provider="fake")), FakeLLMProvider)
     assert isinstance(get_llm_provider(Settings(llm_provider="gemini", gemini_api_key="x")), GeminiLLM)
+
+
+async def test_gemini_generate_maps_finish_reason_name():
+    class M(_Models):
+        def __init__(self, reason):
+            super().__init__()
+            self.reason = reason
+
+        async def generate_content(self, model, contents, config=None):
+            resp = await super().generate_content(model, contents, config)
+            resp.candidates = [SimpleNamespace(finish_reason=self.reason)]
+            return resp
+
+    gen = lambda llm: llm.generate("p", op="x", model="m", timeout_s=1)
+    assert (await gen(_gemini(M(types.FinishReason.MAX_TOKENS)))).finish_reason == "MAX_TOKENS"
+    assert (await gen(_gemini(M(types.FinishReason.STOP)))).finish_reason == "STOP"
+    assert (await gen(_gemini(M(None)))).finish_reason is None
+    assert (await gen(_gemini(_Models()))).finish_reason is None  # response không có candidates
+
+
+async def test_fake_finish_reason_defaults_to_stop_and_is_configurable():
+    assert (await _gen(FakeLLMProvider())).finish_reason == "STOP"
+    assert (await _gen(FakeLLMProvider(finish_reason="MAX_TOKENS"))).finish_reason == "MAX_TOKENS"
