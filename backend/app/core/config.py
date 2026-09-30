@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     tutor_refuse_threshold: float = 0.3
     tutor_top_k: int = 6
     tutor_rate_limit_per_hour: int = 30  # số câu hỏi Tutor mỗi học viên mỗi giờ (spec 5.3 bước 7)
+    # Hạn chót tổng của bước viết lại câu hỏi (gồm cả retry); quá hạn thì dùng câu hỏi gốc.
+    tutor_rewrite_deadline_s: float = 20.0
+    # Hạn chót tổng trước token đầu tiên: viết lại + tìm tài liệu + mở stream (gồm retry). Quá hạn → event error.
+    tutor_prestream_deadline_s: float = 60.0
 
     @field_validator("cors_origins", mode="before")
     @classmethod
