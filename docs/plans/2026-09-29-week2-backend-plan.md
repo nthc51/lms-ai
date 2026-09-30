@@ -2984,7 +2984,7 @@ git add backend/app/ai/embedder.py backend/app/modules/tutor backend/app/main.py
   - `AskContext(session_id, scope: SearchScope, course_title: str, question: str, history: list[tuple[ChatRole, str]])`
   - `answer_stream(ctx, *, llm, embedder, is_disconnected: Callable[[], Awaitable[bool]], session_factory=SessionLocal, settings=None) -> AsyncIterator[str]` — sinh chuỗi SSE `sources → token… → done` hoặc `sources → … → error`; luôn lưu đúng một tin nhắn assistant.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_tutor_answer.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_tutor_answer.py`**
 
 ```python
 import asyncio
@@ -3184,12 +3184,12 @@ async def test_llm_errors_send_error_event_and_keep_partial_answer(db):
     assert msg.truncated is True and msg.content == "một hai"
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_tutor_answer.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.modules.tutor.answer'`
 
-- [ ] **Step 3: `app/modules/tutor/answer.py`**
+- [x] **Step 3: `app/modules/tutor/answer.py`**
 
 ```python
 """Luồng trả lời của AI Tutor (spec 5.3): viết lại câu hỏi → tìm tài liệu → chốt chặn → stream SSE → lưu."""
@@ -3364,17 +3364,17 @@ async def answer_stream(
                 await answer.save(truncated=True)
 ```
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
 
 Run: `uv run pytest tests/test_tutor_answer.py -v`
 Expected: PASS 8 test. Nếu `test_cancelled_stream_still_saves_partial_answer` không thấy tin nhắn, kiểm tra `answer.save` trong `finally` nằm trong `anyio.CancelScope(shield=True)` (không có shield thì lệnh `await` đầu tiên trong `finally` bị hủy ngay).
 
-- [ ] **Step 5: Chạy toàn bộ**
+- [x] **Step 5: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 6: Commit** (từ thư mục gốc repo)
+- [x] **Step 6: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/tutor/answer.py backend/tests/test_tutor_answer.py && git commit -m "feat(tutor): RAG answer stream with rewrite, refuse gate, disconnect handling and persistence"
