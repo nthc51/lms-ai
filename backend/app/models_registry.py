@@ -6,3 +6,4 @@ from app.modules.courses import models as courses_models  # noqa: F401
 from app.modules.enrollment import models as enrollment_models  # noqa: F401
 from app.modules.jobs import models as jobs_models  # noqa: F401
 from app.modules.materials import models as materials_models  # noqa: F401
+from app.modules.tutor import models as tutor_models  # noqa: F401
