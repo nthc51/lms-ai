@@ -192,11 +192,28 @@ class FakeLLMProvider:
 
 
 class _GeminiStream:
+    """Mảnh đầu đã lấy trước; phần còn lại do một task bơm vào hàng đợi.
+
+    Đóng generator ngoài của SDK không đóng các generator lồng bên trong (response HTTP chỉ được đóng khi GC
+    chạy, trong lúc đó Gemini vẫn sinh tiếp). Cancel task đang đọc mạng thì CancelledError đi qua mọi frame
+    lồng nhau, các khối finally của SDK đóng response httpx ngay."""
+
     def __init__(self, first, rest):
         self._first = first
         self._rest = rest
         self.tokens_in: int | None = None
         self.tokens_out: int | None = None
+        self._queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
+        self._task = asyncio.create_task(self._pump())
+
+    async def _pump(self) -> None:
+        try:
+            async for chunk in self._rest:
+                self._queue.put_nowait(("chunk", chunk))
+        except Exception as exc:  # noqa: BLE001 — chuyển lỗi sang phía đọc stream
+            self._queue.put_nowait(("error", exc))
+        else:
+            self._queue.put_nowait(("done", None))
 
     def _usage(self, chunk) -> None:
         usage = getattr(chunk, "usage_metadata", None)
@@ -213,15 +230,22 @@ class _GeminiStream:
             self._usage(first)
             if first.text:
                 yield first.text
-        async for chunk in self._rest:
-            self._usage(chunk)
-            if chunk.text:
-                yield chunk.text
+        while True:
+            kind, item = await self._queue.get()
+            if kind == "done":
+                return
+            if kind == "error":
+                raise item
+            self._usage(item)
+            if item.text:
+                yield item.text
 
     async def aclose(self) -> None:
-        aclose = getattr(self._rest, "aclose", None)
-        if aclose is not None:
-            await aclose()
+        """Dừng request đang chạy (đóng response HTTP ngay). Gọi lại nhiều lần / sau khi đọc hết đều an toàn."""
+        if not self._task.done():
+            self._task.cancel()
+            await asyncio.wait([self._task])  # không nuốt CancelledError của chính caller
+            self._queue.put_nowait(("done", None))  # ai còn đang đọc thì kết thúc thay vì treo
 
 
 class GeminiLLM:
@@ -244,7 +268,11 @@ class GeminiLLM:
             else {}
         )
         return types.GenerateContentConfig(
-            temperature=0, http_options=types.HttpOptions(timeout=int(timeout_s * 1000)), **extra
+            temperature=0,
+            http_options=types.HttpOptions(timeout=int(timeout_s * 1000)),
+            # không dùng tool: tắt AFC để SDK không log cảnh báo ở mỗi lời gọi
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            **extra,
         )
 
     async def generate(

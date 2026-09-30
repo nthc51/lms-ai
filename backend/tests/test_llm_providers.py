@@ -2,8 +2,10 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
-from google.genai import errors
+from google import genai
+from google.genai import errors, types
 
 from app.ai.llm import FakeLLMProvider, GeminiLLM, get_llm_provider, split_pieces
 from app.core.config import Settings
@@ -78,10 +80,11 @@ async def test_fake_stream_gate_blocks_and_error_is_raised_mid_stream():
 
 
 class _Models:
-    def __init__(self, chunks=(), error=None):
+    def __init__(self, chunks=(), error=None, mid_error=None):
         self.configs = []
         self.chunks = list(chunks)
         self.error = error
+        self.mid_error = mid_error
 
     async def generate_content(self, model, contents, config=None):
         self.configs.append(config)
@@ -90,13 +93,15 @@ class _Models:
 
     async def generate_content_stream(self, model, contents, config=None):
         self.configs.append(config)
-        chunks, error = self.chunks, self.error
+        chunks, error, mid_error = self.chunks, self.error, self.mid_error
 
         async def gen():
             if error is not None:
                 raise error
             for c in chunks:
                 yield c
+            if mid_error is not None:
+                raise mid_error
 
         return gen()
 
@@ -115,6 +120,7 @@ async def test_gemini_generate_sends_schema_timeout_and_maps_usage():
     config = models.configs[0]
     assert config.response_json_schema == schema and config.response_mime_type == "application/json"
     assert config.http_options.timeout == 12500 and config.temperature == 0
+    assert config.automatic_function_calling.disable is True
 
 
 async def test_gemini_stream_prefetches_first_chunk_and_reads_usage():
@@ -125,11 +131,73 @@ async def test_gemini_stream_prefetches_first_chunk_and_reads_usage():
     stream = await _gemini(models).open_stream("p", op="tutor_answer", model="m", timeout_s=30)
     assert [p async for p in stream] == ["Xin ", "chào"]
     assert (stream.tokens_in, stream.tokens_out) == (5, 2)
+    await stream.aclose()  # an toàn sau khi đọc hết, gọi lại nhiều lần được
+    await stream.aclose()
+    assert models.configs[0].automatic_function_calling.disable is True
     # lỗi 429 ném ra ngay lúc mở, trước token đầu → LLMClient retry được
     with pytest.raises(errors.ClientError):
         await _gemini(_Models(error=api_error(429))).open_stream(
             "p", op="tutor_answer", model="m", timeout_s=30
         )
+
+
+async def test_gemini_stream_reraises_mid_stream_error():
+    chunks = [SimpleNamespace(text="a", usage_metadata=None), SimpleNamespace(text="b", usage_metadata=None)]
+    stream = await _gemini(_Models(chunks, mid_error=api_error(503))).open_stream(
+        "p", op="tutor_answer", model="m", timeout_s=30
+    )
+    got = []
+    with pytest.raises(errors.ServerError):
+        async for piece in stream:
+            got.append(piece)
+    assert got == ["a", "b"]
+    await stream.aclose()
+
+
+def _sse(text: str, n: int) -> bytes:
+    chunk = {
+        "candidates": [{"content": {"role": "model", "parts": [{"text": text}]}}],
+        "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": n},
+    }
+    return f"data: {json.dumps(chunk)}\n\n".encode()
+
+
+class _EndlessSSE(httpx.AsyncByteStream):
+    """Body SSE: gửi `ready` mảnh rồi treo như model vẫn đang sinh; ghi lại việc body bị đóng."""
+
+    def __init__(self, ready: int):
+        self.ready = ready
+        self.closed = False
+
+    async def __aiter__(self):
+        for i in range(self.ready):
+            yield _sse(f"w{i} ", i + 1)
+        await asyncio.Event().wait()  # đang chờ mảnh tiếp theo từ mạng
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+async def test_gemini_stream_aclose_closes_http_response_without_gc():
+    body = _EndlessSSE(ready=10)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=body)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        client = genai.Client(api_key="x", http_options=types.HttpOptions(httpx_async_client=http))
+        stream = await GeminiLLM("x", client=client).open_stream(
+            "p", op="tutor_answer", model="m", timeout_s=30
+        )
+        got = []
+        async for piece in stream:
+            got.append(piece)
+            if len(got) == 3:
+                break
+        assert got == ["w0 ", "w1 ", "w2 "] and stream.tokens_out == 3
+        await stream.aclose()
+        assert body.closed  # không gọi gc.collect(): aclose phải tự đóng response HTTP
+        await stream.aclose()
 
 
 def test_factory_picks_fake_by_default():
