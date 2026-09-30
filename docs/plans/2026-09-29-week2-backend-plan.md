@@ -1353,7 +1353,7 @@ git add backend/app/ai/models.py backend/app/ai/llm_client.py backend/app/models
   - `LLMStream`: `async for piece in stream`, `.text`, `.parts`, `.completed: bool`, `.cached: bool`, `.tokens_in: int`, `.tokens_out: int` (provider báo hoặc ước lượng 1.4 × số từ)
   - `LLMClient.stream(prompt, *, op, model=None, timeout_s=None, use_cache=True)` — async context manager trả `LLMStream`; thoát khối (xong, `break`/`return`, lỗi, bị hủy) luôn `aclose()` upstream.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_llm_stream.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_llm_stream.py`**
 
 ```python
 import pytest
@@ -1421,12 +1421,12 @@ async def test_open_is_retried_but_mid_stream_error_is_not():
     assert s.text == "a" and not s.completed and llm.streams[0].closed
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_llm_stream.py -v`
 Expected: FAIL với `AttributeError: 'LLMClient' object has no attribute 'stream'`
 
-- [ ] **Step 3: Thêm stream vào `app/ai/llm_client.py`**
+- [x] **Step 3: Thêm stream vào `app/ai/llm_client.py`**
 
 Thay khối import của file bằng:
 
@@ -1554,17 +1554,17 @@ Thêm method vào cuối class `LLMClient` (sau `generate_json`):
             await self._cache_put(key, model, stream.text)
 ```
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
 
 Run: `uv run pytest tests/test_llm_stream.py tests/test_llm_client.py -v`
 Expected: PASS 14 test.
 
-- [ ] **Step 5: Chạy toàn bộ**
+- [x] **Step 5: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 6: Commit** (từ thư mục gốc repo)
+- [x] **Step 6: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/ai/llm_client.py backend/tests/test_llm_stream.py && git commit -m "feat(ai): streaming through LLMClient with retry on open and cache on completion"
