@@ -67,6 +67,39 @@ async def test_lesson_scope_ranks_by_cosine_and_limits_top_k(db):
     assert result.chunks[0].lesson_title == "Bài 1" and result.chunks[0].page_no == 1
 
 
+async def test_retrieved_chunk_passes_through_citation_fields(db):
+    teacher = await make_user(db)
+    course, lesson, source = await _ready_lesson(db, teacher)
+    chunk = await add_chunk(
+        db,
+        source,
+        course,
+        lesson,
+        "có mốc",
+        unit_vector(0),
+        page_no=None,
+        heading_path="Chương 1 > Mục 2",
+        start_sec=12.5,
+    )
+    result = await retrieve(db, VectorEmbedder(unit_vector(0)), SearchScope(course.id, lesson.id), "q")
+    [got] = result.chunks
+    assert got.chunk_id == chunk.id and got.lesson_id == lesson.id
+    assert got.heading_path == "Chương 1 > Mục 2" and got.page_no is None and got.start_sec == 12.5
+    assert abs(got.similarity - 1.0) < 1e-5
+
+
+async def test_lesson_scope_requires_lesson_to_belong_to_course(db):
+    teacher = await make_user(db)
+    course, lesson, source = await _ready_lesson(db, teacher)
+    other_course, _, _ = await _ready_lesson(db, teacher)
+    await add_chunk(db, source, course, lesson, "bài 1", unit_vector(0))
+    emb = VectorEmbedder(unit_vector(0))
+    mismatched = SearchScope(other_course.id, lesson.id)
+    assert (await retrieve(db, emb, mismatched, "q")).chunks == []
+    assert await count_ready_chunks(db, mismatched, emb.model) == 0
+    assert await count_ready_chunks(db, SearchScope(course.id, lesson.id), emb.model) == 1
+
+
 async def test_course_scope_covers_lessons_of_published_course_only(db):
     teacher = await make_user(db)
     course, l1, s1 = await _ready_lesson(db, teacher)
@@ -94,9 +127,13 @@ async def test_other_embedding_model_and_unready_sources_are_ignored(db):
     processing = await make_pdf_source(
         db, InMemoryStorage(), teacher, lesson, b"%PDF-1.7", status=SourceStatus.processing
     )
+    failed = await make_pdf_source(
+        db, InMemoryStorage(), teacher, lesson, b"%PDF-1.7", status=SourceStatus.failed
+    )
     await add_chunk(db, ready, course, lesson, "đúng model", unit_vector(0))
     await add_chunk(db, ready, course, lesson, "model cũ", unit_vector(0), embedding_model="old-768")
     await add_chunk(db, processing, course, lesson, "đang xử lý lại", unit_vector(0))
+    await add_chunk(db, failed, course, lesson, "xử lý lại bị lỗi", unit_vector(0))
     emb = VectorEmbedder(unit_vector(0))
     scope = SearchScope(course.id, lesson.id)
     assert [c.content for c in (await retrieve(db, emb, scope, "q")).chunks] == ["đúng model"]
@@ -110,3 +147,7 @@ def test_should_refuse():
     assert not should_refuse(RetrievalResult([chunk], 0.25), 0.2)
     # B2: có kết quả full-text thì không từ chối dù similarity thấp
     assert not should_refuse(RetrievalResult([chunk], 0.25, has_fulltext_match=True), 0.3)
+    # NaN/None không bao giờ lọt qua chốt chặn
+    assert should_refuse(RetrievalResult([chunk], float("nan")), 0.3)
+    assert should_refuse(RetrievalResult([chunk], None), 0.3)
+    assert not should_refuse(RetrievalResult([chunk], 0.3), 0.3)

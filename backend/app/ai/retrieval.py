@@ -43,15 +43,21 @@ class RetrievalResult:
 
 
 def scope_filter(scope: SearchScope, embedding_model: str) -> list[ColumnElement[bool]]:
-    """Điều kiện chung của retrieve và count_ready_chunks (câu lệnh phải join Source và Course).
+    """Điều kiện chung của retrieve và count_ready_chunks (câu lệnh phải join Source; theo khóa thì join
+    thêm Course).
 
     Luôn lọc đúng model embedding hiện tại và chỉ lấy chunk của source đang ready (source đang xử lý lại
-    hoặc xử lý lại bị lỗi vẫn còn chunk cũ). Theo khóa thì chỉ khi khóa đã publish."""
-    conds = [Chunk.embedding_model == embedding_model, Source.status == SourceStatus.ready]
+    hoặc xử lý lại bị lỗi vẫn còn chunk cũ). Luôn lọc course_id (kể cả theo bài học: lesson không thuộc
+    khóa thì không ra gì, và dùng được ix_chunks_scope). Theo khóa thì chỉ khi khóa đã publish."""
+    conds = [
+        Chunk.course_id == scope.course_id,
+        Chunk.embedding_model == embedding_model,
+        Source.status == SourceStatus.ready,
+    ]
     if scope.lesson_id is not None:
         conds.append(Chunk.lesson_id == scope.lesson_id)
     else:
-        conds += [Chunk.course_id == scope.course_id, Course.status == CourseStatus.published]
+        conds.append(Course.status == CourseStatus.published)
     return conds
 
 
@@ -100,18 +106,20 @@ async def retrieve(
 
 async def count_ready_chunks(db: AsyncSession, scope: SearchScope, embedding_model: str) -> int:
     """Số chunk Tutor tìm được trong phạm vi; 0 thì ẩn Tutor ("Tài liệu đang được xử lý", spec 5.7)."""
-    n = await db.scalar(
-        select(func.count(Chunk.id))
-        .join(Source, Source.id == Chunk.source_id)
-        .join(Course, Course.id == Chunk.course_id)
-        .where(*scope_filter(scope, embedding_model))
-    )
+    stmt = select(func.count(Chunk.id)).join(Source, Source.id == Chunk.source_id)
+    if scope.lesson_id is None:
+        stmt = stmt.join(Course, Course.id == Chunk.course_id)
+    n = await db.scalar(stmt.where(*scope_filter(scope, embedding_model)))
     return n or 0
 
 
 def should_refuse(result: RetrievalResult, threshold: float) -> bool:
     """Chốt chặn trước LLM (spec 5.3 bước 3): không có chunk nào, hoặc similarity cao nhất < τ và không có
-    kết quả full-text. A5: has_fulltext_match luôn False nên chỉ còn điều kiện similarity."""
+    kết quả full-text. A5: has_fulltext_match luôn False nên chỉ còn điều kiện similarity.
+    Viết dạng `not (x >= τ)` để similarity None hoặc NaN cũng bị từ chối."""
     if not result.chunks:
         return True
-    return result.top_similarity < threshold and not result.has_fulltext_match
+    if result.has_fulltext_match:
+        return False
+    top = result.top_similarity
+    return top is None or not (top >= threshold)

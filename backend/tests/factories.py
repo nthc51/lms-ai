@@ -77,6 +77,7 @@ async def add_chunk(
     page_no: int | None = 1,
     heading_path: str = "",
     token_count: int | None = None,
+    start_sec: float | None = None,
 ) -> Chunk:
     chunk = Chunk(
         source_id=source.id,
@@ -85,6 +86,7 @@ async def add_chunk(
         content=content,
         heading_path=heading_path,
         page_no=page_no,
+        start_sec=start_sec,
         token_count=len(content.split()) if token_count is None else token_count,
         embedding_model=embedding_model,
         embedding=embedding,
