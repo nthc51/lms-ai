@@ -871,7 +871,7 @@ git add backend/app/ai/llm.py backend/app/core/config.py backend/.env.example ba
   - `LLMCache` (`app/ai/models.py`): `key_hash` PK, `provider`, `model`, `response`, `hit_count`, `created_at`.
   - Tên `op` dùng trong cả dự án: `tutor_rewrite`, `tutor_answer`, `quiz_generate`, `quiz_self_check`.
 
-- [ ] **Step 1: `app/ai/models.py`**
+- [x] **Step 1: `app/ai/models.py`**
 
 ```python
 from sqlalchemy import Integer, String, Text
@@ -898,7 +898,7 @@ Thêm vào `app/models_registry.py` (dòng đầu tiên trong nhóm import, gi�
 from app.ai import models as ai_models  # noqa: F401
 ```
 
-- [ ] **Step 2: Migration `alembic/versions/5e0b7c2a91d4_llm_cache.py`** (viết tay, không autogenerate)
+- [x] **Step 2: Migration `alembic/versions/5e0b7c2a91d4_llm_cache.py`** (viết tay, không autogenerate)
 
 ```python
 """llm cache
@@ -943,14 +943,14 @@ def downgrade() -> None:
 Run: `uv run alembic upgrade head && uv run alembic check`
 Expected: `No new upgrade operations detected.` (model và migration khớp nhau).
 
-- [ ] **Step 3: Cập nhật `tests/conftest.py`** — thêm ngay sau dòng `os.environ["VISION_PROVIDER"] = "fake"`:
+- [x] **Step 3: Cập nhật `tests/conftest.py`** — thêm ngay sau dòng `os.environ["VISION_PROVIDER"] = "fake"`:
 
 ```python
 os.environ["LLM_PROVIDER"] = "fake"
 os.environ["LLM_CACHE_ENABLED"] = "false"  # test nào cần cache tự bật bằng Settings riêng
 ```
 
-- [ ] **Step 4: Viết test hỏng trước — `tests/test_llm_client.py`**
+- [x] **Step 4: Viết test hỏng trước — `tests/test_llm_client.py`**
 
 ```python
 import logging
@@ -1078,12 +1078,12 @@ async def test_invalid_json_raises_and_is_not_cached(db):
     assert row.response == '{"answer_option_id": "C"}'
 ```
 
-- [ ] **Step 5: Chạy test**
+- [x] **Step 5: Chạy test**
 
 Run: `uv run pytest tests/test_llm_client.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.ai.llm_client'`
 
-- [ ] **Step 6: `app/ai/llm_client.py`**
+- [x] **Step 6: `app/ai/llm_client.py`**
 
 ```python
 """Lớp gọi LLM dùng chung (spec 5.0). Mọi lời gọi LLM trong dự án đều đi qua LLMClient:
@@ -1323,17 +1323,17 @@ def get_llm_client() -> LLMClient:
     return LLMClient(get_llm_provider(s), s)
 ```
 
-- [ ] **Step 7: Chạy lại test**
+- [x] **Step 7: Chạy lại test**
 
 Run: `uv run pytest tests/test_llm_client.py -v`
 Expected: PASS 10 test.
 
-- [ ] **Step 8: Chạy toàn bộ**
+- [x] **Step 8: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS (fixture `_migrate` chạy cả migration mới trên `lms_test`).
 
-- [ ] **Step 9: Commit** (từ thư mục gốc repo)
+- [x] **Step 9: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/ai/models.py backend/app/ai/llm_client.py backend/app/models_registry.py backend/alembic/versions/5e0b7c2a91d4_llm_cache.py backend/tests/conftest.py backend/tests/test_llm_client.py && git commit -m "feat(ai): shared LLM client with timeout, retry, llm_cache and JSON validation"
