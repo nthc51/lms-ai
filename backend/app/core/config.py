@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     vision_concurrency: int = 4  # số lời gọi vision chạy song song tối đa trong một tài liệu
     # Job 'pending' quá số phút này (Redis mất job) → sweeper enqueue lại một lần; quá thêm lần nữa → failed
     pending_job_requeue_after_min: int = 10
+    llm_provider: str = "fake"  # fake | gemini
+    llm_model: str = "gemini-2.5-flash"
+    llm_cheap_model: str = "gemini-2.5-flash-lite"  # lời gọi rẻ: viết lại câu hỏi (spec 5.3 bước 1)
+    llm_timeout_s: float = 60.0  # lời gọi thường (sinh quiz, tự kiểm tra)
+    llm_stream_timeout_s: float = 120.0  # stream câu trả lời của Tutor
+    llm_rewrite_timeout_s: float = 15.0
+    llm_cache_enabled: bool = True
 
     @field_validator("cors_origins", mode="before")
     @classmethod
