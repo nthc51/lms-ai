@@ -12,6 +12,8 @@ from app.core.errors import AppError
 
 logger = logging.getLogger(__name__)
 
+REDIS_TIMEOUT_S = 1.0  # Redis treo thì fail-open nhanh thay vì chặn request
+
 
 class RateLimiter(Protocol):
     async def hit(self, key: str, limit: int, window_s: int) -> int | None:
@@ -27,7 +29,9 @@ class RedisRateLimiter:
 
     @classmethod
     def from_url(cls, url: str) -> "RedisRateLimiter":
-        return cls(Redis.from_url(url))
+        return cls(
+            Redis.from_url(url, socket_connect_timeout=REDIS_TIMEOUT_S, socket_timeout=REDIS_TIMEOUT_S)
+        )
 
     async def hit(self, key: str, limit: int, window_s: int) -> int | None:
         full = self.PREFIX + key

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from app.core.config import get_settings
@@ -24,6 +25,21 @@ async def test_redis_down_fails_open():
         assert await limiter.hit("x", 1, 60) is None
     finally:
         await limiter.aclose()
+
+
+async def test_redis_hang_fails_open_fast():
+    async def silent(reader, writer):  # nhận kết nối nhưng không bao giờ trả lời
+        await asyncio.sleep(30)
+
+    server = await asyncio.start_server(silent, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    limiter = RedisRateLimiter.from_url(f"redis://127.0.0.1:{port}/0")
+    try:
+        async with asyncio.timeout(5):
+            assert await limiter.hit("x", 1, 60) is None
+    finally:
+        await limiter.aclose()
+        server.close()
 
 
 def test_rate_limited_error_has_retry_after_header():
