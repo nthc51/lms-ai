@@ -2158,7 +2158,7 @@ git add backend/app/ai/retrieval.py backend/app/core/config.py backend/.env.exam
 - Consumes: `RetrievedChunk` (Task 6); `ChatRole` (Task 5).
 - Produces (`app/modules/tutor/text.py`): `REFUSE_TOKEN = "REFUSE"`, `REFUSAL_MESSAGE: str`; `RefuseFilter` (`.feed(piece) -> str`, `.finish() -> str`, `.refused: bool`); `clean_citations(text, n_sources) -> tuple[str, list[int]]`; `format_context(chunks) -> str`; `format_history(history: Sequence[tuple[ChatRole, str]]) -> str`; `citation_record(n, chunk) -> dict`; `source_payload(n, chunk) -> dict`; `sse(event, data) -> str`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_tutor_text.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_tutor_text.py`**
 
 ```python
 import uuid
@@ -2228,12 +2228,12 @@ def test_history_citation_and_sse_format():
     assert sse("token", {"text": "xin\nchào"}) == 'event: token\ndata: {"text": "xin\\nchào"}\n\n'
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_tutor_text.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.modules.tutor.text'`
 
-- [ ] **Step 3: `app/modules/tutor/text.py`**
+- [x] **Step 3: `app/modules/tutor/text.py`**
 
 ```python
 """Hàm thuần cho AI Tutor: chặn token REFUSE, lọc trích dẫn [n], dựng context/lịch sử, định dạng SSE."""
@@ -2350,17 +2350,17 @@ def sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 ```
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
 
 Run: `uv run pytest tests/test_tutor_text.py -v`
 Expected: PASS 6 test.
 
-- [ ] **Step 5: Chạy toàn bộ**
+- [x] **Step 5: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 6: Commit** (từ thư mục gốc repo)
+- [x] **Step 6: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/tutor/text.py backend/tests/test_tutor_text.py && git commit -m "feat(tutor): refuse filter, citation cleanup, context and SSE helpers"
