@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 DEDUP_THRESHOLD = 0.9  # cosine giữa stem mới và stem đã có > ngưỡng này thì coi là trùng (spec 5.4 bước 5)
 NO_CHUNKS_ERROR = "Bài học chưa có tài liệu đã xử lý đủ dài để sinh câu hỏi"
 NO_QUESTIONS_ERROR = "AI không sinh được câu hỏi hợp lệ nào"
+ALL_DUPLICATES_ERROR = "Các câu AI sinh ra đều trùng với câu hỏi đã có của bài học"
 
 
 @dataclass
@@ -33,11 +34,13 @@ class GenerationStats:
     duplicates: int = 0
     flagged: int = 0
     saved: int = 0
+    difficulty_mismatches: int = 0  # câu hợp lệ có độ khó model ghi khác độ khó đã lên kế hoạch cho vị trí đó
 
 
 @dataclass(frozen=True)
 class _Candidate:
-    question: QuestionContent
+    question: QuestionContent  # độ khó = độ khó đã lên kế hoạch cho vị trí (slot) của câu
+    original: QuestionContent  # đúng như model trả về (sau chuẩn hóa mã lựa chọn), lưu vào ai_original
     chunk: ChunkInfo
     prompt_version: str
 
@@ -63,15 +66,18 @@ async def load_lesson_chunks(db: AsyncSession, lesson_id: uuid.UUID) -> list[Chu
 
 
 async def _generate_for_chunk(llm: LLMClient, plan: ChunkPlan, stats: GenerationStats) -> list[_Candidate]:
-    """Sinh câu cho một chunk. Câu sai luật được sinh lại đúng 1 lần kèm lý do sai; vẫn sai thì bỏ câu đó."""
+    """Sinh câu cho một chunk. Mỗi câu ứng với một vị trí (slot) có độ khó đã lên kế hoạch; draft thứ i của
+    lô ứng với slot thứ i đang chờ. Slot có câu sai luật hoặc bị thiếu được sinh lại đúng 1 lần (yêu cầu đúng
+    các độ khó của những slot đó, kèm lý do sai); vẫn sai thì bỏ. Câu được giữ luôn mang độ khó của slot,
+    để phân bố độ khó khớp yêu cầu của giảng viên dù model ghi độ khó khác (đếm vào difficulty_mismatches)."""
     template = load_prompt("quiz_generate")
-    remaining = list(plan.difficulties)
+    pending = list(plan.difficulties)  # độ khó của các slot chưa có câu hợp lệ, theo thứ tự
     feedback = ""
     kept: list[_Candidate] = []
     for attempt in (1, 2):
         prompt = template.render(
-            count=len(remaining),
-            difficulties=", ".join(d.value for d in remaining),
+            count=len(pending),
+            difficulties=", ".join(d.value for d in pending),
             heading=plan.chunk.heading_path or "(không có)",
             source=plan.chunk.content,
             feedback=feedback,
@@ -80,35 +86,41 @@ async def _generate_for_chunk(llm: LLMClient, plan: ChunkPlan, stats: Generation
         try:
             # Không dùng cache: sinh lại cùng bài phải ra câu mới, không phải lô cũ mà bước lọc trùng sẽ loại hết.
             result, _ = await llm.generate_json(prompt, DraftBatch, op="quiz_generate", use_cache=False)
-            drafts = result.questions[: len(remaining)]
-            if len(drafts) < len(remaining):
-                problems.append(f"thiếu {len(remaining) - len(drafts)} câu")
+            drafts = result.questions[: len(pending)]
+            if len(drafts) < len(pending):
+                problems.append(f"thiếu {len(pending) - len(drafts)} câu")
         except LLMOutputError as e:
             drafts = []
             problems.append(f"JSON không đúng schema: {e.error[:200]}")
-        valid = 0
-        for draft in drafts:
-            question, error = validate_draft(draft)
+        failed: list[Difficulty] = []
+        for i, slot in enumerate(pending):
+            if i >= len(drafts):
+                failed.append(slot)
+                continue
+            question, error = validate_draft(drafts[i])
             if question is None:
-                problems.append(error)
-            else:
-                kept.append(_Candidate(question, plan.chunk, prompt.prompt_version))
-                valid += 1
-        remaining = remaining[valid:]
-        if not remaining:
+                problems.append(f"câu {i + 1}: {error}")
+                failed.append(slot)
+                continue
+            if question.difficulty != slot:
+                stats.difficulty_mismatches += 1
+            planned = question.model_copy(update={"difficulty": slot})
+            kept.append(_Candidate(planned, question, plan.chunk, prompt.prompt_version))
+        pending = failed
+        if not pending:
             break
         if attempt == 2:
-            stats.invalid += len(remaining)
+            stats.invalid += len(pending)
             logger.warning(
                 "Bỏ %d câu không hợp lệ của chunk %s sau khi đã sinh lại: %s",
-                len(remaining),
+                len(pending),
                 plan.chunk.id,
                 "; ".join(problems),
             )
             break
         feedback = (
             f"Lần trước có câu không hợp lệ ({'; '.join(problems)}). "
-            f"Hãy sinh {len(remaining)} câu mới, tuân thủ đúng mọi yêu cầu."
+            f"Hãy sinh {len(pending)} câu mới, tuân thủ đúng mọi yêu cầu."
         )
     return kept
 
@@ -180,7 +192,8 @@ async def generate_questions_for_lesson(
         candidates += await _generate_for_chunk(llm, plan, stats)
     kept = (await _dedup(embedder, existing, candidates, stats))[:count]
     if not kept:
-        raise ValueError(NO_QUESTIONS_ERROR)
+        # Có câu hợp lệ nhưng đều trùng câu đã có: báo rõ để giảng viên không tưởng AI hỏng.
+        raise ValueError(ALL_DUPLICATES_ERROR if stats.duplicates else NO_QUESTIONS_ERROR)
     rows = []
     for cand in kept:
         flagged = await _self_check(llm, cand)
@@ -198,7 +211,7 @@ async def generate_questions_for_lesson(
                 source_chunk_id=cand.chunk.id,
                 review_status=ReviewStatus.pending,
                 self_check_flag=flagged,
-                ai_original=q.model_dump(mode="json"),
+                ai_original=cand.original.model_dump(mode="json"),
                 prompt_version=cand.prompt_version,
             )
         )

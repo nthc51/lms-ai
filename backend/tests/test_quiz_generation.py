@@ -11,6 +11,7 @@ from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.service import create_job
 from app.modules.materials.models import SourceStatus
 from app.modules.quiz.generation import (
+    ALL_DUPLICATES_ERROR,
     NO_CHUNKS_ERROR,
     NO_QUESTIONS_ERROR,
     generate_questions_for_lesson,
@@ -202,3 +203,37 @@ async def test_load_lesson_chunks_is_ordered_and_ready_only(db):
     loaded = await load_lesson_chunks(db, lesson.id)
     assert [c.id for c in loaded] == [c.id for c in chunks]
     assert [c.page_no for c in loaded] == [1, 2, 3]
+
+
+async def test_retry_requests_the_failed_slots_difficulty_and_saved_keeps_plan(db):
+    lesson, _ = await _lesson(db)  # kế hoạch 2 câu: slot 1 easy, slot 2 medium
+    bad_first = q(S1, correct="E")
+    provider = FakeLLMProvider([batch(bad_first, q(S2)), batch(q(S3)), CHECK_A, CHECK_A])
+    stats = await _generate(lesson, provider)
+    retry_prompt = provider.calls[1].prompt
+    assert "Số câu cần sinh: 1" in retry_prompt and "Độ khó lần lượt: easy\n" in retry_prompt
+    rows = {r.stem: r for r in await _questions(db, lesson)}
+    assert rows[S2].difficulty == Difficulty.medium and rows[S3].difficulty == Difficulty.easy
+    assert rows[S2].ai_original["difficulty"] == "easy"  # ai_original giữ đúng output của model
+    assert stats.difficulty_mismatches == 1
+
+
+async def test_saved_difficulties_follow_plan_when_model_ignores_it(db):
+    lesson, _ = await _lesson(db)
+    stems = [f"Khái niệm từ{i}a từ{i}b từ{i}c từ{i}d có nghĩa là gì?" for i in range(10)]
+    drafts = [{**q(s), "difficulty": "medium"} for s in stems]
+    provider = FakeLLMProvider([batch(*drafts)] + [CHECK_A] * 10)
+    stats = await _generate(lesson, provider, count=10)
+    counts = {d: 0 for d in Difficulty}
+    for r in await _questions(db, lesson):
+        counts[r.difficulty] += 1
+    assert counts == {Difficulty.easy: 3, Difficulty.medium: 5, Difficulty.hard: 2}
+    assert (stats.saved, stats.difficulty_mismatches) == (10, 5)
+
+
+async def test_all_duplicates_has_a_distinct_error(db):
+    lesson, _ = await _lesson(db)
+    await make_question(db, lesson.id, stem=S1)
+    await make_question(db, lesson.id, stem=S2)
+    with pytest.raises(ValueError, match=ALL_DUPLICATES_ERROR):
+        await _generate(lesson, FakeLLMProvider([batch(q(S1), q(S2))]))
