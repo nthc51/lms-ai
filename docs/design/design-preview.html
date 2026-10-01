@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LMS-AI — Xem trước giao diện</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Noto+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root, [data-theme="light"] {
+    --background:#F7F5F0; --surface:#FFFDF9; --foreground:#24292F; --muted:#5B6470; --border:#E3DED4;
+    --primary:#0F6E66; --on-primary:#FFFFFF; --accent:#A15C07; --success:#2F7D4F; --destructive:#B42318;
+    --hover:rgba(36,41,47,.06); --shadow:0 8px 24px rgba(36,41,47,.10);
+  }
+  [data-theme="dark"] {
+    --background:#171A1E; --surface:#1F2328; --foreground:#E4E1DA; --muted:#A3A8AF; --border:#33383F;
+    --primary:#5FBFB3; --on-primary:#0E1A19; --accent:#E0A458; --success:#7CC49A; --destructive:#F2867A;
+    --hover:rgba(228,225,218,.07); --shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  [data-theme="sepia"] {
+    --background:#F3EAD7; --surface:#F9F2E3; --foreground:#3A2F24; --muted:#6B5B49; --border:#DDCFB4;
+    --primary:#2F6B5E; --on-primary:#FFFFFF; --accent:#8A5313; --success:#3B6E45; --destructive:#A3321F;
+    --hover:rgba(58,47,36,.06); --shadow:0 8px 24px rgba(58,47,36,.12);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--background); color:var(--foreground); font-family:"Be Vietnam Pro",system-ui,sans-serif;
+         font-size:16px; line-height:1.5; transition:background .2s,color .2s; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+  header.top { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border);
+               position:sticky; top:0; background:var(--background); z-index:5; flex-wrap:wrap; }
+  header.top h1 { font-size:18px; font-weight:600; margin:0; margin-right:auto; }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .seg button { border:0; background:transparent; color:var(--foreground); padding:8px 14px; font:inherit; font-size:14px; cursor:pointer; min-height:40px; }
+  .seg button[aria-pressed="true"] { background:var(--primary); color:var(--on-primary); }
+  main { max-width:1280px; margin:0 auto; padding:24px 16px 64px; }
+  h2.sec { font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; margin:40px 0 12px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  /* Buttons */
+  .btn { display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 16px; border-radius:8px; font:inherit; font-size:15px;
+         font-weight:500; cursor:pointer; border:1px solid transparent; transition:background .15s, border-color .15s; }
+  .btn svg { width:16px; height:16px; }
+  .btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  .btn-primary { background:var(--primary); color:var(--on-primary); }
+  .btn-primary:hover { filter:brightness(1.08); }
+  .btn-outline { background:transparent; border-color:var(--border); color:var(--foreground); }
+  .btn-outline:hover, .btn-ghost:hover { background:var(--hover); }
+  .btn-ghost { background:transparent; color:var(--foreground); }
+  .btn-danger-outline { background:transparent; border-color:var(--destructive); color:var(--destructive); }
+  .btn-danger { background:var(--destructive); color:var(--on-primary); }
+  .btn-link { background:none; border:0; color:var(--primary); padding:0; height:auto; }
+  .btn-link:hover { text-decoration:underline; }
+  .btn-lg { height:48px; padding:0 20px; font-size:16px; }
+  .btn-icon { width:40px; padding:0; justify-content:center; }
+  .btn[disabled] { opacity:.5; cursor:not-allowed; }
+  .spin { animation:spin 1s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
+  .label { font-size:12px; color:var(--muted); margin-top:6px; }
+  .btn-cell { display:flex; flex-direction:column; align-items:flex-start; }
+  /* Lesson layout */
+  .lesson { display:grid; grid-template-columns:1fr; gap:0; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); }
+  @media (min-width:1024px) { .lesson.with-tutor { grid-template-columns:1fr 400px; } }
+  .progress { height:2px; background:var(--border); } .progress > i { display:block; height:100%; width:38%; background:var(--accent); }
+  .toolbar { display:flex; align-items:center; gap:4px; padding:8px 12px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .crumb { font-size:14px; color:var(--muted); margin-right:auto; }
+  .reader { padding:32px 20px 40px; }
+  .reader article { max-width:68ch; margin:0 auto; font-family:"Noto Sans",sans-serif; font-size:var(--read-size,17px); line-height:1.75; }
+  .reader h3 { font-family:"Be Vietnam Pro",system-ui,sans-serif; font-size:24px; font-weight:600; line-height:1.3; margin:0 0 16px; }
+  .reader code { font-family:ui-monospace,monospace; font-size:.88em; background:var(--hover); padding:1px 5px; border-radius:4px; }
+  .reader pre { background:var(--hover); padding:14px; border-radius:8px; overflow:auto; font-size:14px; line-height:1.6; }
+  .reader pre code { background:none; padding:0; font-size:inherit; }
+  mark.cited { background:color-mix(in srgb, var(--accent) 18%, transparent); color:inherit; border-radius:3px; padding:0 2px; }
+  .lesson-foot { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; max-width:68ch; margin:32px auto 0; padding-top:20px; border-top:1px solid var(--border); }
+  /* Tutor */
+  .tutor { border-left:1px solid var(--border); display:flex; flex-direction:column; min-height:560px; }
+  .tutor-head { display:flex; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border); font-weight:600; }
+  .tutor-head span { margin-right:auto; }
+  .msgs { flex:1; padding:16px; display:flex; flex-direction:column; gap:14px; overflow:auto; font-family:"Noto Sans",system-ui,sans-serif; font-size:15px; line-height:1.65; }
+  .q { align-self:flex-end; background:var(--hover); padding:10px 14px; border-radius:12px 12px 2px 12px; max-width:85%; }
+  .sources { display:flex; gap:6px; flex-wrap:wrap; }
+  .src { font-size:12.5px; border:1px solid var(--border); border-radius:999px; padding:3px 10px; color:var(--muted); background:var(--surface); cursor:pointer; }
+  .src b { color:var(--accent); font-weight:600; }
+  .cite { color:var(--accent); font-weight:600; font-size:.8em; vertical-align:super; cursor:pointer; }
+  .a-actions { display:flex; gap:2px; margin-top:4px; }
+  .composer { border-top:1px solid var(--border); padding:12px; display:flex; gap:8px; align-items:flex-end; }
+  .composer textarea { flex:1; resize:none; min-height:44px; max-height:140px; border:1px solid var(--border); border-radius:8px; background:var(--background);
+    color:var(--foreground); font:inherit; font-size:15px; padding:10px 12px; }
+  .composer textarea:focus-visible { outline:2px solid var(--primary); outline-offset:1px; }
+  .hint { font-size:12px; color:var(--muted); padding:0 12px 10px; }
+  /* Quiz */
+  .grid2 { display:grid; grid-template-columns:1fr; gap:20px; } @media (min-width:900px) { .grid2 { grid-template-columns:1fr 1fr; } }
+  .opt { display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border:1px solid var(--border); border-radius:10px; cursor:pointer; min-height:48px;
+         font-family:"Noto Sans",system-ui,sans-serif; font-size:16px; margin-top:10px; background:var(--surface); }
+  .opt:hover { background:var(--hover); }
+  .opt input { margin-top:4px; accent-color:var(--primary); width:18px; height:18px; }
+  .opt.correct { border-color:var(--success); } .opt.wrong { border-color:var(--destructive); }
+  .tag { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:500; }
+  .ok { color:var(--success); } .bad { color:var(--destructive); }
+  .qhead { display:flex; justify-content:space-between; color:var(--muted); font-size:14px; }
+  .saved { font-size:13px; color:var(--success); }
+  .toast { display:flex; gap:12px; align-items:center; background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow);
+           border-radius:10px; padding:12px 14px; max-width:420px; font-size:14.5px; }
+  .dialog { background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow); border-radius:12px; padding:20px; max-width:440px; }
+  .dialog h4 { margin:0 0 8px; font-size:18px; font-weight:600; } .dialog p { margin:0 0 20px; color:var(--muted); font-size:15px; }
+  .dialog .row { justify-content:flex-end; }
+  .swatches { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  .sw { border:1px solid var(--border); border-radius:8px; overflow:hidden; font-size:12.5px; }
+  .sw i { display:block; height:44px; } .sw div { padding:6px 8px; color:var(--muted); }
+  .note { color:var(--muted); font-size:14px; margin:8px 0 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>LMS-AI · Xem trước giao diện</h1>
+  <div class="seg" role="group" aria-label="Chế độ màu">
+    <button aria-pressed="true" data-t="light">Sáng</button>
+    <button aria-pressed="false" data-t="dark">Tối dịu</button>
+    <button aria-pressed="false" data-t="sepia">Giấy</button>
+  </div>
+</header>
+
+<main>
+  <h2 class="sec">1 · Trang bài học + AI Tutor (desktop)</h2>
+  <div class="lesson with-tutor" id="lesson">
+    <div>
+      <div class="progress" aria-hidden="true"><i></i></div>
+      <div class="toolbar">
+        <span class="crumb">Cấu trúc dữ liệu › Chương 2 › Tìm kiếm nhị phân</span>
+        <button class="btn btn-ghost btn-icon" aria-label="Giảm cỡ chữ" title="Giảm cỡ chữ (A−)" data-size="-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16l4-8 4 8M4.5 13h5M15 12h6"/></svg></button>
+        <button class="btn btn-ghost btn-icon" aria-label="Tăng cỡ chữ" title="Tăng cỡ chữ (A+)" data-size="1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16l4-8 4 8M4.5 13h5M18 9v6M15 12h6"/></svg></button>
+        <button class="btn btn-ghost btn-icon" aria-label="Chế độ tập trung" title="Chế độ tập trung (F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+        <button class="btn btn-ghost" id="toggleTutor" aria-pressed="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5h.01"/></svg>Hỏi AI</button>
+      </div>
+      <div class="reader">
+        <article>
+          <h3>Tìm kiếm nhị phân</h3>
+          <p>Tìm kiếm nhị phân áp dụng cho <strong>mảng đã sắp xếp</strong>. Ở mỗi bước, thuật toán so sánh phần tử ở giữa khoảng tìm với giá trị cần tìm,
+            rồi <mark class="cited">loại bỏ một nửa khoảng không thể chứa đáp án</mark>. Nhờ vậy số bước giảm theo cấp số nhân.</p>
+          <p>Với mảng có <code>n</code> phần tử, số lần so sánh trong trường hợp xấu nhất là khoảng <code>log₂ n</code>. Một mảng một triệu phần tử chỉ cần khoảng 20 lần so sánh.</p>
+<pre><code>def binary_search(a, x):
+    lo, hi = 0, len(a) - 1
+    while lo &lt;= hi:
+        mid = (lo + hi) // 2
+        if a[mid] == x: return mid
+        if a[mid] &lt; x: lo = mid + 1
+        else: hi = mid - 1
+    return -1</code></pre>
+          <p>Lưu ý điều kiện dừng <code>lo &lt;= hi</code>: nếu viết <code>lo &lt; hi</code> sẽ bỏ sót trường hợp khoảng tìm chỉ còn một phần tử.</p>
+          <div class="lesson-foot">
+            <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="M22 4 12 14l-3-3"/></svg>Đánh dấu đã học</button>
+            <button class="btn btn-primary">Bài tiếp theo<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+          </div>
+        </article>
+      </div>
+    </div>
+    <aside class="tutor" id="tutor" aria-label="AI Tutor">
+      <div class="tutor-head"><span>AI Tutor · trong bài này</span>
+        <button class="btn btn-ghost btn-icon" aria-label="Đóng AI Tutor" title="Đóng (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+      <div class="msgs">
+        <div class="q">Vì sao điều kiện dừng là lo &lt;= hi mà không phải lo &lt; hi?</div>
+        <div>
+          <div class="sources"><span class="src"><b>[1]</b> Tìm kiếm nhị phân · tr.12</span><span class="src"><b>[2]</b> Chương 2 · tr.14</span></div>
+          <p style="margin:10px 0 0">Khi khoảng tìm chỉ còn một phần tử thì <code>lo == hi</code>, và phần tử đó vẫn cần được so sánh<span class="cite">[1]</span>.
+            Nếu dùng <code>lo &lt; hi</code>, vòng lặp dừng sớm và bỏ sót phần tử cuối cùng<span class="cite">[2]</span>.</p>
+          <div class="a-actions">
+            <button class="btn btn-ghost btn-icon" aria-label="Câu trả lời hữu ích" aria-pressed="false" title="Hữu ích"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12M15 5.9 14 10h5.8a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.4 22H7V10l4-8a3 3 0 0 1 4 3.9z"/></svg></button>
+            <button class="btn btn-ghost btn-icon" aria-label="Câu trả lời chưa tốt" aria-pressed="false" title="Chưa tốt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14V2M9 18.1 10 14H4.2a2 2 0 0 1-2-2.3l1.4-8A2 2 0 0 1 5.6 2H17v12l-4 8a3 3 0 0 1-4-3.9z"/></svg></button>
+            <button class="btn btn-ghost btn-icon" aria-label="Sao chép câu trả lời" title="Sao chép"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <label for="ask" style="position:absolute;left:-9999px">Câu hỏi cho AI Tutor</label>
+        <textarea id="ask" rows="1" placeholder="Hỏi về bài này…"></textarea>
+        <button class="btn btn-primary btn-icon" aria-label="Gửi câu hỏi" title="Gửi (Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l3 9-3 9 19-9z"/><path d="M6 12h16"/></svg></button>
+      </div>
+      <div class="hint">AI chỉ trả lời dựa trên tài liệu của khóa học · Enter để gửi, Shift+Enter xuống dòng</div>
+    </aside>
+  </div>
+  <p class="note">Bấm A− / A+ để đổi cỡ chữ đọc, và nút "Hỏi AI" để mở hoặc đóng panel. Cột chữ giữ khoảng 68 ký tự mỗi dòng dù màn hình rộng.</p>
+
+  <h2 class="sec">2 · Hệ thống nút</h2>
+  <div class="card">
+    <div class="row">
+      <div class="btn-cell"><button class="btn btn-primary btn-lg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>Đăng ký khóa học</button><span class="label">Chính · lg · 1 nút mỗi màn</span></div>
+      <div class="btn-cell"><button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Xem trước</button><span class="label">Phụ</span></div>
+      <div class="btn-cell"><button class="btn btn-ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Sao chép</button><span class="label">Nhẹ</span></div>
+      <div class="btn-cell"><button class="btn btn-danger-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Xóa bài học</button><span class="label">Nguy hiểm · luôn có xác nhận</span></div>
+      <div class="btn-cell"><button class="btn btn-link">Xem tất cả khóa học</button><span class="label">Liên kết</span></div>
+    </div>
+    <div class="row" style="margin-top:20px">
+      <div class="btn-cell"><button class="btn btn-primary" disabled aria-busy="true"><svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>Đang nộp…</button><span class="label">Đang xử lý: khóa, đổi chữ</span></div>
+      <div class="btn-cell"><button class="btn btn-primary" disabled>Sinh câu hỏi bằng AI</button><span class="label">Bị khóa · có lý do: "Tài liệu đang được xử lý"</span></div>
+      <div class="btn-cell"><button class="btn btn-outline">Hủy</button><span class="label">Hủy luôn là Phụ, đứng trước</span></div>
+    </div>
+  </div>
+
+  <h2 class="sec">3 · Quiz: đang làm và kết quả</h2>
+  <div class="grid2">
+    <div class="card">
+      <div class="qhead"><span>Câu 3 / 10</span><span>Còn 11:42</span></div>
+      <p style="font-family:'Noto Sans',system-ui,sans-serif;font-size:18px;line-height:1.6;margin:12px 0 4px">Độ phức tạp thời gian của tìm kiếm nhị phân trong trường hợp xấu nhất là?</p>
+      <label class="opt"><input type="radio" name="q"> O(n)</label>
+      <label class="opt"><input type="radio" name="q" checked> O(log n)</label>
+      <label class="opt"><input type="radio" name="q"> O(n log n)</label>
+      <label class="opt"><input type="radio" name="q"> O(1)</label>
+      <div class="row" style="margin-top:20px;justify-content:space-between">
+        <button class="btn btn-outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>Câu trước</button>
+        <span class="saved">✓ Đã lưu</span>
+        <button class="btn btn-outline">Câu sau<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+      <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:16px">Nộp bài</button>
+    </div>
+    <div class="card">
+      <div class="qhead"><span>Kết quả · 8 / 10</span><span class="tag ok">✓ Đạt</span></div>
+      <p style="font-family:'Noto Sans',system-ui,sans-serif;font-size:17px;margin:12px 0 4px">Điều kiện vòng lặp đúng là?</p>
+      <div class="opt correct"><span class="tag ok">✓ Đúng</span>&nbsp; lo &lt;= hi</div>
+      <div class="opt wrong"><span class="tag bad">✕ Bạn chọn</span>&nbsp; lo &lt; hi</div>
+      <p class="note" style="font-size:15px;line-height:1.65">Khi khoảng tìm còn một phần tử thì lo == hi và phần tử đó vẫn cần so sánh. <a class="btn-link" href="#">Xem lại trong bài (tr.12)</a></p>
+    </div>
+  </div>
+
+  <h2 class="sec">4 · Phản hồi</h2>
+  <div class="grid2">
+    <div class="toast" role="status">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex:none"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/></svg>
+      <div style="flex:1">Bạn đã học 45 phút. Nhìn xa khoảng 6m trong 20 giây để mắt nghỉ nhé.</div>
+      <button class="btn btn-ghost" style="height:32px">Nhắc sau</button>
+    </div>
+    <div class="dialog" role="dialog" aria-labelledby="dlg">
+      <h4 id="dlg">Xóa chương "Cây nhị phân"?</h4>
+      <p>3 bài học và 2 tài liệu PDF trong chương sẽ bị xóa vĩnh viễn. Học viên sẽ mất tiến độ của các bài này.</p>
+      <div class="row"><button class="btn btn-outline">Hủy</button><button class="btn btn-danger">Xóa chương</button></div>
+    </div>
+  </div>
+
+  <h2 class="sec">5 · Màu của chế độ đang chọn</h2>
+  <div class="swatches" id="sw"></div>
+</main>
+
+<script>
+  const root = document.documentElement;
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+    root.dataset.theme = b.dataset.t;
+    document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    drawSwatches();
+  }));
+  let size = 17;
+  document.querySelectorAll('[data-size]').forEach(b => b.addEventListener('click', () => {
+    size = Math.min(21, Math.max(15, size + Number(b.dataset.size)));
+    document.querySelector('.reader article').style.setProperty('--read-size', size + 'px');
+  }));
+  const tbtn = document.getElementById('toggleTutor'), lesson = document.getElementById('lesson'), tutor = document.getElementById('tutor');
+  tbtn.addEventListener('click', () => {
+    const open = tbtn.getAttribute('aria-pressed') !== 'true';
+    tbtn.setAttribute('aria-pressed', String(open));
+    lesson.classList.toggle('with-tutor', open); tutor.hidden = !open;
+  });
+  const names = ['background','surface','foreground','muted','border','primary','accent','success','destructive'];
+  function drawSwatches() {
+    const cs = getComputedStyle(root);
+    document.getElementById('sw').innerHTML = names.map(n =>
+      `<div class="sw"><i style="background:var(--${n})"></i><div>--${n}<br>${cs.getPropertyValue('--' + n).trim()}</div></div>`).join('');
+  }
+  drawSwatches();
+  new MutationObserver(drawSwatches).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
+</body>
+</html>
