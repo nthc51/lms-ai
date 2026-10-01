@@ -3399,7 +3399,7 @@ git add backend/app/modules/tutor/answer.py backend/tests/test_tutor_answer.py &
   - Fixture test `llm` (`FakeLLMProvider()`), `limiter` (`InMemoryRateLimiter()`); `client` override `get_llm_client`, `get_rate_limiter`
   - `tests/helpers.py`: `parse_sse(body: str) -> list[tuple[str, dict]]`
 
-- [ ] **Step 1: Fixture và helper**
+- [x] **Step 1: Fixture và helper**
 
 Trong `tests/conftest.py`, thay khối import đầu file (từ `import httpx` tới `from tests.fakes import ...`) bằng:
 
@@ -3457,7 +3457,7 @@ def parse_sse(body: str) -> list[tuple[str, dict]]:
     return events
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_tutor_api.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_tutor_api.py`**
 
 ```python
 import uuid
@@ -3555,12 +3555,12 @@ async def test_feedback_on_own_assistant_message(client, db):
     assert r.status_code == 404
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_tutor_api.py -v`
 Expected: FAIL — `POST /tutor/sessions/{id}/messages` trả `405 METHOD_NOT_ALLOWED` (route chưa có), assert `status_code == 200` hỏng.
 
-- [ ] **Step 4: Thêm vào `app/modules/tutor/service.py`**
+- [x] **Step 4: Thêm vào `app/modules/tutor/service.py`**
 
 Thay khối import của file bằng:
 
@@ -3658,7 +3658,7 @@ async def set_feedback(db: AsyncSession, user: User, message_id: uuid.UUID, valu
     return message
 ```
 
-- [ ] **Step 5: Thay toàn bộ `app/modules/tutor/router.py`**
+- [x] **Step 5: Thay toàn bộ `app/modules/tutor/router.py`**
 
 ```python
 import uuid
@@ -3764,17 +3764,17 @@ async def feedback(
     return await service.set_feedback(db, user, message_id, data.value)
 ```
 
-- [ ] **Step 6: Chạy lại test**
+- [x] **Step 6: Chạy lại test**
 
 Run: `uv run pytest tests/test_tutor_api.py tests/test_tutor_sessions.py -v`
 Expected: PASS 12 test.
 
-- [ ] **Step 7: Chạy toàn bộ**
+- [x] **Step 7: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 8: Commit** (từ thư mục gốc repo)
+- [x] **Step 8: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/tutor/service.py backend/app/modules/tutor/router.py backend/tests/conftest.py backend/tests/helpers.py backend/tests/test_tutor_api.py && git commit -m "feat(tutor): SSE ask endpoint with rate limit and answer feedback"
