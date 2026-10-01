@@ -4237,7 +4237,7 @@ git add backend/app/modules/quiz backend/app/modules/jobs/models.py backend/app/
   - `validation.py`: `OPTION_IDS = ("A", "B", "C", "D")`; `OptionIn(id, text)`; `QuestionContent(stem, options, correct_option_id, explanation, difficulty)` + `.normalized()`; `DraftOption`, `DraftQuestion`, `DraftBatch(questions)` (schema gửi LLM); `SelfCheckOut(answer_option_id)`; `validate_draft(draft) -> tuple[QuestionContent | None, str | None]`.
   - `selection.py`: `MIN_CHUNK_TOKENS = 150`; `ChunkInfo(id, content, heading_path, page_no, token_count)`; `ChunkPlan(chunk, difficulties: tuple[Difficulty, ...])`; `select_chunks(chunks, count) -> list[ChunkInfo]`; `difficulty_sequence(n, mix) -> list[Difficulty]`; `plan_questions(chunks, count, mix) -> list[ChunkPlan]`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_quiz_validation.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_quiz_validation.py`**
 
 ```python
 import uuid
@@ -4339,12 +4339,12 @@ def test_difficulty_sequence_follows_mix():
     assert difficulty_sequence(2, {}) == [Difficulty.medium] * 2
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_quiz_validation.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.modules.quiz.selection'`
 
-- [ ] **Step 3: `app/modules/quiz/validation.py`**
+- [x] **Step 3: `app/modules/quiz/validation.py`**
 
 ```python
 """Luật của một câu hỏi trắc nghiệm hợp lệ (spec 5.4 bước 4). Dùng cho output của AI và khi giảng viên sửa câu."""
@@ -4433,7 +4433,7 @@ def validate_draft(draft: DraftQuestion) -> tuple[QuestionContent | None, str | 
         return None, "; ".join(err["msg"] for err in e.errors())[:300]
 ```
 
-- [ ] **Step 4: `app/modules/quiz/selection.py`**
+- [x] **Step 4: `app/modules/quiz/selection.py`**
 
 ```python
 """Chọn chunk để sinh câu hỏi (spec 5.4 bước 2) và chia độ khó theo tỉ lệ (bước 1). Hàm thuần, không đụng DB."""
@@ -4516,17 +4516,17 @@ def plan_questions(chunks: Sequence[ChunkInfo], count: int, mix: Mapping[Difficu
     return [ChunkPlan(c, tuple(seq[i * per_chunk : (i + 1) * per_chunk])) for i, c in enumerate(picked)]
 ```
 
-- [ ] **Step 5: Chạy lại test**
+- [x] **Step 5: Chạy lại test**
 
 Run: `uv run pytest tests/test_quiz_validation.py -v`
 Expected: PASS 14 test (7 trường hợp sai luật được tham số hóa).
 
-- [ ] **Step 6: Chạy toàn bộ**
+- [x] **Step 6: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 7: Commit** (từ thư mục gốc repo)
+- [x] **Step 7: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/quiz/validation.py backend/app/modules/quiz/selection.py backend/tests/test_quiz_validation.py && git commit -m "feat(quiz): question validation rules, chunk selection and difficulty mix"
