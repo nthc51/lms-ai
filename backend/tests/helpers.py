@@ -101,3 +101,41 @@ def parse_sse(body: str) -> list[tuple[str, dict]]:
         fields = dict(line.split(": ", 1) for line in block.splitlines())
         events.append((fields["event"], json.loads(fields["data"])))
     return events
+
+
+def keys_in(obj) -> set[str]:
+    """Mọi key xuất hiện ở bất kỳ độ sâu nào trong JSON (để kiểm tra không lộ đáp án)."""
+    if isinstance(obj, dict):
+        return set(obj) | set().union(*(keys_in(v) for v in obj.values()))
+    if isinstance(obj, list):
+        return set().union(*(keys_in(v) for v in obj))
+    return set()
+
+
+async def make_published_quiz(client, db, *, max_attempts: int = 1, n_questions: int = 3):
+    """Giảng viên có khóa đã publish, n câu đã duyệt (đáp án đúng luôn là "A"), một quiz đã xuất bản;
+    một học viên đã đăng ký khóa. Trả về (gv_headers, sv_headers, course, quiz, questions)."""
+    from tests.factories import make_question
+
+    _, gv = await make_teacher(client)
+    course, _, lesson = await make_published_course(client, gv)
+    lesson_id = uuid.UUID(lesson["id"])
+    qs = [
+        await make_question(db, lesson_id, stem=f"Câu hỏi số {i} về tìm kiếm nhị phân?")
+        for i in range(n_questions)
+    ]
+    body = {
+        "lesson_id": lesson["id"],
+        "title": "Quiz tìm kiếm nhị phân",
+        "max_attempts": max_attempts,
+        "question_ids": [str(q.id) for q in qs],
+    }
+    r = await client.post(f"{API}/quizzes", json=body, headers=gv)
+    assert r.status_code == 201, r.text
+    r = await client.post(f"{API}/quizzes/{r.json()['id']}/publish", headers=gv)
+    assert r.status_code == 200, r.text
+    quiz = r.json()
+    _, sv = await make_student(client)
+    enrolled = await client.post(f"{API}/courses/{course['id']}/enroll", headers=sv)
+    assert enrolled.status_code == 201, enrolled.text
+    return gv, sv, course, quiz, qs

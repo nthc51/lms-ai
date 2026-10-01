@@ -95,6 +95,8 @@ def _invalid_question(e: ValidationError) -> AppError:
 
 
 async def review_question(db: AsyncSession, question: Question, data: QuestionReview) -> QuestionOut:
+    # Khóa dòng câu hỏi: tạo/sửa/xuất bản quiz (Task 17) khóa cùng dòng này nên không chen vào giữa kiểm tra và ghi
+    await db.refresh(question, with_for_update=True)
     quiz_statuses = set(
         (
             await db.scalars(

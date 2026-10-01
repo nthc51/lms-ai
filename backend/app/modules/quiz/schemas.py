@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from app.core.pagination import Page
-from app.modules.quiz.models import Difficulty, QuestionOrigin, ReviewStatus
+from app.modules.quiz.models import Difficulty, QuestionOrigin, QuizStatus, ReviewStatus
 from app.modules.quiz.validation import OptionIn
 
 
@@ -77,3 +77,35 @@ class QuestionReview(BaseModel):
     correct_option_id: str | None = None
     explanation: str | None = None
     difficulty: Difficulty | None = None
+
+
+class QuizCreate(BaseModel):
+    lesson_id: uuid.UUID
+    title: str = Field(min_length=1, max_length=200)
+    max_attempts: int = Field(1, ge=1, le=20)
+    pass_score: float = Field(50, ge=0, le=100)  # phần trăm
+    question_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+
+
+class QuizUpdate(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=200)
+    max_attempts: int | None = Field(None, ge=1, le=20)
+    pass_score: float | None = Field(None, ge=0, le=100)
+    question_ids: list[uuid.UUID] | None = Field(None, max_length=100)  # chỉ đổi được khi quiz còn nháp
+
+
+class QuizOut(BaseModel):
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    title: str
+    max_attempts: int
+    pass_score: float
+    status: QuizStatus
+    question_count: int
+    created_at: datetime
+    attempts_used: int | None = None  # chỉ trả cho học viên: số lần đã làm
+    questions: list[QuestionOut] | None = None  # chỉ giảng viên sở hữu / admin (có đáp án)
+
+
+class QuizPage(Page[QuizOut]):
+    pass
