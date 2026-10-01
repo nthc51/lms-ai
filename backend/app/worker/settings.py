@@ -4,10 +4,12 @@ from arq import cron, func
 from arq.connections import RedisSettings
 
 from app.ai.embedder import get_embedder
+from app.ai.llm import get_llm_provider
+from app.ai.llm_client import LLMClient
 from app.ai.vision import get_vision
 from app.core.config import get_settings
 from app.core.storage import MinioStorage
-from app.worker.tasks import JOB_TIMEOUTS, ingest_pdf, sweep_stale_jobs
+from app.worker.tasks import JOB_TIMEOUTS, ingest_pdf, quiz_gen, sweep_stale_jobs
 
 
 async def startup(ctx: dict) -> None:
@@ -17,11 +19,15 @@ async def startup(ctx: dict) -> None:
     ctx["storage"] = storage
     ctx["embedder"] = get_embedder(s)
     ctx["vision"] = get_vision(s)
+    ctx["llm"] = LLMClient(get_llm_provider(s), s)
 
 
 class WorkerSettings:
     # Tên hàm = job.type. timeout riêng cho từng loại job (spec K4)
-    functions: ClassVar = [func(ingest_pdf, name="ingest_pdf", timeout=JOB_TIMEOUTS["ingest_pdf"])]
+    functions: ClassVar = [
+        func(ingest_pdf, name="ingest_pdf", timeout=JOB_TIMEOUTS["ingest_pdf"]),
+        func(quiz_gen, name="quiz_gen", timeout=JOB_TIMEOUTS["quiz_gen"]),
+    ]
     # 5 phút một lần: job processing quá timeout + 5 phút → failed "Worker bị gián đoạn";
     # job pending bị kẹt → enqueue lại một lần, vẫn kẹt → failed "Không đưa được job vào hàng đợi"
     cron_jobs: ClassVar = [

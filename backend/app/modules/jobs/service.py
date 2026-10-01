@@ -12,13 +12,20 @@ ACTIVE = (JobStatus.pending, JobStatus.processing)
 
 
 async def create_job(
-    db: AsyncSession, type_: str, ref_id: uuid.UUID, ref_version: int = 0, *, created_by: uuid.UUID | None
+    db: AsyncSession,
+    type_: str,
+    ref_id: uuid.UUID,
+    ref_version: int = 0,
+    *,
+    created_by: uuid.UUID | None,
+    payload: dict | None = None,
 ) -> tuple[Job, bool]:
     """Tạo job nếu chưa có job đang chạy cho (type, ref_id, ref_version). Chưa commit — caller tự commit.
 
     Nhờ partial unique index uq_active_job, hai request đồng thời vẫn chỉ tạo được một job.
     created_by: id người dùng thao tác (NULL = job hệ thống). Nếu trả về job đang chạy sẵn thì giữ nguyên
     người tạo của job đó.
+    payload: tham số của job; nếu trả về job đang chạy sẵn thì payload mới bị bỏ qua.
     """
     for _ in range(2):  # lặp lại một lần phòng khi job cũ vừa kết thúc giữa hai câu lệnh
         stmt = (
@@ -31,6 +38,7 @@ async def create_job(
                 status=JobStatus.pending,
                 attempts=0,
                 created_by=created_by,
+                payload=payload,
             )
             .on_conflict_do_nothing(
                 index_elements=["type", "ref_id", "ref_version"], index_where=text(ACTIVE_JOB_PREDICATE)
@@ -61,9 +69,10 @@ async def create_and_enqueue(
     ref_version: int = 0,
     *,
     created_by: uuid.UUID | None,
+    payload: dict | None = None,
 ) -> Job:
     """Commit mọi thay đổi đang chờ trong session cùng với job, rồi mới đẩy lên hàng đợi."""
-    job, created = await create_job(db, type_, ref_id, ref_version, created_by=created_by)
+    job, created = await create_job(db, type_, ref_id, ref_version, created_by=created_by, payload=payload)
     await db.commit()
     if created:
         await queue.enqueue(job)

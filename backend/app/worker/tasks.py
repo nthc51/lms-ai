@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 
+from pydantic import ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -15,11 +16,13 @@ from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.queue import ArqQueue, JobQueue
 from app.modules.jobs.service import finish_job
 from app.modules.materials.models import Source, SourceStatus
+from app.modules.quiz.generation import generate_questions_for_lesson
+from app.modules.quiz.schemas import QuizGenerateIn
 
 logger = logging.getLogger(__name__)
 
 # job_timeout riêng cho từng loại job (spec K4), đơn vị giây. arq hủy job chạy quá thời gian này.
-JOB_TIMEOUTS: dict[str, int] = {"ingest_pdf": 600}
+JOB_TIMEOUTS: dict[str, int] = {"ingest_pdf": 600, "quiz_gen": 900}
 # Handler bị hủy sớm hơn job_timeout của arq một khoảng này, để run_job kịp ghi job + source failed
 # ngay (arq hủy ở đúng job_timeout thì không còn cơ hội ghi, phải đợi sweeper).
 JOB_TIMEOUT_MARGIN_S = 30
@@ -28,8 +31,14 @@ STALE_GRACE = timedelta(minutes=5)
 STALE_JOB_ERROR = "Worker bị gián đoạn"
 # Job 'pending' đã được enqueue lại một lần mà vẫn không có worker nhận (Redis mất job, arq hết hạn...)
 PENDING_JOB_ERROR = "Không đưa được job vào hàng đợi"
-# Loại job có ref_id trỏ tới sources.id: sweeper đánh dấu luôn source failed để giảng viên bấm "Xử lý lại"
+# Loại job có ref_id trỏ tới sources.id: sweeper đánh dấu luôn source failed để giảng viên bấm "Xử lý lại".
+# quiz_gen (ref_id = lessons.id) không cần: câu hỏi chỉ được ghi ở commit cuối cùng với job done, nên job bị
+# sweeper chốt failed không để lại dữ liệu dở dang nào.
 SOURCE_JOB_TYPES = frozenset({"ingest_pdf"})
+# quiz_gen: lỗi nghiệp vụ (ValueError của generation, vd. NO_CHUNKS_ERROR) ghi nguyên văn vào job; lỗi khác
+# (LLM/hạ tầng) ghi thông báo chung này, chi tiết nằm trong log.
+QUIZ_GEN_ERROR = "Không sinh được câu hỏi do lỗi hệ thống hoặc dịch vụ AI, vui lòng thử lại sau"
+QUIZ_GEN_PAYLOAD_ERROR = "Tham số sinh câu hỏi không hợp lệ"
 
 
 def handler_timeout(job_type: str) -> float:
@@ -114,6 +123,40 @@ async def ingest_pdf(ctx: dict, job_id: str) -> None:
         )
 
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("ingest_pdf"))
+
+
+async def quiz_gen(ctx: dict, job_id: str) -> None:
+    """Job sinh câu hỏi (spec 5.4). ref_id = lessons.id; tham số (count, difficulty) nằm trong jobs.payload.
+    Câu hỏi và trạng thái done được ghi cùng transaction trong generate_questions_for_lesson; mọi lỗi để
+    run_job ghi job failed (không có source nào phải đổi theo)."""
+    session_factory = ctx.get("session_factory", SessionLocal)
+    jid = uuid.UUID(job_id)
+
+    async def handler(lesson_id: uuid.UUID) -> None:
+        async with session_factory() as db:
+            payload = await db.scalar(select(Job.payload).where(Job.id == jid))
+        try:
+            params = QuizGenerateIn.model_validate(payload or {})
+        except ValidationError as e:
+            raise ValueError(QUIZ_GEN_PAYLOAD_ERROR) from e
+        try:
+            await generate_questions_for_lesson(
+                lesson_id,
+                count=params.count,
+                mix=params.difficulty.as_mapping(),
+                llm=ctx["llm"],
+                embedder=ctx["embedder"],
+                job_id=jid,
+                session_factory=session_factory,
+            )
+        except ValidationError as e:  # ValidationError cũng là ValueError nhưng message tiếng Anh
+            raise RuntimeError(QUIZ_GEN_ERROR) from e
+        except ValueError:  # thông báo tiếng Việt cho giảng viên (NO_CHUNKS_ERROR, ...)
+            raise
+        except Exception as e:  # run_job ghi log kèm traceback của lỗi gốc
+            raise RuntimeError(QUIZ_GEN_ERROR) from e
+
+    await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("quiz_gen"))
 
 
 async def _fail_jobs(db, jobs_where, error: str, now) -> int:
