@@ -1,6 +1,9 @@
 """Luật của một câu hỏi trắc nghiệm hợp lệ (spec 5.4 bước 4). Dùng cho output của AI và khi giảng viên sửa câu."""
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+import unicodedata
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from app.modules.quiz.models import Difficulty
 
@@ -8,7 +11,7 @@ OPTION_IDS = ("A", "B", "C", "D")
 
 
 def _norm(text: str) -> str:
-    return " ".join(text.split()).casefold()
+    return " ".join(unicodedata.normalize("NFC", text).split()).casefold()
 
 
 class OptionIn(BaseModel):
@@ -54,18 +57,32 @@ class QuestionContent(BaseModel):
 
 class DraftOption(BaseModel):
     id: str
-    text: str
+    # Giới hạn chỉ nằm trong JSON schema gửi LLM (không ép lúc parse) để câu sai luật chỉ bị bỏ riêng câu đó.
+    text: str = Field(json_schema_extra={"maxLength": 300})
 
 
 class DraftQuestion(BaseModel):
     """Hình dạng output của AI (schema gửi cho LLM). Lỏng hơn QuestionContent để parse được cả câu sai luật,
-    rồi mới kiểm tra từng câu: câu sai chỉ bỏ câu đó, không bỏ cả lô."""
+    rồi mới kiểm tra từng câu: câu sai chỉ bỏ câu đó, không bỏ cả lô. Schema vẫn dẫn dắt model: enum độ khó,
+    đúng 4 lựa chọn, giới hạn độ dài."""
 
-    stem: str
-    options: list[DraftOption]
+    stem: str = Field(json_schema_extra={"maxLength": 1000})
+    options: list[DraftOption] = Field(json_schema_extra={"minItems": 4, "maxItems": 4})
     correct_option_id: str
-    explanation: str = ""
-    difficulty: str = "medium"
+    explanation: str = Field(json_schema_extra={"maxLength": 2000})
+    difficulty: Difficulty
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_missing(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            data = {"explanation": "", "difficulty": "medium", **data}
+        return data
+
+    @field_validator("difficulty", mode="before")
+    @classmethod
+    def _tolerant_difficulty(cls, v: Any) -> Any:
+        return v.strip().lower() if isinstance(v, str) else v
 
 
 class DraftBatch(BaseModel):
@@ -76,9 +93,14 @@ class SelfCheckOut(BaseModel):
     answer_option_id: str
 
 
+def _describe(err: Any) -> str:
+    loc = ".".join(str(x) for x in err["loc"])
+    return f"{loc}: {err['msg']}" if loc else err["msg"]
+
+
 def validate_draft(draft: DraftQuestion) -> tuple[QuestionContent | None, str | None]:
     """(câu đã chuẩn hóa, None) nếu hợp lệ; (None, lý do) nếu sai luật — lý do được gửi lại cho LLM khi sinh lại."""
     try:
         return QuestionContent.model_validate(draft.model_dump()).normalized(), None
     except ValidationError as e:
-        return None, "; ".join(err["msg"] for err in e.errors())[:300]
+        return None, "; ".join(_describe(err) for err in e.errors())[:300]

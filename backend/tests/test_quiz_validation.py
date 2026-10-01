@@ -103,3 +103,64 @@ def test_difficulty_sequence_follows_mix():
     assert counts == [3, 5, 2] and seq[:3] == [Difficulty.easy, Difficulty.medium, Difficulty.hard]
     assert difficulty_sequence(3, {Difficulty.hard: 1.0}) == [Difficulty.hard] * 3
     assert difficulty_sequence(2, {}) == [Difficulty.medium] * 2
+
+
+def test_draft_difficulty_is_tolerant_and_schema_is_steered():
+    for raw in ("Easy", " HARD "):
+        ok, err = validate_draft(DraftQuestion.model_validate(_q(difficulty=raw)))
+        assert err is None and ok.difficulty == Difficulty(raw.strip().lower())
+    missing = _q()
+    del missing["difficulty"], missing["explanation"]
+    ok, _ = validate_draft(DraftQuestion.model_validate(missing))
+    assert ok.difficulty == Difficulty.medium
+    schema = DraftQuestion.model_json_schema()
+    assert schema["properties"]["difficulty"]["$ref"] == "#/$defs/Difficulty"
+    assert schema["$defs"]["Difficulty"]["enum"] == ["easy", "medium", "hard"]
+    assert (
+        schema["properties"]["options"]["minItems"] == 4 and schema["properties"]["options"]["maxItems"] == 4
+    )
+    assert schema["properties"]["stem"]["maxLength"] == 1000
+    assert schema["$defs"]["DraftOption"]["properties"]["text"]["maxLength"] == 300
+    assert (
+        "default" not in schema["properties"]["difficulty"]
+        and "default" not in schema["properties"]["explanation"]
+    )
+
+
+def test_nfc_and_nfd_options_are_duplicates():
+    import unicodedata
+
+    nfd = unicodedata.normalize("NFD", "Đúng rồi")
+    opts = [*OPTIONS[:3], {"id": "D", "text": "Đúng rồi"}]
+    opts[0] = {"id": "A", "text": nfd}
+    with pytest.raises(ValidationError, match="trùng nhau"):
+        QuestionContent.model_validate(_q(options=opts))
+
+
+def test_validate_draft_error_names_the_field():
+    _, err = validate_draft(DraftQuestion.model_validate(_q(stem="Ngắn?")))
+    assert err.startswith("stem:")
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 7, 10, 13, 30])
+@pytest.mark.parametrize("n_chunks", [1, 2, 3, 5, 20])
+@pytest.mark.parametrize("mix", [MIX, {Difficulty.hard: 1.0}, {}])
+def test_plan_totals_exactly_n(n, n_chunks, mix):
+    chunks = [_chunk(f"H{i}") for i in range(n_chunks)]
+    plans = plan_questions(chunks, n, mix)
+    flat = [d for p in plans for d in p.difficulties]
+    assert len(flat) == n and all(p.difficulties for p in plans)
+    expected = difficulty_sequence(n, mix)
+    assert sorted(flat, key=str) == sorted(expected, key=str)
+    if n_chunks >= n // 2 and n >= 2:
+        assert all(2 <= len(p.difficulties) <= 3 for p in plans)
+
+
+def test_plan_single_question_uses_one_chunk():
+    plans = plan_questions([_chunk("A"), _chunk("B")], 1, MIX)
+    assert [len(p.difficulties) for p in plans] == [1]
+
+
+def test_plan_more_questions_than_three_per_chunk_still_totals_n():
+    plans = plan_questions([_chunk("A"), _chunk("B")], 10, MIX)
+    assert [len(p.difficulties) for p in plans] == [5, 5]

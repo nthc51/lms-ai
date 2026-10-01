@@ -71,10 +71,23 @@ def difficulty_sequence(n: int, mix: Mapping[Difficulty, float]) -> list[Difficu
 def plan_questions(
     chunks: Sequence[ChunkInfo], count: int, mix: Mapping[Difficulty, float]
 ) -> list[ChunkPlan]:
-    """Mỗi chunk được chọn sinh 2 câu; thiếu chunk (count > 2 × số chunk) thì 3 câu (spec: 2–3 câu mỗi chunk)."""
-    picked = select_chunks(chunks, count)
+    """Kế hoạch sinh đúng `count` câu: tổng số độ khó trong kế hoạch == count và khớp chia tỉ lệ cho count.
+
+    Số chunk k = max(1, count // 2) (mỗi chunk 2-3 câu), bị chặn bởi số chunk đủ dài; count nhỏ (1) thì 1 chunk 1 câu.
+    Nếu k bị chặn bởi số chunk thì mỗi chunk nhận nhiều câu hơn (có thể > 3) - vẫn đủ count câu.
+    Chỉ khi không có chunk đủ dài mới trả [] (caller xử lý 409/failed). Các độ khó xen kẽ dễ -> vừa -> khó được
+    chia lần lượt cho từng chunk nên mỗi chunk có độ khó trộn."""
+    if count <= 0:
+        return []
+    picked = select_chunks(chunks, 2 * max(1, count // 2))
     if not picked:
         return []
-    per_chunk = 3 if count > 2 * len(picked) else 2
-    seq = difficulty_sequence(per_chunk * len(picked), mix)
-    return [ChunkPlan(c, tuple(seq[i * per_chunk : (i + 1) * per_chunk])) for i, c in enumerate(picked)]
+    seq = difficulty_sequence(count, mix)
+    base, extra = divmod(count, len(picked))
+    plans: list[ChunkPlan] = []
+    pos = 0
+    for i, c in enumerate(picked):
+        n = base + (1 if i < extra else 0)
+        plans.append(ChunkPlan(c, tuple(seq[pos : pos + n])))
+        pos += n
+    return plans
