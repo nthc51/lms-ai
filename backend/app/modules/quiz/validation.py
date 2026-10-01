@@ -83,8 +83,13 @@ class DraftQuestion(BaseModel):
     @classmethod
     def _tolerant_difficulty(cls, v: Any) -> Any:
         # Không bao giờ làm hỏng cả lô vì độ khó lạ: giá trị không hợp lệ (chuỗi lạ, None, số) -> medium.
-        v = v.strip().lower() if isinstance(v, str) else v
-        return v if v in {d.value for d in Difficulty} else Difficulty.medium.value
+        if isinstance(v, Difficulty):
+            return v.value
+        if isinstance(v, str):
+            v = v.strip().lower()
+            if v in {d.value for d in Difficulty}:
+                return v
+        return Difficulty.medium.value
 
 
 class DraftBatch(BaseModel):

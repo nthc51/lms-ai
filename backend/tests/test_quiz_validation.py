@@ -166,7 +166,7 @@ def test_plan_more_questions_than_three_per_chunk_still_totals_n():
     assert [len(p.difficulties) for p in plans] == [5, 5]
 
 
-@pytest.mark.parametrize("bad", ["siêu khó", None, 5])
+@pytest.mark.parametrize("bad", ["siêu khó", None, 5, [], {}, ["easy"], True, float("nan")])
 def test_unknown_draft_difficulty_does_not_fail_the_batch(bad):
     batch = DraftBatch.model_validate({"questions": [_q(), _q(difficulty=bad)]})
     assert [q.difficulty for q in batch.questions] == [Difficulty.easy, Difficulty.medium]
