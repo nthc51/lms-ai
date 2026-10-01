@@ -3796,7 +3796,7 @@ git add backend/app/modules/tutor/service.py backend/app/modules/tutor/router.py
   - `Job.payload: dict | None` (JSONB).
   - `tests/factories.py`: `async make_question(db, lesson_id, *, stem=..., review_status=ReviewStatus.approved, correct="A", origin=QuestionOrigin.ai, texts=(...), source_chunk_id=None) -> Question`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_quiz_models.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_quiz_models.py`**
 
 ```python
 import uuid
@@ -3880,12 +3880,12 @@ async def test_job_payload_roundtrip(db):
     assert (await db.get(Job, job.id, populate_existing=True)).payload == {"count": 5}
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_quiz_models.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.modules.quiz'`
 
-- [ ] **Step 3: `app/modules/quiz/models.py`**
+- [x] **Step 3: `app/modules/quiz/models.py`**
 
 ```python
 import enum
@@ -4069,7 +4069,7 @@ async def make_question(
     return q
 ```
 
-- [ ] **Step 4: Migration `alembic/versions/c47e2b9d5f10_quiz.py`**
+- [x] **Step 4: Migration `alembic/versions/c47e2b9d5f10_quiz.py`**
 
 ```python
 """quiz tables and jobs.payload
@@ -4207,17 +4207,17 @@ def downgrade() -> None:
 Run: `uv run alembic upgrade head && uv run alembic check`
 Expected: `No new upgrade operations detected.`
 
-- [ ] **Step 5: Chạy lại test**
+- [x] **Step 5: Chạy lại test**
 
 Run: `uv run pytest tests/test_quiz_models.py -v`
 Expected: PASS 4 test.
 
-- [ ] **Step 6: Chạy toàn bộ**
+- [x] **Step 6: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 7: Commit** (từ thư mục gốc repo)
+- [x] **Step 7: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/quiz backend/app/modules/jobs/models.py backend/app/models_registry.py backend/alembic/versions/c47e2b9d5f10_quiz.py backend/tests/factories.py backend/tests/test_quiz_models.py && git commit -m "feat(quiz): questions, quizzes and attempts tables; jobs.payload"
