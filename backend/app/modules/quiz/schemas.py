@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from app.modules.quiz.models import Difficulty
 
@@ -21,5 +21,10 @@ class DifficultyMix(BaseModel):
 
 
 class QuizGenerateIn(BaseModel):
-    count: int = Field(10, ge=1, le=30)
+    """Body của POST sinh câu hỏi và cũng là jobs.payload của quiz_gen. Không nhận trường lạ; count phải là số
+    nguyên thật (không nhận true hay "7")."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    count: StrictInt = Field(10, ge=1, le=30)
     difficulty: DifficultyMix = Field(default_factory=DifficultyMix)

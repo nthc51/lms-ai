@@ -27,6 +27,10 @@ NO_QUESTIONS_ERROR = "AI không sinh được câu hỏi hợp lệ nào"
 ALL_DUPLICATES_ERROR = "Các câu AI sinh ra đều trùng với câu hỏi đã có của bài học"
 
 
+class QuizGenerationError(ValueError):
+    """Lỗi nghiệp vụ khi sinh câu hỏi; message tiếng Việt được hiển thị nguyên văn cho giảng viên (job.error_msg)."""
+
+
 @dataclass
 class GenerationStats:
     requested: int
@@ -185,7 +189,7 @@ async def generate_questions_for_lesson(
         )
     plans = plan_questions(chunks, count, mix)
     if not plans:
-        raise ValueError(NO_CHUNKS_ERROR)
+        raise QuizGenerationError(NO_CHUNKS_ERROR)
     stats = GenerationStats(requested=count)
     candidates: list[_Candidate] = []
     for plan in plans:
@@ -193,7 +197,7 @@ async def generate_questions_for_lesson(
     kept = (await _dedup(embedder, existing, candidates, stats))[:count]
     if not kept:
         # Có câu hợp lệ nhưng đều trùng câu đã có: báo rõ để giảng viên không tưởng AI hỏng.
-        raise ValueError(ALL_DUPLICATES_ERROR if stats.duplicates else NO_QUESTIONS_ERROR)
+        raise QuizGenerationError(ALL_DUPLICATES_ERROR if stats.duplicates else NO_QUESTIONS_ERROR)
     rows = []
     for cand in kept:
         flagged = await _self_check(llm, cand)

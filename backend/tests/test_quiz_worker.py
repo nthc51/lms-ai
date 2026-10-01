@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import pytest
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.ai.embedder import FakeEmbedder
@@ -11,6 +13,7 @@ from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.service import create_and_enqueue, create_job
 from app.modules.quiz.generation import NO_CHUNKS_ERROR
 from app.modules.quiz.models import Question, ReviewStatus
+from app.modules.quiz.schemas import QuizGenerateIn
 from app.worker.settings import WorkerSettings
 from app.worker.tasks import (
     JOB_TIMEOUTS,
@@ -75,6 +78,38 @@ async def test_quiz_gen_unexpected_error_fails_job_with_generic_message(db):
     assert job.status == JobStatus.failed and job.error_msg == QUIZ_GEN_ERROR
     assert job.finished_at is not None
     assert (await db.scalars(select(Question).where(Question.lesson_id == lesson.id))).all() == []
+
+
+class _ShortEmbedder(FakeEmbedder):
+    """Trả thiếu một vector: zip(strict=True) trong bước lọc trùng ném ValueError tiếng Anh."""
+
+    async def embed_documents(self, texts):
+        return (await super().embed_documents(texts))[:-1]
+
+
+async def test_quiz_gen_non_generation_value_error_gets_generic_message(db):
+    teacher = await make_user(db)
+    _, lesson = await make_lesson(db, teacher)
+    await seed_chunks(db, lesson.id, [LONG_LESSON_TEXT])
+    job, _ = await create_job(db, "quiz_gen", lesson.id, created_by=teacher.id, payload={"count": 2})
+    await db.commit()
+    ctx = _ctx() | {"embedder": _ShortEmbedder(768)}
+    await quiz_gen(ctx, str(job.id))
+    job = await db.get(Job, job.id, populate_existing=True)
+    assert job.status == JobStatus.failed and job.error_msg == QUIZ_GEN_ERROR
+    assert (await db.scalars(select(Question).where(Question.lesson_id == lesson.id))).all() == []
+
+
+@pytest.mark.parametrize("body", [{"cnt": 5}, {"count": True}, {"count": "7"}, {"count": 7.0}])
+def test_quiz_generate_in_is_strict(body):
+    with pytest.raises(ValidationError):
+        QuizGenerateIn.model_validate(body)
+
+
+def test_quiz_generate_in_defaults_and_json_roundtrip():
+    params = QuizGenerateIn.model_validate({"count": 7})
+    assert params.count == 7 and params.difficulty.as_mapping()
+    assert QuizGenerateIn.model_validate(params.model_dump(mode="json")) == params
 
 
 async def test_quiz_gen_invalid_payload_fails_job_in_vietnamese(db):
