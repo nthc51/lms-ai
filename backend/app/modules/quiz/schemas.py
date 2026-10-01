@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from app.core.pagination import Page
-from app.modules.quiz.models import Difficulty, QuestionOrigin, QuizStatus, ReviewStatus
+from app.modules.quiz.models import AttemptStatus, Difficulty, QuestionOrigin, QuizStatus, ReviewStatus
 from app.modules.quiz.validation import OptionIn
 
 
@@ -109,3 +109,32 @@ class QuizOut(BaseModel):
 
 class QuizPage(Page[QuizOut]):
     pass
+
+
+class AttemptQuestion(BaseModel):
+    """Câu hỏi khi đang làm bài: KHÔNG có đáp án đúng, không có giải thích."""
+
+    id: uuid.UUID
+    stem: str
+    options: list[OptionOut]
+
+
+class AttemptOut(BaseModel):
+    id: uuid.UUID
+    quiz_id: uuid.UUID
+    attempt_no: int
+    status: AttemptStatus
+    started_at: datetime
+    deadline_at: datetime | None  # B1 (tuần 3): luôn None ở A7
+    questions: list[AttemptQuestion]
+    answers: dict[str, str]  # question_id → selected_option_id đã autosave
+
+
+class AnswerIn(BaseModel):
+    selected_option_id: str = Field(min_length=1, max_length=8)
+
+
+class AnswerOut(BaseModel):
+    question_id: uuid.UUID
+    selected_option_id: str
+    answered_at: datetime

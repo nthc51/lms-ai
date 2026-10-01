@@ -1,17 +1,20 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.deps import get_current_user, require_staff
+from app.core.deps import get_current_user, require_role, require_staff
 from app.core.pagination import PageParams, page_params
-from app.modules.auth.models import User
+from app.modules.auth.models import Role, User
 from app.modules.jobs.queue import JobQueue, get_queue
 from app.modules.materials.schemas import JobRef
-from app.modules.quiz import questions, quizzes
+from app.modules.quiz import attempts, questions, quizzes
 from app.modules.quiz.models import ReviewStatus
 from app.modules.quiz.schemas import (
+    AnswerIn,
+    AnswerOut,
+    AttemptOut,
     QuestionOut,
     QuestionPage,
     QuestionReview,
@@ -23,6 +26,7 @@ from app.modules.quiz.schemas import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["quiz"])
+_require_student = require_role(Role.student)
 
 
 @router.post("/lessons/{lesson_id}/questions/generate", response_model=JobRef, status_code=202)
@@ -108,3 +112,27 @@ async def publish_quiz(
 ):
     quiz = await quizzes.get_owned_quiz(db, quiz_id, user)
     return await quizzes.publish_quiz(db, user, quiz)
+
+
+@router.post("/quizzes/{quiz_id}/attempts", response_model=AttemptOut, status_code=201)
+async def start_attempt(
+    quiz_id: uuid.UUID,
+    response: Response,
+    user: User = Depends(_require_student),
+    db: AsyncSession = Depends(get_db),
+):
+    attempt, created = await attempts.start_attempt(db, user, quiz_id)
+    if not created:
+        response.status_code = 200  # đang có bài làm dở: trả lại bài đó
+    return attempt
+
+
+@router.put("/attempts/{attempt_id}/answers/{question_id}", response_model=AnswerOut)
+async def save_answer(
+    attempt_id: uuid.UUID,
+    question_id: uuid.UUID,
+    data: AnswerIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await attempts.save_answer(db, user, attempt_id, question_id, data)
