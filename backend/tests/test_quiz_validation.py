@@ -11,7 +11,7 @@ from app.modules.quiz.selection import (
     plan_questions,
     select_chunks,
 )
-from app.modules.quiz.validation import DraftQuestion, QuestionContent, validate_draft
+from app.modules.quiz.validation import DraftBatch, DraftQuestion, QuestionContent, validate_draft
 
 MIX = {Difficulty.easy: 0.3, Difficulty.medium: 0.5, Difficulty.hard: 0.2}
 OPTIONS = [
@@ -164,3 +164,9 @@ def test_plan_single_question_uses_one_chunk():
 def test_plan_more_questions_than_three_per_chunk_still_totals_n():
     plans = plan_questions([_chunk("A"), _chunk("B")], 10, MIX)
     assert [len(p.difficulties) for p in plans] == [5, 5]
+
+
+@pytest.mark.parametrize("bad", ["siêu khó", None, 5])
+def test_unknown_draft_difficulty_does_not_fail_the_batch(bad):
+    batch = DraftBatch.model_validate({"questions": [_q(), _q(difficulty=bad)]})
+    assert [q.difficulty for q in batch.questions] == [Difficulty.easy, Difficulty.medium]
