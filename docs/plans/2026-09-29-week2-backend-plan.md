@@ -4940,7 +4940,7 @@ git add backend/app/modules/quiz/generation.py backend/tests/test_quiz_generatio
   - `app/modules/quiz/schemas.py`: `DifficultyMix(easy=0.3, medium=0.5, hard=0.2)` + `.as_mapping()`, `QuizGenerateIn(count=10 (1..30), difficulty)`
   - `JOB_TIMEOUTS["quiz_gen"] = 900`; `async quiz_gen(ctx, job_id)`; worker `ctx["llm"]: LLMClient`; `WorkerSettings.functions` có `quiz_gen`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_quiz_worker.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_quiz_worker.py`**
 
 ```python
 from datetime import timedelta
@@ -5020,12 +5020,12 @@ def test_worker_registers_quiz_gen_with_its_own_timeout():
     assert handler_timeout("quiz_gen") == 870
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_quiz_worker.py -v`
 Expected: FAIL với `ImportError: cannot import name 'quiz_gen' from 'app.worker.tasks'`
 
-- [ ] **Step 3: `payload` trong `app/modules/jobs/service.py`**
+- [x] **Step 3: `payload` trong `app/modules/jobs/service.py`**
 
 Thay chữ ký và phần `.values(...)` của `create_job`:
 
@@ -5077,7 +5077,7 @@ async def create_and_enqueue(
     return job
 ```
 
-- [ ] **Step 4: `app/modules/quiz/schemas.py`**
+- [x] **Step 4: `app/modules/quiz/schemas.py`**
 
 ```python
 from pydantic import BaseModel, Field, model_validator
@@ -5107,7 +5107,7 @@ class QuizGenerateIn(BaseModel):
     difficulty: DifficultyMix = Field(default_factory=DifficultyMix)
 ```
 
-- [ ] **Step 5: `app/worker/tasks.py`**
+- [x] **Step 5: `app/worker/tasks.py`**
 
 Thêm import (nhóm `app.modules`, theo thứ tự chữ cái sau `app.modules.materials.models`):
 
@@ -5154,7 +5154,7 @@ async def quiz_gen(ctx: dict, job_id: str) -> None:
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("quiz_gen"))
 ```
 
-- [ ] **Step 6: `app/worker/settings.py`**
+- [x] **Step 6: `app/worker/settings.py`**
 
 Thay khối import và `startup`, `functions`:
 
@@ -5192,17 +5192,17 @@ async def startup(ctx: dict) -> None:
 
 (giữ nguyên `cron_jobs`, `on_startup`, `redis_settings`, `max_jobs`).
 
-- [ ] **Step 7: Chạy lại test**
+- [x] **Step 7: Chạy lại test**
 
 Run: `uv run pytest tests/test_quiz_worker.py tests/test_worker.py tests/test_jobs.py -v`
 Expected: PASS toàn bộ (4 test mới; test worker/jobs cũ không đổi hành vi).
 
-- [ ] **Step 8: Chạy toàn bộ**
+- [x] **Step 8: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 9: Commit** (từ thư mục gốc repo)
+- [x] **Step 9: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/jobs/service.py backend/app/modules/quiz/schemas.py backend/app/worker/tasks.py backend/app/worker/settings.py backend/tests/test_quiz_worker.py && git commit -m "feat(worker): quiz_gen job with payload, own timeout and sweeper coverage"
