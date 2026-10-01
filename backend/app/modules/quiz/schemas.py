@@ -1,6 +1,12 @@
+import uuid
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
-from app.modules.quiz.models import Difficulty
+from app.core.pagination import Page
+from app.modules.quiz.models import Difficulty, QuestionOrigin, ReviewStatus
+from app.modules.quiz.validation import OptionIn
 
 
 class DifficultyMix(BaseModel):
@@ -28,3 +34,46 @@ class QuizGenerateIn(BaseModel):
 
     count: StrictInt = Field(10, ge=1, le=30)
     difficulty: DifficultyMix = Field(default_factory=DifficultyMix)
+
+
+class OptionOut(BaseModel):
+    id: str
+    text: str
+
+
+class QuestionOut(BaseModel):
+    """Câu hỏi kèm đáp án — chỉ trả cho giảng viên sở hữu / admin."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    stem: str
+    options: list[OptionOut]
+    correct_option_id: str
+    explanation: str
+    difficulty: Difficulty
+    origin: QuestionOrigin
+    review_status: ReviewStatus
+    self_check_flag: bool
+    ai_original: dict | None
+    prompt_version: str | None
+    source_chunk_id: uuid.UUID | None
+    source_page_no: int | None = None  # trang của đoạn nguồn (màn duyệt hiển thị bên cạnh câu hỏi)
+    source_excerpt: str | None = None
+    created_at: datetime
+
+
+class QuestionPage(Page[QuestionOut]):
+    pass
+
+
+class QuestionReview(BaseModel):
+    """approve: duyệt; reject: loại; edit: sửa các trường gửi kèm (validate lại đủ luật, đặt edited)."""
+
+    action: Literal["approve", "edit", "reject"]
+    stem: str | None = None
+    options: list[OptionIn] | None = None
+    correct_option_id: str | None = None
+    explanation: str | None = None
+    difficulty: Difficulty | None = None
