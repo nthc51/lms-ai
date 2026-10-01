@@ -5,6 +5,7 @@ from app.core.time import utcnow
 from app.modules.auth.models import Role, TeacherStatus, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.materials.models import Asset, AssetKind, Chunk, Source, SourceStatus, SourceType
+from app.modules.quiz.models import Difficulty, Question, QuestionOrigin, ReviewStatus
 from tests.fakes import InMemoryStorage
 
 
@@ -141,3 +142,32 @@ async def seed_chunks(
             )
         )
     return chunks
+
+
+async def make_question(
+    db,
+    lesson_id: uuid.UUID,
+    *,
+    stem: str = "Tìm kiếm nhị phân yêu cầu dữ liệu đầu vào như thế nào?",
+    review_status: ReviewStatus = ReviewStatus.approved,
+    correct: str = "A",
+    origin: QuestionOrigin = QuestionOrigin.ai,
+    texts: tuple[str, str, str, str] = ("Mảng đã sắp xếp", "Mảng rỗng", "Danh sách liên kết", "Cây nhị phân"),
+    source_chunk_id: uuid.UUID | None = None,
+) -> Question:
+    q = Question(
+        lesson_id=lesson_id,
+        stem=stem,
+        options=[{"id": i, "text": t} for i, t in zip("ABCD", texts, strict=True)],
+        correct_option_id=correct,
+        explanation="Vì mỗi bước so sánh với phần tử ở giữa.",
+        difficulty=Difficulty.easy,
+        origin=origin,
+        source_chunk_id=source_chunk_id,
+        review_status=review_status,
+        ai_original={"stem": stem} if origin == QuestionOrigin.ai else None,
+        prompt_version="quiz_generate@v1" if origin == QuestionOrigin.ai else None,
+    )
+    db.add(q)
+    await db.commit()
+    return q

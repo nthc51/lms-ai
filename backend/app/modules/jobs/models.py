@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, IdMixin, TimestampMixin
@@ -23,7 +24,8 @@ class Job(IdMixin, TimestampMixin, Base):
     grade_submission → submissions.id (ref_version = submissions.version).
 
     created_by: người tạo job (NULL = job hệ thống, vd. do cron tạo); GET /jobs/{id} chỉ trả cho người tạo
-    hoặc admin. requeued_at: lúc sweeper đẩy lại job 'pending' bị kẹt vào hàng đợi (chỉ một lần)."""
+    hoặc admin. requeued_at: lúc sweeper đẩy lại job 'pending' bị kẹt vào hàng đợi (chỉ một lần).
+    payload: tham số của job (NULL nếu không có)."""
 
     __tablename__ = "jobs"
     __table_args__ = (
@@ -47,3 +49,4 @@ class Job(IdMixin, TimestampMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     requeued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    payload: Mapped[dict | None] = mapped_column(JSONB)  # tham số của job (quiz_gen: count, difficulty)
