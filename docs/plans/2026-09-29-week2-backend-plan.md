@@ -5224,7 +5224,7 @@ git add backend/app/modules/jobs/service.py backend/app/modules/quiz/schemas.py 
   - `questions.py`: `QUIZ_GEN = "quiz_gen"`, `async request_generation(db, queue, user, lesson_id, data) -> Job`, `to_out(q, page_no=None, content=None) -> QuestionOut`, `async list_questions(db, user, lesson_id, review_status, params) -> QuestionPage`, `async get_owned_question(db, question_id, user) -> Question`, `async review_question(db, question, data) -> QuestionOut`
   - `router.py`: `router` với `POST /lessons/{id}/questions/generate` (202 `{job_id}`), `GET /lessons/{id}/questions?review_status=`, `PATCH /questions/{id}`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_questions_api.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_questions_api.py`**
 
 ```python
 import asyncio
@@ -5311,12 +5311,12 @@ async def test_review_edit_keeps_ai_original_then_approve_and_reject(client, db)
     assert (await client.patch(url, json={"action": "approve"}, headers=gv2)).status_code == 404
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_questions_api.py -v`
 Expected: FAIL — `POST /lessons/{id}/questions/generate` trả `404` (chưa có route), assert `status_code == 202` hỏng.
 
-- [ ] **Step 3: Thêm vào `app/modules/quiz/schemas.py`**
+- [x] **Step 3: Thêm vào `app/modules/quiz/schemas.py`**
 
 Thay khối import bằng:
 
@@ -5378,7 +5378,7 @@ class QuestionReview(BaseModel):
     difficulty: Difficulty | None = None
 ```
 
-- [ ] **Step 4: `app/modules/quiz/questions.py`**
+- [x] **Step 4: `app/modules/quiz/questions.py`**
 
 ```python
 """Câu hỏi của bài học: yêu cầu AI sinh (job quiz_gen) và màn duyệt của giảng viên (spec 5.4, 6.4)."""
@@ -5522,7 +5522,7 @@ async def review_question(db: AsyncSession, question: Question, data: QuestionRe
     return to_out(question)
 ```
 
-- [ ] **Step 5: `app/modules/quiz/router.py`**
+- [x] **Step 5: `app/modules/quiz/router.py`**
 
 ```python
 import uuid
@@ -5579,17 +5579,17 @@ async def review_question(
 
 Gắn router vào `app/main.py`: import `from app.modules.quiz.router import router as quiz_router` (theo thứ tự chữ cái, trước `tutor_router`) và `app.include_router(quiz_router)` sau `app.include_router(tutor_router)`.
 
-- [ ] **Step 6: Chạy lại test**
+- [x] **Step 6: Chạy lại test**
 
 Run: `uv run pytest tests/test_questions_api.py -v`
 Expected: PASS 4 test.
 
-- [ ] **Step 7: Chạy toàn bộ**
+- [x] **Step 7: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 8: Commit** (từ thư mục gốc repo)
+- [x] **Step 8: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/questions.py backend/app/modules/quiz/router.py backend/app/main.py backend/tests/test_questions_api.py && git commit -m "feat(quiz): generate questions endpoint and teacher review API"
