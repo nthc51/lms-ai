@@ -5612,7 +5612,7 @@ git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/questions.p
   - Route: `POST /quizzes` (201), `GET /quizzes?lesson_id=`, `GET /quizzes/{id}`, `PATCH /quizzes/{id}`, `DELETE /quizzes/{id}` (204), `POST /quizzes/{id}/publish`
   - `tests/helpers.py`: `keys_in(obj) -> set[str]`, `async make_published_quiz(client, db, *, max_attempts=1, n_questions=3) -> tuple[dict, dict, dict, dict, list[Question]]` = `(gv_headers, sv_headers, course, quiz, questions)` (học viên đã đăng ký khóa).
 
-- [ ] **Step 1: Helper test** — thêm vào cuối `tests/helpers.py`:
+- [x] **Step 1: Helper test** — thêm vào cuối `tests/helpers.py`:
 
 ```python
 def keys_in(obj) -> set[str]:
@@ -5654,7 +5654,7 @@ async def make_published_quiz(client, db, *, max_attempts: int = 1, n_questions:
 
 (`tests/helpers.py` đã có `import uuid` ở đầu file; `make_teacher`, `make_student`, `make_published_course` nằm ngay trong file này.)
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_quizzes_api.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_quizzes_api.py`**
 
 ```python
 import uuid
@@ -5743,12 +5743,12 @@ async def test_only_owner_updates_or_deletes(client, db):
     assert (await client.get(f"{API}/quizzes/{quiz['id']}", headers=gv)).status_code == 404
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_quizzes_api.py -v`
 Expected: FAIL — `POST /quizzes` trả `404`/`405`, assert `status_code == 201` hỏng.
 
-- [ ] **Step 4: Thêm vào cuối `app/modules/quiz/schemas.py`**
+- [x] **Step 4: Thêm vào cuối `app/modules/quiz/schemas.py`**
 
 Đổi dòng import models thành `from app.modules.quiz.models import Difficulty, QuestionOrigin, QuizStatus, ReviewStatus`, rồi thêm:
 
@@ -5781,7 +5781,7 @@ class QuizOut(BaseModel):
     questions: list[QuestionOut] | None = None  # chỉ giảng viên sở hữu / admin (có đáp án)
 ```
 
-- [ ] **Step 5: `app/modules/quiz/quizzes.py`**
+- [x] **Step 5: `app/modules/quiz/quizzes.py`**
 
 ```python
 """Quiz của bài học: CRUD cho giảng viên; học viên chỉ xem quiz đã xuất bản, không bao giờ kèm đáp án."""
@@ -5983,7 +5983,7 @@ async def get_quiz_for_viewer(db: AsyncSession, user: User, quiz_id: uuid.UUID) 
     return (await _to_outs(db, [quiz], user, manager, with_questions=True))[0]
 ```
 
-- [ ] **Step 6: Route quiz trong `app/modules/quiz/router.py`**
+- [x] **Step 6: Route quiz trong `app/modules/quiz/router.py`**
 
 Thay khối import bằng:
 
@@ -6054,17 +6054,17 @@ async def publish_quiz(quiz_id: uuid.UUID, user: User = Depends(require_staff), 
     return await quizzes.publish_quiz(db, user, quiz)
 ```
 
-- [ ] **Step 7: Chạy lại test**
+- [x] **Step 7: Chạy lại test**
 
 Run: `uv run pytest tests/test_quizzes_api.py tests/test_questions_api.py -v`
 Expected: PASS 8 test.
 
-- [ ] **Step 8: Chạy toàn bộ**
+- [x] **Step 8: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 9: Commit** (từ thư mục gốc repo)
+- [x] **Step 9: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/quizzes.py backend/app/modules/quiz/router.py backend/tests/helpers.py backend/tests/test_quizzes_api.py && git commit -m "feat(quiz): quiz CRUD and publish, student view without answers"
