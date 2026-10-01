@@ -4548,7 +4548,7 @@ git add backend/app/modules/quiz/validation.py backend/app/modules/quiz/selectio
   - `async load_lesson_chunks(db, lesson_id) -> list[ChunkInfo]`
   - `async generate_questions_for_lesson(lesson_id, *, count, mix, llm, embedder, job_id=None, session_factory=SessionLocal) -> GenerationStats` (ném `ValueError(NO_CHUNKS_ERROR | NO_QUESTIONS_ERROR)`; câu hỏi ghi cùng transaction với `finish_job(done)`).
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_quiz_generation.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_quiz_generation.py`**
 
 ```python
 import json
@@ -4695,12 +4695,12 @@ async def test_questions_are_saved_with_job_done_or_dropped_if_job_was_swept(db)
     assert stats.saved == 0 and len(await _questions(db, lesson)) == 2
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_quiz_generation.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.modules.quiz.generation'`
 
-- [ ] **Step 3: `app/modules/quiz/generation.py`**
+- [x] **Step 3: `app/modules/quiz/generation.py`**
 
 ```python
 """Sinh câu hỏi trắc nghiệm cho một bài học — thân của job quiz_gen (spec 5.4)."""
@@ -4908,17 +4908,17 @@ async def generate_questions_for_lesson(
     return stats
 ```
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
 
 Run: `uv run pytest tests/test_quiz_generation.py -v`
 Expected: PASS 8 test.
 
-- [ ] **Step 5: Chạy toàn bộ**
+- [x] **Step 5: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 6: Commit** (từ thư mục gốc repo)
+- [x] **Step 6: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/quiz/generation.py backend/tests/test_quiz_generation.py && git commit -m "feat(quiz): question generation with validation retry, dedup and self-check"
