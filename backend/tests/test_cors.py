@@ -29,6 +29,8 @@ async def test_simple_request_exposes_request_id():
         r = await c.get("/api/v1/health", headers={"Origin": "http://localhost:3000"})
     assert r.headers["access-control-allow-origin"] == "http://localhost:3000"
     assert "x-request-id" in r.headers["access-control-expose-headers"].lower()
+    # 429 RATE_LIMITED: frontend cần đọc Retry-After
+    assert "retry-after" in r.headers["access-control-expose-headers"].lower()
 
 
 async def test_unknown_origin_gets_no_cors_headers():

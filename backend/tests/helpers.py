@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from app.core.db import SessionLocal
@@ -91,3 +92,12 @@ async def upload_file(client, storage, headers, data: bytes, kind="pdf", mime="a
     done = await client.post(f"{API}/uploads/{r.json()['asset_id']}/complete", headers=headers)
     assert done.status_code == 200, done.text
     return r.json()["asset_id"]
+
+
+def parse_sse(body: str) -> list[tuple[str, dict]]:
+    """Tách thân response SSE thành [(event, data)]."""
+    events = []
+    for block in body.strip().split("\n\n"):
+        fields = dict(line.split(": ", 1) for line in block.splitlines())
+        events.append((fields["event"], json.loads(fields["data"])))
+    return events

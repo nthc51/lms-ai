@@ -59,6 +59,22 @@ def get_rate_limiter() -> RateLimiter:
     return RedisRateLimiter.from_url(get_settings().redis_url)
 
 
+async def close_rate_limiter() -> None:
+    """Đóng client Redis của get_rate_limiter lúc tắt app (lifespan). Chưa tạo thì thôi (không tạo mới chỉ
+    để đóng); lỗi lúc đóng chỉ ghi log. Xóa cache để app khởi động lại trong cùng process tạo client mới."""
+    if get_rate_limiter.cache_info().currsize == 0:
+        return
+    limiter = get_rate_limiter()
+    get_rate_limiter.cache_clear()
+    aclose = getattr(limiter, "aclose", None)
+    if aclose is None:
+        return
+    try:
+        await aclose()
+    except Exception:
+        logger.warning("Không đóng được client Redis của rate limiter", exc_info=True)
+
+
 def rate_limited(retry_after: int) -> AppError:
     return AppError(
         "RATE_LIMITED",

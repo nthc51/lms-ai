@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.middleware import RequestIdMiddleware, StrictCORSMiddleware
+from app.core.ratelimit import close_rate_limiter
 from app.core.storage import get_storage
 from app.modules.auth.router import router as auth_router
 from app.modules.courses.router import router as courses_router
@@ -20,7 +21,10 @@ async def lifespan(app: FastAPI):
     ensure_bucket = getattr(storage, "ensure_bucket", None)
     if ensure_bucket is not None:
         await ensure_bucket()
-    yield
+    try:
+        yield
+    finally:
+        await close_rate_limiter()  # tự bắt lỗi, không làm hỏng việc tắt app
 
 
 def create_app() -> FastAPI:
@@ -33,7 +37,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
-        expose_headers=["x-request-id"],
+        expose_headers=["x-request-id", "retry-after"],
     )
     register_error_handlers(app)
 

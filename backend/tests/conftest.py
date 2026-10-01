@@ -16,10 +16,14 @@ os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef-0123456789"
 import httpx
 import pytest
 
+from app.ai.llm import FakeLLMProvider
+from app.ai.llm_client import LLMClient, get_llm_client
+from app.core.config import get_settings
+from app.core.ratelimit import get_rate_limiter
 from app.core.storage import get_storage
 from app.main import create_app
 from app.modules.jobs.queue import get_queue
-from tests.fakes import InMemoryStorage, RecordingQueue
+from tests.fakes import InMemoryRateLimiter, InMemoryStorage, RecordingQueue
 
 
 @pytest.fixture
@@ -32,11 +36,27 @@ def queue():
     return RecordingQueue()
 
 
+async def _no_sleep(_delay: float) -> None:
+    return None
+
+
 @pytest.fixture
-async def client(storage, queue):
+def llm():
+    return FakeLLMProvider()
+
+
+@pytest.fixture
+def limiter():
+    return InMemoryRateLimiter()
+
+
+@pytest.fixture
+async def client(storage, queue, llm, limiter):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_queue] = lambda: queue
+    app.dependency_overrides[get_llm_client] = lambda: LLMClient(llm, get_settings(), sleep=_no_sleep)
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         yield c
 

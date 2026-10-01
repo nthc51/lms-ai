@@ -4,12 +4,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.retrieval import SearchScope, count_ready_chunks
+from app.core.config import get_settings
 from app.core.errors import AppError, not_found
 from app.core.pagination import PageParams, paginate
+from app.core.ratelimit import RateLimiter, rate_limited
 from app.modules.auth.models import Role, User
 from app.modules.courses.models import Course, CourseStatus, Lesson
 from app.modules.enrollment.service import ensure_lesson_access, is_enrolled
-from app.modules.tutor.models import ChatMessage, ChatSession
+from app.modules.tutor.answer import AskContext
+from app.modules.tutor.models import ChatMessage, ChatRole, ChatSession
 from app.modules.tutor.schemas import (
     AvailabilityOut,
     MessageOut,
@@ -20,6 +23,8 @@ from app.modules.tutor.schemas import (
 )
 
 NOT_READY_MESSAGE = "Tài liệu đang được xử lý"
+HISTORY_LIMIT = 4  # số tin nhắn gần nhất dùng để viết lại câu hỏi (spec 5.3 bước 1)
+RATE_WINDOW_S = 3600
 
 
 async def ensure_course_access(db: AsyncSession, course_id: uuid.UUID, user: User) -> Course:
@@ -99,3 +104,69 @@ async def availability(
     course, lesson = await resolve_scope(db, user, course_id, lesson_id)
     n = await count_ready_chunks(db, SearchScope(course.id, lesson.id if lesson else None), embedding_model)
     return AvailabilityOut(available=n > 0, ready_chunks=n, message=None if n else NOT_READY_MESSAGE)
+
+
+async def load_history(
+    db: AsyncSession, session_id: uuid.UUID, limit: int = HISTORY_LIMIT
+) -> list[tuple[ChatRole, str]]:
+    """Tối đa `limit` tin nhắn gần nhất (bỏ tin rỗng do lỗi), xếp cũ → mới theo đúng thứ tự của list_messages
+    (created_at, role, id): lấy theo thứ tự đảo ngược rồi đảo lại."""
+    rows = (
+        await db.execute(
+            select(ChatMessage.role, ChatMessage.content)
+            .where(ChatMessage.session_id == session_id, ChatMessage.content != "")
+            .order_by(ChatMessage.created_at.desc(), ChatMessage.role.desc(), ChatMessage.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [(role, content) for role, content in reversed(rows)]
+
+
+async def prepare_question(
+    db: AsyncSession, limiter: RateLimiter, user: User, session_id: uuid.UUID, question: str
+) -> AskContext:
+    """Chạy trước khi mở stream (lỗi ở đây trả JSON lỗi bình thường), theo thứ tự:
+    1. kiểm quyền lại ở MỖI câu hỏi: phiên của chính mình (người khác → 404) và resolve_scope (bị hủy đăng ký /
+       khóa bị gỡ publish sau khi tạo phiên → đúng lỗi mà tạo phiên sẽ trả);
+    2. rate limit cho học viên (key `tutor:<user_id>`, RedisRateLimiter thêm tiền tố `rl:`), trước khi lưu, nên
+       câu bị chặn không được lưu; bị từ chối ở bước 1 thì không tốn lượt;
+    3. lấy lịch sử (trước khi lưu câu hỏi, nên không chứa chính câu này);
+    4. lưu câu hỏi và COMMIT trong transaction riêng: câu hỏi luôn còn dù LLM lỗi sau đó (spec 5.7)."""
+    session = await get_own_session(db, session_id, user)
+    course, _ = await resolve_scope(db, user, session.course_id, session.lesson_id)
+    if user.role == Role.student:
+        retry_after = await limiter.hit(
+            f"tutor:{user.id}", get_settings().tutor_rate_limit_per_hour, RATE_WINDOW_S
+        )
+        if retry_after is not None:
+            raise rate_limited(retry_after)
+    history = await load_history(db, session.id)
+    db.add(ChatMessage(session_id=session.id, role=ChatRole.user, content=question))
+    # commit xong thì session trả connection về pool (expire_on_commit=False nên đọc thuộc tính bên dưới không
+    # mở lại connection): stream (có thể vài chục giây) không giữ connection này
+    await db.commit()
+    return AskContext(
+        session_id=session.id,
+        scope=scope_of(session),
+        course_title=course.title,
+        question=question,
+        history=history,
+    )
+
+
+async def set_feedback(db: AsyncSession, user: User, message_id: uuid.UUID, value: int | None) -> ChatMessage:
+    """Đánh giá (D1: 1 / -1 / None) câu trả lời trong phiên của chính mình; tin người khác / tin user → 404."""
+    message = await db.scalar(
+        select(ChatMessage)
+        .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+        .where(
+            ChatMessage.id == message_id,
+            ChatSession.user_id == user.id,
+            ChatMessage.role == ChatRole.assistant,
+        )
+    )
+    if message is None:
+        raise not_found("Tin nhắn")
+    message.feedback = value
+    await db.commit()
+    return message
