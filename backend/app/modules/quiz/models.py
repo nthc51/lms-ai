@@ -70,7 +70,7 @@ class Question(IdMixin, TimestampMixin, Base):
         ForeignKey("chunks.id", ondelete="SET NULL"), index=True
     )
     review_status: Mapped[ReviewStatus] = mapped_column(
-        SAEnum(ReviewStatus, name="review_status"), default=ReviewStatus.pending
+        SAEnum(ReviewStatus, name="question_review_status"), default=ReviewStatus.pending
     )
     self_check_flag: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     ai_original: Mapped[dict | None] = mapped_column(JSONB)  # bản AI sinh ra, không bao giờ bị sửa

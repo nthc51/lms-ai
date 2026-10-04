@@ -1,7 +1,7 @@
 import uuid
 
 import pytest
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.auth.models import Role
@@ -79,3 +79,17 @@ async def test_job_payload_roundtrip(db):
     job.payload = {"count": 5}
     await db.commit()
     assert (await db.get(Job, job.id, populate_existing=True)).payload == {"count": 5}
+
+
+async def test_review_status_enum_type_has_a_question_specific_name(db):
+    names = set(
+        (await db.scalars(text("SELECT typname FROM pg_type WHERE typname LIKE '%review_status'"))).all()
+    )
+    assert "question_review_status" in names and "review_status" not in names
+    column_type = await db.scalar(
+        text(
+            "SELECT udt_name FROM information_schema.columns "
+            "WHERE table_name = 'questions' AND column_name = 'review_status'"
+        )
+    )
+    assert column_type == "question_review_status"
