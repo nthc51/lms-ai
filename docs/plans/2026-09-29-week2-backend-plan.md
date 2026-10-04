@@ -6418,7 +6418,7 @@ git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/attempts.py
   - `attempts.py`: `async finalize_attempt(db, attempt_id, *, status=AttemptStatus.completed, final_answers=()) -> bool` (dùng lại cho cron B1), `async submit_attempt(db, user, attempt_id, data) -> AttemptResult`, `async get_result(db, user, attempt_id) -> AttemptResult`
   - Route: `POST /attempts/{id}/submit`, `GET /attempts/{id}/result`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_submit_api.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_submit_api.py`**
 
 ```python
 import asyncio
@@ -6523,12 +6523,12 @@ async def test_finalize_is_atomic_against_another_finalizer(db):
     assert attempt.status == AttemptStatus.timed_out and attempt.score == 0.0
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_submit_api.py -v`
 Expected: FAIL với `ImportError: cannot import name 'finalize_attempt' from 'app.modules.quiz.attempts'`
 
-- [ ] **Step 3: Thêm vào cuối `app/modules/quiz/schemas.py`**
+- [x] **Step 3: Thêm vào cuối `app/modules/quiz/schemas.py`**
 
 ```python
 class FinalAnswer(BaseModel):
@@ -6563,7 +6563,7 @@ class AttemptResult(BaseModel):
     questions: list[ResultQuestion]
 ```
 
-- [ ] **Step 4: Chốt bài, chấm, kết quả trong `app/modules/quiz/attempts.py`**
+- [x] **Step 4: Chốt bài, chấm, kết quả trong `app/modules/quiz/attempts.py`**
 
 Thay khối import bằng:
 
@@ -6737,7 +6737,7 @@ async def get_result(db: AsyncSession, user: User, attempt_id: uuid.UUID) -> Att
     return await _result(db, user.id, attempt_id)
 ```
 
-- [ ] **Step 5: Route trong `app/modules/quiz/router.py`**
+- [x] **Step 5: Route trong `app/modules/quiz/router.py`**
 
 Thêm `AttemptResult`, `SubmitIn` vào danh sách import từ `app.modules.quiz.schemas` (giữ thứ tự chữ cái), rồi thêm vào cuối file:
 
@@ -6759,17 +6759,17 @@ async def attempt_result(
     return await attempts.get_result(db, user, attempt_id)
 ```
 
-- [ ] **Step 6: Chạy lại test**
+- [x] **Step 6: Chạy lại test**
 
 Run: `uv run pytest tests/test_submit_api.py tests/test_attempts_api.py -v`
 Expected: PASS 10 test. Nếu `test_concurrent_submits_finalize_exactly_once` báo cả hai 200, kiểm tra `finalize_attempt` có điều kiện `status == in_progress` trong chính câu `UPDATE` (không phải kiểm tra bằng một câu `SELECT` trước đó).
 
-- [ ] **Step 7: Chạy toàn bộ**
+- [x] **Step 7: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 8: Commit** (từ thư mục gốc repo)
+- [x] **Step 8: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/attempts.py backend/app/modules/quiz/router.py backend/tests/test_submit_api.py && git commit -m "feat(quiz): atomic submit with final answers, auto-grading, results and attempt limit"
