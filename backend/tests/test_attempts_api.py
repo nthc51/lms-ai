@@ -4,6 +4,8 @@ import uuid
 from sqlalchemy import select, update
 
 from app.core.db import SessionLocal
+from app.modules.auth.models import User
+from app.modules.quiz import attempts
 from app.modules.quiz.models import AttemptStatus, QuizAttempt
 from tests.helpers import API, keys_in, make_published_quiz, make_student
 
@@ -130,7 +132,8 @@ async def test_autosave_waits_for_a_concurrent_finalize_and_then_sees_it_closed(
         await finalizer.commit()
     r = await asyncio.wait_for(save, TIMEOUT)
     assert (r.status_code, r.json()["error"]["code"]) == (409, "ATTEMPT_CLOSED")
-    assert (await _start(client, sv, quiz)).status_code == 409  # max_attempts=1 đã dùng hết
+    r = await _start(client, sv, quiz)  # max_attempts=1 đã dùng hết
+    assert (r.status_code, r.json()["error"]["code"]) == (409, "QUIZ_ATTEMPT_LIMIT")
 
 
 async def test_concurrent_autosaves_last_write_wins_without_errors(client, db):
@@ -145,5 +148,53 @@ async def test_concurrent_autosaves_last_write_wins_without_errors(client, db):
     ]
     results = await asyncio.wait_for(asyncio.gather(*puts), TIMEOUT)
     assert {r.status_code for r in results} == {200}
+    assert all(r.json()["answered_at"] for r in results)
     answers = (await _start(client, sv, quiz)).json()["answers"]
     assert set(answers) == {str(q.id) for q in qs} and set(answers.values()) <= {"B", "C"}
+
+
+async def _start_with_other_tab_in_between(monkeypatch, quiz_id: uuid.UUID, student_id: uuid.UUID):
+    """Ép thứ tự xấu một cách tất định: tab B đọc snapshot xong, tab A tạo và commit bài làm, rồi B mới ghi."""
+    original = attempts._user_attempts
+    fired = False
+
+    async def hooked(db, qid, uid):
+        nonlocal fired
+        rows = await original(db, qid, uid)
+        if not fired:
+            fired = True
+            async with SessionLocal() as tab_a:
+                results.append(
+                    await attempts.start_attempt(tab_a, await tab_a.get(User, student_id), quiz_id)
+                )
+        return rows
+
+    results: list = []
+    monkeypatch.setattr(attempts, "_user_attempts", hooked)
+    async with SessionLocal() as tab_b:
+        user = await tab_b.get(User, student_id)
+        results.append(await asyncio.wait_for(attempts.start_attempt(tab_b, user, quiz_id), TIMEOUT))
+    return results  # [kết quả tab A, kết quả tab B]
+
+
+async def _student_id(db) -> uuid.UUID:
+    return await db.scalar(select(User.id).where(User.email == "sv@x.com"))
+
+
+async def test_other_tab_committing_between_read_and_insert_returns_its_attempt(client, db, monkeypatch):
+    _, _, _, quiz, _ = await make_published_quiz(client, db, max_attempts=3)
+    (a_view, a_created), (b_view, b_created) = await _start_with_other_tab_in_between(
+        monkeypatch, uuid.UUID(quiz["id"]), await _student_id(db)
+    )
+    assert (a_created, b_created) == (True, False) and a_view.id == b_view.id
+    rows = (await db.scalars(select(QuizAttempt).where(QuizAttempt.quiz_id == uuid.UUID(quiz["id"])))).all()
+    assert [(a.attempt_no, a.status) for a in rows] == [(1, AttemptStatus.in_progress)]
+
+
+async def test_other_tab_in_between_with_single_attempt_quiz_is_not_a_limit_error(client, db, monkeypatch):
+    _, _, _, quiz, _ = await make_published_quiz(client, db, max_attempts=1)
+    (a_view, a_created), (b_view, b_created) = await _start_with_other_tab_in_between(
+        monkeypatch, uuid.UUID(quiz["id"]), await _student_id(db)
+    )
+    assert (a_created, b_created) == (True, False) and a_view.id == b_view.id
+    assert len((await db.scalars(select(QuizAttempt.id))).all()) == 1

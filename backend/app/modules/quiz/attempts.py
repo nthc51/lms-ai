@@ -17,7 +17,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, not_found
-from app.core.time import utcnow
 from app.modules.auth.models import User
 from app.modules.enrollment.service import ensure_lesson_access
 from app.modules.quiz.models import (
@@ -97,52 +96,59 @@ async def attempt_view(db: AsyncSession, attempt: QuizAttempt) -> AttemptOut:
     )
 
 
+async def _user_attempts(db: AsyncSession, quiz_id: uuid.UUID, user_id: uuid.UUID) -> list[QuizAttempt]:
+    """MỌI bài làm của học viên cho quiz (≤ max_attempts dòng) trong MỘT câu lệnh = một snapshot."""
+    rows = await db.scalars(
+        select(QuizAttempt)
+        .where(QuizAttempt.quiz_id == quiz_id, QuizAttempt.user_id == user_id)
+        .order_by(QuizAttempt.attempt_no)
+        .execution_options(populate_existing=True)
+    )
+    return list(rows.all())
+
+
+def _decide(rows: Sequence[QuizAttempt], max_attempts: int) -> QuizAttempt | int:
+    """Từ một snapshot: bài đang làm dở (trả lại nó) hoặc attempt_no cần tạo; hết lượt thì 409."""
+    current = next((a for a in rows if a.status == AttemptStatus.in_progress), None)
+    if current is not None:
+        return current
+    if len(rows) >= max_attempts:
+        raise AppError("QUIZ_ATTEMPT_LIMIT", "Bạn đã dùng hết số lần làm bài", 409)
+    return max((a.attempt_no for a in rows), default=0) + 1
+
+
 async def start_attempt(db: AsyncSession, user: User, quiz_id: uuid.UUID) -> tuple[AttemptOut, bool]:
     """Trả (bài làm, mới_tạo). Đang có bài in_progress thì trả lại bài đó, nên mở 2 tab không tạo 2 bài.
 
-    Hai tab bấm cùng lúc: cả hai tính attempt_no = n + 1; UNIQUE (quiz_id, user_id, attempt_no) + ON CONFLICT
-    DO NOTHING cho đúng một bên tạo được, bên kia rollback rồi đọc lại bài vừa tạo. Giới hạn số lần đếm MỌI
-    bài làm (completed, timed_out và cả in_progress); attempt_no liên tục nên cũng không vượt được giới hạn."""
+    Mọi quyết định (trả bài dở / hết lượt / số thứ tự mới) lấy từ MỘT câu SELECT (một snapshot READ COMMITTED),
+    nên không có kẽ hở giữa "kiểm tra bài dở" và "đếm số lượt". Hai tab cùng tạo: cả hai tính attempt_no = n + 1;
+    UNIQUE (quiz_id, user_id, attempt_no) + ON CONFLICT DO NOTHING cho đúng một bên tạo được, bên kia rollback rồi
+    đọc lại và quyết định lại bằng cùng hàm. Giới hạn đếm MỌI bài làm (completed, timed_out và cả in_progress)."""
     quiz, _ = await get_quiz_context(db, quiz_id)
     if quiz.status != QuizStatus.published:
         raise not_found("Quiz")
     await ensure_lesson_access(db, quiz.lesson_id, user)
     # đọc trước: rollback bên dưới làm hết hạn mọi object trong session (kể cả user)
     user_id, qid, max_attempts = user.id, quiz.id, quiz.max_attempts
-    for _ in range(2):
-        current = await db.scalar(
-            select(QuizAttempt).where(
-                QuizAttempt.quiz_id == qid,
-                QuizAttempt.user_id == user_id,
-                QuizAttempt.status == AttemptStatus.in_progress,
-            )
+    order = [
+        str(x)
+        for x in await db.scalars(
+            select(QuizQuestion.question_id)
+            .where(QuizQuestion.quiz_id == qid)
+            .order_by(QuizQuestion.position)
         )
-        if current is not None:
-            return await attempt_view(db, current), False
-        used, last_no = (
-            await db.execute(
-                select(func.count(QuizAttempt.id), func.coalesce(func.max(QuizAttempt.attempt_no), 0)).where(
-                    QuizAttempt.quiz_id == qid, QuizAttempt.user_id == user_id
-                )
-            )
-        ).one()
-        if used >= max_attempts:
-            raise AppError("QUIZ_ATTEMPT_LIMIT", "Bạn đã dùng hết số lần làm bài", 409)
-        order = [
-            str(x)
-            for x in await db.scalars(
-                select(QuizQuestion.question_id)
-                .where(QuizQuestion.quiz_id == qid)
-                .order_by(QuizQuestion.position)
-            )
-        ]
+    ]
+    for _ in range(3):
+        decision = _decide(await _user_attempts(db, qid, user_id), max_attempts)
+        if isinstance(decision, QuizAttempt):
+            return await attempt_view(db, decision), False
         new_id = await db.scalar(
             pg_insert(QuizAttempt)
             .values(
                 id=uuid.uuid4(),
                 quiz_id=qid,
                 user_id=user_id,
-                attempt_no=last_no + 1,
+                attempt_no=decision,
                 question_order=order,
                 status=AttemptStatus.in_progress,
             )
@@ -152,7 +158,7 @@ async def start_attempt(db: AsyncSession, user: User, quiz_id: uuid.UUID) -> tup
         if new_id is not None:
             await db.commit()
             return await attempt_view(db, await db.get(QuizAttempt, new_id)), True
-        await db.rollback()  # tab khác vừa tạo bài cùng số thứ tự: đọc lại ở vòng sau
+        await db.rollback()  # tab khác vừa tạo bài cùng số thứ tự: đọc lại (một snapshot mới) ở vòng sau
     raise AppError("INVALID_STATE", "Không bắt đầu được bài làm, vui lòng thử lại", 409)
 
 
@@ -161,27 +167,29 @@ async def save_answer(
 ) -> AnswerOut:
     """Autosave một đáp án (spec 6.5), ghi đè (lần ghi sau thắng). FOR SHARE trên dòng attempt: lệnh chốt bài
     (UPDATE) phải đợi autosave này commit xong, còn autosave đến sau khi đã chốt thì thấy status mới và nhận
-    409 ATTEMPT_CLOSED. Xem hợp đồng khóa ở đầu module."""
+    409 ATTEMPT_CLOSED. answered_at lấy theo đồng hồ DB (clock_timestamp, sau khi đã có khóa). Xem hợp đồng
+    khóa ở đầu module."""
     attempt = await _own_attempt(db, attempt_id, user, lock_share=True)
     if attempt.status != AttemptStatus.in_progress:
         raise attempt_closed()
     questions = await _questions(db, attempt.question_order)
     _check_choice(questions, attempt.question_order, str(question_id), data.selected_option_id)
-    now = utcnow()
     stmt = pg_insert(AttemptAnswer).values(
         attempt_id=attempt.id,
         question_id=question_id,
         selected_option_id=data.selected_option_id,
-        answered_at=now,
+        answered_at=func.clock_timestamp(),
     )
-    await db.execute(
+    answered_at = await db.scalar(
         stmt.on_conflict_do_update(
             index_elements=[AttemptAnswer.attempt_id, AttemptAnswer.question_id],
             set_={
                 "selected_option_id": stmt.excluded.selected_option_id,
                 "answered_at": stmt.excluded.answered_at,
             },
-        )
+        ).returning(AttemptAnswer.answered_at)
     )
     await db.commit()
-    return AnswerOut(question_id=question_id, selected_option_id=data.selected_option_id, answered_at=now)
+    return AnswerOut(
+        question_id=question_id, selected_option_id=data.selected_option_id, answered_at=answered_at
+    )
