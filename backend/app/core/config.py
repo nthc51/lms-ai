@@ -1,9 +1,12 @@
 import json
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+# Provider AI hợp lệ. Gõ sai (vd "gemni") thì app/worker không khởi động thay vì âm thầm chạy bản giả.
+AIProvider = Literal["fake", "gemini"]
 
 
 class Settings(BaseSettings):
@@ -27,10 +30,10 @@ class Settings(BaseSettings):
     minio_bucket: str = "lms"
     minio_secure: bool = False
 
-    embed_provider: str = "fake"  # fake | gemini
+    embed_provider: AIProvider = "fake"
     embed_model: str = "gemini-embedding-001"
     embed_dim: int = 768
-    vision_provider: str = "fake"  # fake | gemini
+    vision_provider: AIProvider = "fake"
     vision_model: str = "gemini-2.5-flash"
     gemini_api_key: str = ""
     embed_timeout_s: float = 30.0
@@ -39,7 +42,7 @@ class Settings(BaseSettings):
     vision_concurrency: int = 4  # số lời gọi vision chạy song song tối đa trong một tài liệu
     # Job 'pending' quá số phút này (Redis mất job) → sweeper enqueue lại một lần; quá thêm lần nữa → failed
     pending_job_requeue_after_min: int = 10
-    llm_provider: str = "fake"  # fake | gemini
+    llm_provider: AIProvider = "fake"
     llm_model: str = "gemini-2.5-flash"
     llm_cheap_model: str = "gemini-2.5-flash-lite"  # lời gọi rẻ: viết lại câu hỏi (spec 5.3 bước 1)
     llm_timeout_s: float = 60.0  # lời gọi thường (sinh quiz, tự kiểm tra)
@@ -65,6 +68,22 @@ class Settings(BaseSettings):
                 return json.loads(v)
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
+
+    @model_validator(mode="after")
+    def _require_gemini_key(self) -> "Settings":
+        """Provider nào là gemini thì phải có GEMINI_API_KEY ngay lúc khởi động (không đợi tới lời gọi đầu tiên)."""
+        using = [
+            name
+            for name, value in (
+                ("LLM_PROVIDER", self.llm_provider),
+                ("EMBED_PROVIDER", self.embed_provider),
+                ("VISION_PROVIDER", self.vision_provider),
+            )
+            if value == "gemini"
+        ]
+        if using and not self.gemini_api_key.strip():
+            raise ValueError(f"GEMINI_API_KEY trống trong khi {', '.join(using)}=gemini")
+        return self
 
 
 @lru_cache

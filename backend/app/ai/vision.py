@@ -58,4 +58,6 @@ class GeminiVision:
 def get_vision(s: Settings) -> VisionExtractor:
     if s.vision_provider == "gemini":
         return GeminiVision(s.gemini_api_key, s.vision_model, timeout_s=s.vision_timeout_s)
-    return FakeVision()
+    if s.vision_provider == "fake":
+        return FakeVision()
+    raise ValueError(f"VISION_PROVIDER không hợp lệ: {s.vision_provider!r} (chỉ nhận fake | gemini)")

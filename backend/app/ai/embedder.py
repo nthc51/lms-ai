@@ -107,7 +107,9 @@ class GeminiEmbedder:
 def get_embedder(s: Settings) -> Embedder:
     if s.embed_provider == "gemini":
         return GeminiEmbedder(s.gemini_api_key, s.embed_model, s.embed_dim, timeout_s=s.embed_timeout_s)
-    return FakeEmbedder(s.embed_dim)
+    if s.embed_provider == "fake":
+        return FakeEmbedder(s.embed_dim)
+    raise ValueError(f"EMBED_PROVIDER không hợp lệ: {s.embed_provider!r} (chỉ nhận fake | gemini)")
 
 
 @lru_cache

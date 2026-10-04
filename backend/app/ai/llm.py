@@ -363,4 +363,6 @@ class GeminiLLM:
 def get_llm_provider(s: Settings) -> LLMProvider:
     if s.llm_provider == "gemini":
         return GeminiLLM(s.gemini_api_key)
-    return FakeLLMProvider()
+    if s.llm_provider == "fake":
+        return FakeLLMProvider()
+    raise ValueError(f"LLM_PROVIDER không hợp lệ: {s.llm_provider!r} (chỉ nhận fake | gemini)")
