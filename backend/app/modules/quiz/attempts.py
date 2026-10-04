@@ -12,7 +12,7 @@ khóa dòng attempt trước rồi mới đụng attempt_answers nên không dea
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,12 +23,22 @@ from app.modules.quiz.models import (
     AttemptAnswer,
     AttemptStatus,
     Question,
+    Quiz,
     QuizAttempt,
     QuizQuestion,
     QuizStatus,
 )
 from app.modules.quiz.quizzes import get_quiz_context
-from app.modules.quiz.schemas import AnswerIn, AnswerOut, AttemptOut, AttemptQuestion
+from app.modules.quiz.schemas import (
+    AnswerIn,
+    AnswerOut,
+    AttemptOut,
+    AttemptQuestion,
+    AttemptResult,
+    FinalAnswer,
+    ResultQuestion,
+    SubmitIn,
+)
 
 FINISHED = (AttemptStatus.completed, AttemptStatus.timed_out)
 
@@ -193,3 +203,141 @@ async def save_answer(
     return AnswerOut(
         question_id=question_id, selected_option_id=data.selected_option_id, answered_at=answered_at
     )
+
+
+async def finalize_attempt(
+    db: AsyncSession,
+    attempt_id: uuid.UUID,
+    *,
+    status: AttemptStatus = AttemptStatus.completed,
+    final_answers: Sequence[FinalAnswer] = (),
+) -> bool:
+    """Chốt bài nguyên tử (spec 4.3: UPDATE ... WHERE status='in_progress' RETURNING) rồi chấm, trong transaction
+    của caller (chưa commit). Trả False nếu bài đã được chốt ở nơi khác (submit khác, cron B1): bỏ qua.
+    Dùng lại cho cron B1 (status=timed_out).
+
+    final_answers (caller đã validate) được upsert ngay sau UPDATE, trong cùng transaction nên kết quả vẫn là
+    "payload thắng autosave rồi mới chốt" (spec 6.5). UPDATE là lệnh khóa ĐẦU TIÊN trên dòng attempt (hợp đồng
+    khóa ở đầu module): autosave đang giữ FOR SHARE làm lệnh này đợi; không deadlock với autosave."""
+    order = await db.scalar(
+        update(QuizAttempt)
+        .where(QuizAttempt.id == attempt_id, QuizAttempt.status == AttemptStatus.in_progress)
+        .values(status=status, submitted_at=func.clock_timestamp())
+        .returning(QuizAttempt.question_order)
+    )
+    if order is None:
+        return False
+    if final_answers:
+        stmt = pg_insert(AttemptAnswer).values(
+            [
+                {
+                    "attempt_id": attempt_id,
+                    "question_id": a.question_id,
+                    "selected_option_id": a.selected_option_id,
+                    "answered_at": func.clock_timestamp(),
+                }
+                for a in final_answers
+            ]
+        )
+        await db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=[AttemptAnswer.attempt_id, AttemptAnswer.question_id],
+                set_={
+                    "selected_option_id": stmt.excluded.selected_option_id,
+                    "answered_at": stmt.excluded.answered_at,
+                },
+            )
+        )
+    # chấm từ chính các dòng trong DB sau upsert; câu bỏ trống không có dòng nên tính sai
+    graded = await db.execute(
+        update(AttemptAnswer)
+        .where(AttemptAnswer.attempt_id == attempt_id, AttemptAnswer.question_id == Question.id)
+        .values(is_correct=AttemptAnswer.selected_option_id == Question.correct_option_id)
+        .returning(AttemptAnswer.question_id, AttemptAnswer.is_correct)
+        .execution_options(synchronize_session=False)
+    )
+    in_order = set(order)
+    correct = sum(1 for qid, ok in graded.all() if ok and str(qid) in in_order)
+    score = round(correct * 100 / len(order), 2) if order else 0.0
+    await db.execute(update(QuizAttempt).where(QuizAttempt.id == attempt_id).values(score=score))
+    return True
+
+
+async def submit_attempt(
+    db: AsyncSession, user: User, attempt_id: uuid.UUID, data: SubmitIn
+) -> AttemptResult:
+    """Nộp bài (spec 6.5). final_answers không hợp lệ → 422 và bài vẫn mở (chưa ghi gì). Bài đã chốt (kể cả bị
+    lần nộp khác chốt đồng thời) → 409 ATTEMPT_CLOSED. SELECT ở đây không khóa; khóa đầu tiên là UPDATE chốt bài."""
+    attempt = await _own_attempt(db, attempt_id, user)
+    if attempt.status != AttemptStatus.in_progress:
+        raise attempt_closed()
+    final = data.final_answers or []
+    if final:
+        if len({a.question_id for a in final}) != len(final):
+            raise _invalid("Mỗi câu hỏi chỉ được gửi một đáp án")
+        questions = await _questions(db, attempt.question_order)
+        for a in final:
+            _check_choice(questions, attempt.question_order, str(a.question_id), a.selected_option_id)
+    aid, uid = attempt.id, user.id  # đọc trước: rollback làm hết hạn object trong session
+    if not await finalize_attempt(db, aid, final_answers=final):
+        await db.rollback()  # lần nộp khác (tab khác) hoặc cron vừa chốt bài trước
+        raise attempt_closed()
+    await db.commit()
+    return await _result(db, uid, aid)
+
+
+async def _result(db: AsyncSession, user_id: uuid.UUID, attempt_id: uuid.UUID) -> AttemptResult:
+    attempt = await db.scalar(
+        select(QuizAttempt)
+        .where(QuizAttempt.id == attempt_id, QuizAttempt.user_id == user_id)
+        .execution_options(populate_existing=True)
+    )
+    if attempt is None:
+        raise not_found("Bài làm")
+    if attempt.status not in FINISHED:
+        raise AppError("INVALID_STATE", "Bài làm chưa được nộp", 409)
+    quiz = await db.get(Quiz, attempt.quiz_id)
+    questions = await _questions(db, attempt.question_order)
+    answers = {
+        str(qid): (option, ok)
+        for qid, option, ok in await db.execute(
+            select(
+                AttemptAnswer.question_id, AttemptAnswer.selected_option_id, AttemptAnswer.is_correct
+            ).where(AttemptAnswer.attempt_id == attempt.id)
+        )
+    }
+    items = []
+    for qid in attempt.question_order:
+        q = questions.get(qid)
+        if q is None:
+            continue  # câu hỏi đã bị xóa sau khi bắt đầu: không hiển thị được (vẫn tính vào total)
+        option, ok = answers.get(qid, (None, False))
+        items.append(
+            ResultQuestion(
+                id=q.id,
+                stem=q.stem,
+                options=q.options,
+                selected_option_id=option,
+                correct_option_id=q.correct_option_id,
+                is_correct=bool(ok),
+                explanation=q.explanation,
+            )
+        )
+    score = attempt.score or 0.0
+    return AttemptResult(
+        attempt_id=attempt.id,
+        quiz_id=attempt.quiz_id,
+        attempt_no=attempt.attempt_no,
+        status=attempt.status,
+        score=score,
+        passed=score >= quiz.pass_score,
+        correct_count=sum(i.is_correct for i in items),
+        total=len(attempt.question_order),
+        submitted_at=attempt.submitted_at,
+        questions=items,
+    )
+
+
+async def get_result(db: AsyncSession, user: User, attempt_id: uuid.UUID) -> AttemptResult:
+    """Chỉ khi bài đã completed/timed_out (spec 6.4); chưa nộp → 409 INVALID_STATE; bài người khác → 404."""
+    return await _result(db, user.id, attempt_id)

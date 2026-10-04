@@ -138,3 +138,37 @@ class AnswerOut(BaseModel):
     question_id: uuid.UUID
     selected_option_id: str
     answered_at: datetime
+
+
+class FinalAnswer(BaseModel):
+    question_id: uuid.UUID
+    selected_option_id: str = Field(min_length=1, max_length=8)
+
+
+class SubmitIn(BaseModel):
+    final_answers: list[FinalAnswer] | None = Field(None, max_length=200)  # payload thắng bản autosave
+
+
+class ResultQuestion(BaseModel):
+    """Sau khi nộp: kèm đáp án đúng và giải thích có sẵn của câu hỏi."""
+
+    id: uuid.UUID
+    stem: str
+    options: list[OptionOut]
+    selected_option_id: str | None
+    correct_option_id: str
+    is_correct: bool
+    explanation: str
+
+
+class AttemptResult(BaseModel):
+    attempt_id: uuid.UUID
+    quiz_id: uuid.UUID
+    attempt_no: int
+    status: AttemptStatus
+    score: float  # phần trăm, làm tròn 2 chữ số
+    passed: bool
+    correct_count: int
+    total: int
+    submitted_at: datetime | None
+    questions: list[ResultQuestion]

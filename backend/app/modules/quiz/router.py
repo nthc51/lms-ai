@@ -15,6 +15,7 @@ from app.modules.quiz.schemas import (
     AnswerIn,
     AnswerOut,
     AttemptOut,
+    AttemptResult,
     QuestionOut,
     QuestionPage,
     QuestionReview,
@@ -23,6 +24,7 @@ from app.modules.quiz.schemas import (
     QuizOut,
     QuizPage,
     QuizUpdate,
+    SubmitIn,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["quiz"])
@@ -136,3 +138,20 @@ async def save_answer(
     db: AsyncSession = Depends(get_db),
 ):
     return await attempts.save_answer(db, user, attempt_id, question_id, data)
+
+
+@router.post("/attempts/{attempt_id}/submit", response_model=AttemptResult)
+async def submit_attempt(
+    attempt_id: uuid.UUID,
+    data: SubmitIn | None = None,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await attempts.submit_attempt(db, user, attempt_id, data or SubmitIn())
+
+
+@router.get("/attempts/{attempt_id}/result", response_model=AttemptResult)
+async def attempt_result(
+    attempt_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    return await attempts.get_result(db, user, attempt_id)
