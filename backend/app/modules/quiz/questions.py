@@ -140,4 +140,12 @@ async def review_question(db: AsyncSession, question: Question, data: QuestionRe
         question.difficulty = content.difficulty
         question.review_status = ReviewStatus.edited  # ai_original giữ nguyên bản AI (spec 5.4 bước 7)
     await db.commit()
-    return to_out(question)
+    # Cùng dạng với danh sách (kèm trang + trích đoạn nguồn) để frontend thay thẳng dòng đang hiển thị.
+    page_no, content = None, None
+    if question.source_chunk_id is not None:
+        source = (
+            await db.execute(select(Chunk.page_no, Chunk.content).where(Chunk.id == question.source_chunk_id))
+        ).one_or_none()
+        if source is not None:
+            page_no, content = source
+    return to_out(question, page_no, content)

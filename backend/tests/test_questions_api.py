@@ -106,3 +106,19 @@ async def test_question_in_published_quiz_cannot_be_edited_or_rejected(client, d
         r = await client.patch(url, json=body, headers=gv)
         assert (r.status_code, r.json()["error"]["code"]) == (409, "INVALID_STATE")
     assert (await client.patch(url, json={"action": "approve"}, headers=gv)).status_code == 200
+
+
+async def test_review_response_has_the_same_shape_as_the_list_item(client, db):
+    gv, _, lesson, chunk = await _lesson_with_material(client, db)
+    lid = uuid.UUID(lesson["id"])
+    q = await make_question(db, lid, review_status=ReviewStatus.pending, source_chunk_id=chunk.id)
+    for action in ({"action": "edit", "explanation": "Giải thích mới theo tài liệu."}, {"action": "approve"}):
+        patched = (await client.patch(f"{API}/questions/{q.id}", json=action, headers=gv)).json()
+        [listed] = (await client.get(f"{API}/lessons/{lid}/questions", headers=gv)).json()["items"]
+        assert patched == listed
+        assert patched["source_page_no"] == 1 and patched["source_excerpt"].startswith("Tìm kiếm nhị phân")
+    no_source = await make_question(db, lid, stem="Câu không có đoạn nguồn nào?")
+    body = (
+        await client.patch(f"{API}/questions/{no_source.id}", json={"action": "approve"}, headers=gv)
+    ).json()
+    assert body["source_page_no"] is None and body["source_excerpt"] is None
