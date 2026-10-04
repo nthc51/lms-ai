@@ -276,7 +276,7 @@ llm_cache        key_hash PK, provider, model, response, hit_count
 questions        id, lesson_id, stem, options JSONB [{id,text}], correct_option_id,
                  explanation, difficulty ENUM(easy|medium|hard),
                  origin ENUM(ai|manual), source_chunk_id NULL,
-                 review_status ENUM(pending|approved|edited|rejected),
+                 review_status ENUM question_review_status(pending|approved|edited|rejected),
                  self_check_flag BOOL, ai_original JSONB NULL, prompt_version
 quizzes          id, lesson_id, title, time_limit_sec NULL, max_attempts, shuffle BOOL,
                  pass_score, status ENUM(draft|published)
@@ -339,7 +339,8 @@ Mọi lời gọi LLM đều đi qua lớp này:
 - Retry khi gặp 429, 5xx hoặc timeout: tối đa 3 lần, chờ lâu dần theo cấp số nhân (exponential backoff); có header `Retry-After` thì chờ theo header, tối đa 60 giây (giá trị âm, không phải số hoặc không hữu hạn thì dùng backoff). Các lỗi 4xx khác (sai key, request sai) báo lỗi ngay, không retry.
 - **Đã làm ở tuần 1:** timeout và retry cho embedder và vision của Gemini (`EMBED_TIMEOUT_S`, `VISION_TIMEOUT_S`; hàm chờ inject được để test không phải ngủ thật). **Đã làm ở tuần 2:** `LLMProvider` (`generate`, `open_stream`) và `LLMClient`: timeout theo loại lời gọi (`HttpOptions.timeout` của SDK chỉ là timeout theo thao tác nên `LLMClient` bọc thêm `asyncio.timeout`), retry như trên, cache `llm_cache` theo sha256(provider, model, prompt, JSON schema), log token/độ trễ/`prompt_version`. Stream chỉ retry lúc mở (Gemini: lấy trước mảnh đầu); lỗi giữa chừng không retry.
 - **`finish_reason` và cache:** provider trả `finish_reason`; chỉ cache output không rỗng có `finish_reason` là `STOP` (hoặc không có). Output rỗng, bị chặn an toàn hoặc cắt do `MAX_TOKENS` không bao giờ được cache; text rỗng là lỗi. Stream chỉ cache khi nhận hết; `LLMStream.truncated` = chưa hoàn tất hoặc `finish_reason` khác `STOP`. Đóng stream Gemini phải đóng thật kết nối HTTP (pump task + queue, hủy khi `aclose`), để Gemini không sinh tiếp sau khi client ngắt hoặc gặp `REFUSE`. `FakeLLMProvider` là provider mặc định khi `LLM_PROVIDER=fake`.
-- Cache theo `hash(model + prompt)` trong bảng `llm_cache`.
+- Cache trong bảng `llm_cache`, key = sha256(provider, model, prompt, JSON schema) (xem dòng "Đã làm ở tuần 2" ở trên; `quiz_generate` không dùng cache).
+- **Cấu hình provider (kiểm tra lúc khởi động):** `LLM_PROVIDER`, `EMBED_PROVIDER`, `VISION_PROVIDER` chỉ nhận `fake | gemini`; giá trị khác (gõ sai) làm app/worker không khởi động thay vì âm thầm chạy bản giả. Provider nào là `gemini` thì `GEMINI_API_KEY` bắt buộc (thiếu → lỗi ngay lúc đọc cấu hình, không đợi tới lời gọi đầu). Các hàm `get_llm_provider`/`get_embedder`/`get_vision` cũng báo lỗi với giá trị lạ. `backend/.env.example` liệt kê đủ mọi biến của `Settings` (có test kiểm tra).
 - Log token, độ trễ và `prompt_version`.
 - Output có cấu trúc luôn dùng JSON schema, rồi validate lại bằng Pydantic.
 
@@ -372,8 +373,8 @@ Mọi lời gọi LLM đều đi qua lớp này:
 5. **Stream SSE**, lần lượt các event:
    - `sources`: danh sách nguồn, gửi trước.
    - `token`: từng mảnh chữ.
-   - `done`: `{message_id, citations}`. Backend loại bỏ các `[n]` không nằm trong danh sách nguồn.
-   - `error`: khi có lỗi.
+   - `done`: `{message_id, citations, content, refused}`. Backend loại bỏ các `[n]` không nằm trong danh sách nguồn; `content` là bản đã làm sạch, đúng như bản được lưu.
+   - `error`: khi có lỗi, hoặc khi LLM trả về câu trả lời rỗng.
 6. **Hủy khi client ngắt kết nối:**
    - Lời gọi upstream nằm trong `async with provider.stream(...)`.
    - Cứ khoảng 10 chunk thì kiểm tra `request.is_disconnected()` một lần.
@@ -388,6 +389,15 @@ Mọi lời gọi LLM đều đi qua lớp này:
 - Định dạng SSE: `sources` = `{sources: [{n, chunk_id, lesson_id, page_no, start_sec, lesson_title, heading_path, snippet}]}`; `token` = `{text}`; `done` = `{message_id, citations, content, refused}`; `error` = `{code: "AI_UNAVAILABLE", message}` (có thể là event đầu tiên khi quá hạn chót trước khi có nguồn). Response SSE có header chống buffer. Token `REFUSE` bị giữ lại, không stream ra; từ chối (chốt chặn hoặc `REFUSE`) lưu `refused = true` với câu từ chối cố định.
 - Rate limit: cửa sổ cố định 1 giờ (Redis `INCR` + `EXPIRE NX`, key `rl:tutor:<user_id>`), chỉ áp cho học viên; Redis lỗi hoặc treo (timeout socket 1 giây) thì cho qua (fail-open). Câu bị chặn không được lưu.
 - Phản hồi: `POST /tutor/messages/{id}/feedback` `{value: 1 | -1 | null}` (D1).
+
+**Hợp đồng với frontend (chốt 2026-10-04):**
+
+- Event `token` là text thô của model, có thể chứa `[n]` không hợp lệ (vd. `[7]` khi chỉ có 6 nguồn). Khi nhận `done`, frontend **thay toàn bộ** text đang hiển thị bằng `done.content` và dựng trích dẫn từ `done.citations`.
+- `sources` luôn được gửi trước, kể cả khi sau đó câu trả lời bị từ chối (chốt chặn hoặc `REFUSE`); khi `done.refused = true` frontend không hiển thị danh sách nguồn đó như trích dẫn.
+- Stream kết thúc bình thường nhưng không có chữ nào (sau khi lọc `REFUSE` và làm sạch trích dẫn, không phải từ chối) → event `error` `AI_UNAVAILABLE` thay vì `done` rỗng; tin assistant vẫn được lưu (rỗng, `truncated = true`). Ngoài ra client có thể nhận `error` trong khi đã có một tin assistant `truncated` được lưu (lỗi giữa chừng).
+- `GET /tutor/availability` cho phạm vi cả khóa trên khóa **chưa xuất bản** (chủ khóa/admin xem thử) trả `available = false` với `message = "Hỏi cả khóa chỉ dùng được khi khóa đã xuất bản"` (retrieval theo khóa chỉ xét khóa đã publish); phạm vi bài học vẫn dùng được. "Tài liệu đang được xử lý" chỉ dành cho trường hợp chưa có chunk ready.
+- Lịch sử tin nhắn (`GET /tutor/sessions/{id}/messages`) và phản hồi (`POST /tutor/messages/{id}/feedback`) chỉ kiểm tra phiên là của chính người dùng, **không** kiểm tra lại đăng ký/publish: học viên hủy đăng ký vẫn đọc được lịch sử của mình. Chỉ việc hỏi câu mới mới kiểm tra lại quyền.
+- Body request của Tutor và Quiz (`SessionCreate`, `AskIn`, `FeedbackIn`, `QuizGenerateIn`, `QuizCreate`, `QuizUpdate`, `QuestionReview`, `AnswerIn`, `SubmitIn`) không nhận trường lạ → `422 VALIDATION_ERROR`.
 
 ### 5.4 Sinh quiz (job `quiz_gen`)
 
@@ -407,6 +417,9 @@ Mọi lời gọi LLM đều đi qua lớp này:
 - Tham số job nằm ở `jobs.payload`; body `POST .../questions/generate` là `QuizGenerateIn` chặt (`count` số nguyên 1–30, `difficulty` {easy, medium, hard}, không nhận trường lạ). Bấm sinh khi đã có job đang chạy thì nhận lại job đó.
 - Số câu đúng `N`; tỉ lệ độ khó tính trên `N` rồi chia cho các chunk theo slot; mỗi câu lưu độ khó của slot đã lên kế hoạch (`ai_original` giữ output thô của model, kể cả độ khó model tự gán); retry hỏi lại đúng độ khó của slot hỏng.
 - Lọc trùng so với mọi câu đã có của bài (kể cả câu đã `rejected`) và giữa các câu mới; mọi ứng viên bị trùng thì job `failed` với thông báo riêng. Tự kiểm tra lỗi (API/định dạng) thì gắn `self_check_flag = true`.
+- **Sinh lại cho cùng bài (chốt 2026-10-04):** temperature vẫn 0 và không dùng cache, nên để lần sinh sau không ra đúng các câu cũ (bị lọc trùng hết): (1) chunk được xếp theo số câu hỏi đã có của bài lấy từ chunk đó (`questions.source_chunk_id`, mọi trạng thái), ít nhất trước, giữ thứ tự tài liệu khi bằng nhau; lấy hết mức thấp nhất (rải đều theo heading trong mức) rồi mới sang mức kế; (2) prompt `quiz_generate@v2` kèm tối đa 20 câu đã có của bài ("Không lặp lại các câu sau"), ưu tiên câu sinh từ chính chunk đó rồi câu mới nhất.
+- `PATCH /questions/{id}` trả cùng dạng với một phần tử của `GET /lessons/{id}/questions` (kèm `source_page_no`, `source_excerpt`), để frontend thay thẳng dòng đang hiển thị.
+- Kiểu enum của `questions.review_status` trong Postgres tên là `question_review_status` (đổi từ tên chung `review_status` bằng migration `d2a7f3e81b64`).
 - `job_timeout` của `quiz_gen` là 900 giây (hard timeout 870 giây); sweeper bao phủ qua `JOB_TIMEOUTS`. Chỉ lỗi của chính bước sinh câu hỏi (`QuizGenerationError`) mới hiện ra `jobs.error_msg` cho giảng viên; lỗi khác là `QUIZ_GEN_ERROR` chung bằng tiếng Việt. Thông báo cho giảng viên làm cùng B6.
 
 ### 5.5 Giải thích câu làm sai
@@ -494,6 +507,10 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 **Dashboard A8 (`GET /courses/{id}/analytics`):** `enrollments`, `completed_enrollments` (có `completed_at`); `lessons[]` = `{done_count, completion_rate}` với `completion_rate = done_count / số đăng ký` (0..1); `quizzes[]` = `{attempts, students, avg_score, pass_rate}` chỉ tính bài đã nộp (`completed` + `timed_out`), `avg_score` là trung bình điểm phần trăm, `pass_rate` = số bài có `score ≥ pass_score` chia `attempts`; `tutor` = `{sessions, questions, refused_answers}`. Phân tích sâu (câu hay sai, chủ đề yếu) là B7.
 
+- `completion_rate` (chốt 2026-10-04): `done_count` chỉ đếm học viên **đang** đăng ký khóa có tiến độ `done` ở bài đó (tiến độ của người đã hủy đăng ký không tính); mẫu số là số đăng ký hiện tại; không có đăng ký nào → `0.0`; làm tròn 4 chữ số. `avg_score` là trung bình của các điểm đã làm tròn; thống kê Tutor gồm cả phiên xem thử của giảng viên/admin.
+
+**Xóa khóa/chương/bài (chốt 2026-10-04):** `DELETE /courses/{id}`, `/sections/{id}`, `/lessons/{id}` trả `409 INVALID_STATE` (thông báo tiếng Việt nêu lý do) khi phạm vi bị xóa (cascade) chứa dữ liệu của học viên: (1) quiz đã xuất bản, hoặc (2) bất kỳ lượt làm quiz nào, hoặc (3) lịch sử hỏi Tutor — phiên có ít nhất một tin nhắn của người khác chủ khóa (với khóa: mọi phiên của khóa, kể cả hỏi cả khóa; với chương/bài: phiên gắn với các bài đó). Quiz nháp, câu hỏi, tài liệu, tiến độ học, đăng ký và phiên thử Tutor của chính giảng viên vẫn bị xóa theo cascade như trước. Quiz trong phạm vi bị khóa `FOR UPDATE` (cùng khóa với xuất bản quiz) trong lúc kiểm tra. Vì quiz đã xuất bản không xóa được, bài có quiz đã xuất bản hiện không xóa được qua API (cần cơ chế lưu trữ/ẩn ở sau nếu muốn gỡ).
+
 ### 6.5 Luật làm quiz
 
 - **Autosave:** gửi `PUT` ngay mỗi khi chọn đáp án (debounce 300ms). Đồng thời lưu vào `localStorage` theo `attempt_id`, và đưa các request lỗi vào hàng đợi để retry.
@@ -508,6 +525,10 @@ Mọi lời gọi LLM đều đi qua lớp này:
   - Autosave khóa dòng attempt `FOR SHARE`; submit chạy `UPDATE ... WHERE status='in_progress' RETURNING` trước, rồi upsert `final_answers` (payload thắng autosave) và chấm trong cùng transaction; `finalize_attempt()` dùng lại được cho cron B1.
   - `GET /attempts/{id}/result` (chưa nộp → `409 INVALID_STATE`) trả đáp án đúng và `explanation` có sẵn; `score` là phần trăm làm tròn 2 chữ số, câu bỏ trống tính sai.
   - Câu hỏi nằm trong quiz đã xuất bản không sửa/loại được. Tính giờ (`deadline_at`), xáo trộn và cron chốt bài là B1.
+- **Chốt 2026-10-04 (hợp đồng cho frontend):**
+  - CRUD quiz: `title` 1–200 ký tự, `max_attempts` 1–20 (mặc định 1), `pass_score` 0–100 (phần trăm, mặc định 50), `question_ids` tối đa 100. Chỉ thêm được câu hỏi `approved` hoặc `edited` của đúng bài học (khóa dòng câu hỏi khi thêm/xuất bản); `question_ids` chỉ đổi được khi quiz còn nháp; quiz đã xuất bản không sửa, không xóa được; quiz đã có lượt làm không xóa được.
+  - Đạt/không đạt tính trên điểm **đã làm tròn** 2 chữ số: `passed = round(score, 2) ≥ pass_score` (vd. 2/3 = 66.67 đạt khi `pass_score = 66.67`).
+  - Autosave: server áp dụng "lần ghi sau thắng" theo thứ tự request tới, không có số phiên bản. Frontend phải gửi các lần lưu **của cùng một câu hỏi tuần tự** (chờ request trước xong, chỉ giữ giá trị mới nhất trong hàng đợi retry), để một request cũ retry muộn không ghi đè đáp án mới hơn. Submit kèm `final_answers` vẫn là chốt chặn cuối.
 
 ### 6.6 Phân quyền
 
@@ -726,3 +747,11 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-04 | Quiz A7: attempt `in_progress` được trả lại thay vì tạo mới (một snapshot duy nhất); autosave `FOR SHARE`; submit `UPDATE`-trước-rồi-upsert trong cùng transaction; kết quả kèm đáp án đúng và giải thích; câu hỏi trong quiz đã xuất bản không sửa/loại được; `PATCH /questions/{id}` dùng `action: approve\|edit\|reject` |
 | 2026-10-04 | A8 `GET /courses/{id}/analytics`: tỉ lệ hoàn thành bài trên số đăng ký, quiz chỉ tính bài đã nộp, tỉ lệ đạt theo `pass_score`, thống kê Tutor (phiên, câu hỏi, câu bị từ chối) |
 | 2026-10-04 | Endpoint mới: `GET /tutor/sessions`, `GET /tutor/availability`, `GET /quizzes?lesson_id=`, `POST /quizzes/{id}/publish`, `GET /courses/{id}/analytics`, `POST /tutor/messages/{id}/feedback`. Không có mã lỗi mới (dùng lại `RATE_LIMITED`, `AI_UNAVAILABLE`, `QUIZ_ATTEMPT_LIMIT`, `ATTEMPT_CLOSED`, `INVALID_STATE`, `NOT_ENROLLED`) |
+| 2026-10-04 | Sinh lại câu hỏi cho cùng bài: ưu tiên chunk chưa có câu hỏi (xếp theo số câu đã có của chunk) và prompt `quiz_generate@v2` kèm tối đa 20 câu đã có ("Không lặp lại"); temperature giữ 0 |
+| 2026-10-04 | Provider AI chỉ nhận `fake \| gemini`, kiểm tra lúc khởi động; provider `gemini` bắt buộc `GEMINI_API_KEY`; factory báo lỗi với giá trị lạ (bỏ fallback âm thầm sang bản giả); `.env.example` đủ mọi biến |
+| 2026-10-04 | Front matter của prompt chấp nhận CRLF; `.gitattributes` ép `*.md`, `*.py` dùng LF |
+| 2026-10-04 | Đổi tên kiểu enum `review_status` → `question_review_status` (migration `d2a7f3e81b64`) |
+| 2026-10-04 | `PATCH /questions/{id}` trả cùng dạng với danh sách (kèm `source_page_no`, `source_excerpt`) |
+| 2026-10-04 | Xóa khóa/chương/bài trả `409 INVALID_STATE` khi phạm vi có quiz đã xuất bản, lượt làm quiz, hoặc lịch sử Tutor của người khác chủ khóa |
+| 2026-10-04 | Tutor: stream xong mà rỗng → `error AI_UNAVAILABLE` (lưu tin rỗng `truncated`); availability phạm vi cả khóa trên khóa nháp có thông báo riêng; body request Tutor/Quiz không nhận trường lạ (`422`) |
+| 2026-10-04 | Hợp đồng frontend: thay text đã stream bằng `done.content`; `sources` gửi cả khi từ chối; đạt/không đạt theo điểm đã làm tròn; autosave cùng câu gửi tuần tự (lần sau thắng); lịch sử/phản hồi Tutor đọc được sau khi hủy đăng ký; giới hạn CRUD quiz và chỉ câu `approved`/`edited` |
