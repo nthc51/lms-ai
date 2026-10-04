@@ -7,6 +7,7 @@ from app.core.errors import register_error_handlers
 from app.core.middleware import RequestIdMiddleware, StrictCORSMiddleware
 from app.core.ratelimit import close_rate_limiter
 from app.core.storage import get_storage
+from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.router import router as auth_router
 from app.modules.courses.router import router as courses_router
 from app.modules.enrollment.router import router as enrollment_router
@@ -54,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router)
     app.include_router(tutor_router)
     app.include_router(quiz_router)
+    app.include_router(analytics_router)
     return app
 
 
