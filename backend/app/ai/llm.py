@@ -103,7 +103,10 @@ def default_reply(call: FakeCall) -> str:
         return "Theo tài liệu [1], đây là câu trả lời mô phỏng (chế độ giả lập, không gọi AI)."
     if call.op == "quiz_generate":
         m = re.search(r"Số câu cần sinh: (\d+)", call.prompt)
-        source = _between(call.prompt, "<source>", "</source>")
+        # Thẻ <source> cuối cùng là đoạn tài liệu (phần hướng dẫn phía trên cũng nhắc tới tên thẻ): câu giả phụ
+        # thuộc đúng chunk được gửi, nên sinh lại từ chunk khác ra câu khác.
+        start = call.prompt.rfind("<source>")
+        source = _between(call.prompt[start:], "<source>", "</source>") if start >= 0 else ""
         return json.dumps(_fake_questions(source, int(m.group(1)) if m else 2), ensure_ascii=False)
     if call.op == "quiz_self_check":
         return json.dumps({"answer_option_id": "A"})

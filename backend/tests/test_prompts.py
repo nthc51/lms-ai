@@ -7,7 +7,7 @@ from app.ai.prompts import PROMPTS_DIR, load_prompt
 EXPECTED_VARS = {
     "tutor_answer": {"course_title", "context", "question"},
     "tutor_rewrite": {"history", "question"},
-    "quiz_generate": {"count", "difficulties", "heading", "source", "feedback"},
+    "quiz_generate": {"count", "difficulties", "heading", "source", "avoid", "feedback"},
     "quiz_self_check": {"source", "stem", "options"},
 }
 

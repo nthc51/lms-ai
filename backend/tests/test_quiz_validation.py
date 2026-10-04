@@ -83,6 +83,19 @@ def test_select_round_robins_when_more_chunks_than_headings():
     assert [c.content for c in picked] == ["A 0", "B 0", "A 1", "B 1"]
 
 
+def test_select_prefers_least_used_chunks_then_spreads_within_that_level():
+    chunks = [_chunk(h, i) for h in "AB" for i in range(2)]  # A 0, A 1, B 0, B 1
+    used = {chunks[0].id: 2, chunks[2].id: 1}  # A 0 dùng 2 lần, B 0 dùng 1 lần
+    assert [c.content for c in select_chunks(chunks, 4, used)] == ["A 1", "B 1"]
+    # thiếu chunk chưa dùng → lấy tiếp mức usage thấp kế tiếp, giữ thứ tự gốc
+    assert [c.content for c in select_chunks(chunks, 6, used)] == ["A 1", "B 1", "B 0"]
+    assert [c.content for c in select_chunks(chunks, 8, used)] == ["A 1", "B 1", "B 0", "A 0"]
+    # không có usage → như cũ
+    assert select_chunks(chunks, 4, {}) == select_chunks(chunks, 4)
+    plans = plan_questions(chunks, 2, MIX, used)
+    assert [p.chunk.content for p in plans] == ["A 1"]
+
+
 def test_no_eligible_chunk_gives_empty_plan():
     short = [_chunk("A", tokens=10)]
     assert select_chunks(short, 5) == [] and plan_questions(short, 5, MIX) == []

@@ -2,7 +2,8 @@
 
 import logging
 import uuid
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -25,6 +26,7 @@ DEDUP_THRESHOLD = 0.9  # cosine giữa stem mới và stem đã có > ngưỡng 
 NO_CHUNKS_ERROR = "Bài học chưa có tài liệu đã xử lý đủ dài để sinh câu hỏi"
 NO_QUESTIONS_ERROR = "AI không sinh được câu hỏi hợp lệ nào"
 ALL_DUPLICATES_ERROR = "Các câu AI sinh ra đều trùng với câu hỏi đã có của bài học"
+AVOID_STEMS_LIMIT = 20  # số câu đã có tối đa đưa vào prompt để model không sinh lặp lại
 
 
 class QuizGenerationError(ValueError):
@@ -69,7 +71,37 @@ async def load_lesson_chunks(db: AsyncSession, lesson_id: uuid.UUID) -> list[Chu
     return [ChunkInfo(id=r[0], content=r[1], heading_path=r[2], page_no=r[3], token_count=r[4]) for r in rows]
 
 
-async def _generate_for_chunk(llm: LLMClient, plan: ChunkPlan, stats: GenerationStats) -> list[_Candidate]:
+@dataclass(frozen=True)
+class _ExistingQuestion:
+    stem: str
+    source_chunk_id: uuid.UUID | None
+
+
+async def _load_existing(db: AsyncSession, lesson_id: uuid.UUID) -> list[_ExistingQuestion]:
+    """Mọi câu hỏi đã có của bài (kể cả bị từ chối), mới nhất trước."""
+    rows = await db.execute(
+        select(Question.stem, Question.source_chunk_id)
+        .where(Question.lesson_id == lesson_id)
+        .order_by(Question.created_at.desc(), Question.id)
+    )
+    return [_ExistingQuestion(r[0], r[1]) for r in rows.all()]
+
+
+def _avoid_block(chunk_id: uuid.UUID, existing: Sequence[_ExistingQuestion]) -> str:
+    """Danh sách tối đa AVOID_STEMS_LIMIT câu đã có (ưu tiên câu sinh từ chính chunk này, rồi câu mới nhất) để
+    model tránh lặp lại khi giảng viên sinh thêm câu cho cùng bài. Không có câu nào thì trả chuỗi rỗng."""
+    ordered = [q for q in existing if q.source_chunk_id == chunk_id]
+    ordered += [q for q in existing if q.source_chunk_id != chunk_id]
+    stems = [" ".join(q.stem.split()) for q in ordered[:AVOID_STEMS_LIMIT]]
+    if not stems:
+        return ""
+    lines = "".join(f"- {s}\n" for s in stems)
+    return f"Không lặp lại các câu sau (đã có trong bài), hãy hỏi ý khác:\n{lines}"
+
+
+async def _generate_for_chunk(
+    llm: LLMClient, plan: ChunkPlan, stats: GenerationStats, avoid: str = ""
+) -> list[_Candidate]:
     """Sinh câu cho một chunk. Mỗi câu ứng với một vị trí (slot) có độ khó đã lên kế hoạch; draft thứ i của
     lô ứng với slot thứ i đang chờ. Slot có câu sai luật hoặc bị thiếu được sinh lại đúng 1 lần (yêu cầu đúng
     các độ khó của những slot đó, kèm lý do sai); vẫn sai thì bỏ. Câu được giữ luôn mang độ khó của slot,
@@ -84,6 +116,7 @@ async def _generate_for_chunk(llm: LLMClient, plan: ChunkPlan, stats: Generation
             difficulties=", ".join(d.value for d in pending),
             heading=plan.chunk.heading_path or "(không có)",
             source=plan.chunk.content,
+            avoid=avoid,
             feedback=feedback,
         )
         problems: list[str] = []
@@ -176,7 +209,8 @@ async def generate_questions_for_lesson(
     job_id: uuid.UUID | None = None,
     session_factory: async_sessionmaker = SessionLocal,
 ) -> GenerationStats:
-    """Chọn chunk → sinh (retry 1 lần câu sai) → lọc trùng → tự kiểm tra → lưu review_status=pending.
+    """Chọn chunk (ưu tiên chunk chưa có câu hỏi) → sinh (prompt kèm danh sách câu đã có để tránh lặp; retry 1 lần
+    câu sai) → lọc trùng → tự kiểm tra → lưu review_status=pending.
 
     job_id (worker truyền vào): câu hỏi được ghi cùng transaction với trạng thái done của job; job không còn
     processing (đã bị sweeper chốt) thì bỏ kết quả. Không có chunk đủ dài / không sinh được câu hợp lệ nào /
@@ -184,16 +218,19 @@ async def generate_questions_for_lesson(
     trong lúc gọi LLM."""
     async with session_factory() as db:
         chunks = await load_lesson_chunks(db, lesson_id)
-        existing = list(
-            (await db.scalars(select(Question.stem).where(Question.lesson_id == lesson_id))).all()
-        )
-    plans = plan_questions(chunks, count, mix)
+        existing_questions = await _load_existing(db, lesson_id)
+    existing = [q.stem for q in existing_questions]
+    # Chunk đã có nhiều câu hỏi xếp sau (spec 5.4 bước 2): sinh lại cùng bài dùng phần tài liệu chưa được hỏi.
+    usage = Counter(q.source_chunk_id for q in existing_questions if q.source_chunk_id is not None)
+    plans = plan_questions(chunks, count, mix, usage)
     if not plans:
         raise QuizGenerationError(NO_CHUNKS_ERROR)
     stats = GenerationStats(requested=count)
     candidates: list[_Candidate] = []
     for plan in plans:
-        candidates += await _generate_for_chunk(llm, plan, stats)
+        candidates += await _generate_for_chunk(
+            llm, plan, stats, _avoid_block(plan.chunk.id, existing_questions)
+        )
     kept = (await _dedup(embedder, existing, candidates, stats))[:count]
     if not kept:
         # Có câu hợp lệ nhưng đều trùng câu đã có: báo rõ để giảng viên không tưởng AI hỏng.

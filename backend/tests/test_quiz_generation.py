@@ -73,7 +73,7 @@ async def test_saves_pending_questions_with_ai_original_and_prompt_version(db):
     assert {r.stem for r in rows} == {S1, S2}
     for r in rows:
         assert r.review_status == ReviewStatus.pending and r.origin == QuestionOrigin.ai
-        assert r.source_chunk_id == chunk.id and r.prompt_version == "quiz_generate@v1"
+        assert r.source_chunk_id == chunk.id and r.prompt_version == "quiz_generate@v2"
         assert r.ai_original["stem"] == r.stem and r.ai_original["correct_option_id"] == "A"
         assert [o["id"] for o in r.options] == ["A", "B", "C", "D"] and r.self_check_flag is False
 
@@ -237,3 +237,38 @@ async def test_all_duplicates_has_a_distinct_error(db):
     await make_question(db, lesson.id, stem=S2)
     with pytest.raises(ValueError, match=ALL_DUPLICATES_ERROR):
         await _generate(lesson, FakeLLMProvider([batch(q(S1), q(S2))]))
+
+
+async def test_regenerating_same_lesson_uses_unused_chunks_and_avoid_list(db):
+    other = (
+        "Sắp xếp nổi bọt duyệt danh sách nhiều lượt. Ở mỗi lượt, hai phần tử kề nhau bị đổi chỗ khi đứng sai "
+        "thứ tự, nên phần tử lớn nhất dần nổi lên cuối dãy. Độ phức tạp trung bình bằng bình phương kích thước. "
+    ) * 4
+    lesson, chunks = await _lesson(db, [LONG_LESSON_TEXT, other])
+    first = FakeLLMProvider()  # trả lời mặc định: câu hỏi phụ thuộc đoạn nguồn trong prompt
+    assert (await _generate(lesson, first)).saved == 2
+    assert "Không lặp lại" not in first.calls[0].prompt
+    saved_stems = {r.stem for r in await _questions(db, lesson)}
+    assert {r.source_chunk_id for r in await _questions(db, lesson)} == {chunks[0].id}
+
+    second = FakeLLMProvider()
+    stats = await _generate(lesson, second)  # temperature vẫn 0, nhưng chunk và prompt khác
+    assert stats.saved == 2 and stats.duplicates == 0
+    gen = next(c for c in second.calls if c.op == "quiz_generate")
+    assert "Sắp xếp nổi bọt" in gen.prompt and "Không lặp lại các câu sau" in gen.prompt
+    assert all(f"- {s}" in gen.prompt for s in saved_stems)
+    rows = await _questions(db, lesson)
+    assert len(rows) == 4 and {r.source_chunk_id for r in rows} == {chunks[0].id, chunks[1].id}
+
+
+async def test_avoid_list_is_capped_and_prefers_the_chunk_own_questions(db):
+    lesson, [chunk] = await _lesson(db)
+    # câu của chính chunk được tạo trước (cũ nhất) nhưng vẫn đứng đầu danh sách
+    await make_question(db, lesson.id, stem="Câu của chính chunk này là gì vậy?", source_chunk_id=chunk.id)
+    for i in range(25):
+        await make_question(db, lesson.id, stem=f"Câu đã có số {i} về chủ đề riêng {i}?")
+    provider = FakeLLMProvider([batch(q(S1), q(S2)), CHECK_A, CHECK_A])
+    await _generate(lesson, provider)
+    prompt = provider.calls[0].prompt
+    listed = [line for line in prompt.splitlines() if line.startswith("- Câu")]
+    assert len(listed) == 20 and listed[0] == "- Câu của chính chunk này là gì vậy?"
