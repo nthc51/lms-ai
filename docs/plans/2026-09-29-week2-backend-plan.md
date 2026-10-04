@@ -38,7 +38,7 @@ Các yêu cầu áp dụng cho **mọi** task (chép từ spec và quy ước đ
 
 ## Ghi chú bổ sung so với spec
 
-(cập nhật vào spec ở Task 21)
+(đã cập nhật vào spec ngày 2026-10-04, Task 21)
 
 - **Tầng A5 chỉ tìm vector.** Hybrid RRF là B2 (tuần 3). `retrieve(db, embedder, scope, query, *, top_k)` trả `RetrievalResult(chunks, top_similarity, has_fulltext_match=False)`; B2 chỉ thay phần thân hàm này, caller (Tutor) và `should_refuse` không đổi. Chốt chặn ở A5 do đó chỉ còn điều kiện `similarity cao nhất < τ` (hoặc không có chunk nào).
 - **`τ` tạm thời:** `TUTOR_REFUSE_THRESHOLD = 0.3` (setting), sẽ chọn lại trên tập dev ở tuần 3. Top-k: `TUTOR_TOP_K = 6`.

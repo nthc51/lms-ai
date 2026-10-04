@@ -4,7 +4,7 @@
 - **Ngày tạo:** 2026-09-29
 - **Loại:** Đồ án tốt nghiệp: full stack, web động, tích hợp AI
 - **Nguồn lực:** 1 người làm full-time trong 5 tuần, có Claude hỗ trợ viết code
-- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), đang triển khai (xong backend tuần 1)
+- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), đang triển khai (xong backend tuần 1 và tuần 2)
 
 ---
 
@@ -12,7 +12,7 @@
 
 > Cập nhật mục này mỗi khi xong việc. Ký hiệu: `[ ]` chưa làm · `[~]` đang làm · `[x]` xong · `[-]` đã cắt.
 
-**Tuần hiện tại:** 1 / 5  **Tổng tiến độ:** 0 / 40 hạng mục
+**Tuần hiện tại:** 2 / 5  **Tổng tiến độ:** 0 / 40 hạng mục
 
 **Thứ tự ưu tiên:** A (lõi) → B (mức Khá) → S (chất lượng hệ thống) → C (điểm nhấn). Hết thời gian mà vẫn còn việc thì phần bị trễ là tầng C, không phải S. Tuần 5 vẫn giữ cho báo cáo và bộ đánh giá.
 
@@ -22,10 +22,10 @@
 - [~] A2. Khóa học, chương, bài học; upload PDF và video (presign MinIO)
 - [~] A3. Đăng ký khóa, tiến độ học
 - [~] A4. Pipeline xử lý tài liệu: parse → chunk → embed (có fallback vision)
-- [ ] A5. AI Tutor: RAG, trích nguồn, streaming SSE, giới hạn phạm vi
-- [ ] A6. AI sinh quiz + màn duyệt của giáo viên
-- [ ] A7. Học viên làm quiz, chấm tự động
-- [ ] A8. Dashboard giáo viên cơ bản
+- [~] A5. AI Tutor: RAG, trích nguồn, streaming SSE, giới hạn phạm vi
+- [~] A6. AI sinh quiz + màn duyệt của giáo viên
+- [~] A7. Học viên làm quiz, chấm tự động
+- [~] A8. Dashboard giáo viên cơ bản
 
 ### Tầng B: mức "Khá" (tuần 3)
 
@@ -68,7 +68,7 @@
 
 ### Phục vụ bảo vệ
 
-- [ ] D1. Nút 👍/👎 cho câu trả lời của AI Tutor
+- [~] D1. Nút 👍/👎 cho câu trả lời của AI Tutor
 - [ ] D2. Deploy VPS có domain và HTTPS
 - [ ] D3. Test tự động (unit, integration, API, phân quyền, đồng thời, 3–4 luồng E2E)
 - [ ] D4. Bộ đánh giá RAG khoảng 80 câu hỏi + script `eval/`
@@ -258,7 +258,8 @@ jobs             id, type, ref_id, ref_version INT DEFAULT 0,
                  status ENUM(pending|processing|done|failed),
                  attempts, error_msg, started_at, finished_at,
                  created_by→users NULL ON DELETE SET NULL   (NULL = job hệ thống, vd. do cron tạo),
-                 requeued_at NULL   (lúc sweeper enqueue lại job pending bị kẹt, chỉ một lần)
+                 requeued_at NULL   (lúc sweeper enqueue lại job pending bị kẹt, chỉ một lần),
+                 payload JSONB NULL   (tham số của job, vd. quiz_gen: {count, difficulty: {easy, medium, hard}})
                  UNIQUE INDEX uq_active_job (type, ref_id, ref_version)
                      WHERE status IN ('pending','processing')
                  (ref_version = submissions.version với grade_submission; job khác = 0)
@@ -266,7 +267,7 @@ jobs             id, type, ref_id, ref_version INT DEFAULT 0,
 -- AI Tutor
 chat_sessions    id, user_id, course_id, lesson_id NULL      (NULL = hỏi cả khóa)
 chat_messages    id, session_id, role ENUM(user|assistant), content,
-                 citations JSONB [{n, chunk_id, page_no, start_sec}],
+                 citations JSONB [{n, chunk_id, lesson_id, page_no, start_sec}],
                  refused BOOL, truncated BOOL, feedback SMALLINT NULL (1 | -1),
                  latency_ms, ttft_ms, tokens_in, tokens_out, prompt_version
 llm_cache        key_hash PK, provider, model, response, hit_count
@@ -314,6 +315,7 @@ certificates     id, user_id, course_id, code UNIQUE, asset_id, issued_at
   - Theo bài học: `lesson_id = ?`.
   - Theo khóa học: `course_id = ?` và chỉ lấy bài thuộc khóa đã publish.
   - Luôn lọc thêm `embedding_model = <model hiện tại>`.
+  - Chỉ lấy chunk của source đang `ready` (source đang xử lý lại hoặc xử lý lại bị lỗi vẫn còn chunk cũ, không được dùng).
 - **Đổi model embedding:** số chiều `D` cố định trong migration. Đổi model thì chạy script `reindex` để embed lại toàn bộ.
 - **Truy vấn full-text:** luôn dùng `websearch_to_tsquery('simple', immutable_unaccent(:q))`. Có test riêng cho chữ `đ`/`Đ` → `d`.
 - **Chốt bài quiz (nguyên tử):** `UPDATE ... WHERE id=:id AND status='in_progress' RETURNING id`. Không trả về dòng nào nghĩa là bài đã được chốt ở chỗ khác, bỏ qua.
@@ -335,7 +337,8 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 - Timeout riêng cho từng loại lời gọi.
 - Retry khi gặp 429, 5xx hoặc timeout: tối đa 3 lần, chờ lâu dần theo cấp số nhân (exponential backoff); có header `Retry-After` thì chờ theo header, tối đa 60 giây (giá trị âm, không phải số hoặc không hữu hạn thì dùng backoff). Các lỗi 4xx khác (sai key, request sai) báo lỗi ngay, không retry.
-- **Đã làm ở tuần 1:** timeout và retry cho embedder và vision của Gemini (`EMBED_TIMEOUT_S`, `VISION_TIMEOUT_S`; hàm chờ inject được để test không phải ngủ thật). Phần cache `llm_cache`, log token và `prompt_version` làm cùng LLM ở tuần 2.
+- **Đã làm ở tuần 1:** timeout và retry cho embedder và vision của Gemini (`EMBED_TIMEOUT_S`, `VISION_TIMEOUT_S`; hàm chờ inject được để test không phải ngủ thật). **Đã làm ở tuần 2:** `LLMProvider` (`generate`, `open_stream`) và `LLMClient`: timeout theo loại lời gọi (`HttpOptions.timeout` của SDK chỉ là timeout theo thao tác nên `LLMClient` bọc thêm `asyncio.timeout`), retry như trên, cache `llm_cache` theo sha256(provider, model, prompt, JSON schema), log token/độ trễ/`prompt_version`. Stream chỉ retry lúc mở (Gemini: lấy trước mảnh đầu); lỗi giữa chừng không retry.
+- **`finish_reason` và cache:** provider trả `finish_reason`; chỉ cache output không rỗng có `finish_reason` là `STOP` (hoặc không có). Output rỗng, bị chặn an toàn hoặc cắt do `MAX_TOKENS` không bao giờ được cache; text rỗng là lỗi. Stream chỉ cache khi nhận hết; `LLMStream.truncated` = chưa hoàn tất hoặc `finish_reason` khác `STOP`. Đóng stream Gemini phải đóng thật kết nối HTTP (pump task + queue, hủy khi `aclose`), để Gemini không sinh tiếp sau khi client ngắt hoặc gặp `REFUSE`. `FakeLLMProvider` là provider mặc định khi `LLM_PROVIDER=fake`.
 - Cache theo `hash(model + prompt)` trong bảng `llm_cache`.
 - Log token, độ trễ và `prompt_version`.
 - Output có cấu trúc luôn dùng JSON schema, rồi validate lại bằng Pydantic.
@@ -378,6 +381,14 @@ Mọi lời gọi LLM đều đi qua lớp này:
    - Nút "Dừng sinh" ở frontend gọi `AbortController.abort()` và đi đúng luồng này.
 7. **Rate limit:** mỗi học viên tối đa 30 câu hỏi mỗi giờ, đếm bằng bộ đếm trong Redis. Vượt thì trả `429` kèm `Retry-After`.
 
+**Đã làm ở tuần 2 (A5):**
+
+- Retrieval chỉ vector (hybrid RRF là B2; giao diện `retrieve`/`RetrievalResult`/`should_refuse` giữ nguyên). Chốt chặn chỉ theo `similarity < τ` hoặc không có chunk; `τ` tạm = 0.3 (`TUTOR_REFUSE_THRESHOLD`, chọn lại trên tập dev ở tuần 3).
+- Mỗi lần hỏi đều kiểm tra lại quyền truy cập (`resolve_scope`), không chỉ lúc tạo phiên (khóa bị gỡ publish hoặc học viên hủy đăng ký sau đó thì bị từ chối). Tin nhắn của học viên được commit trước khi gọi LLM nên lỗi LLM vẫn còn câu hỏi; tin nhắn assistant luôn được lưu (`truncated` khi lỗi/ngắt/hủy, lưu trong `CancelScope` có shield).
+- Định dạng SSE: `sources` = `{sources: [{n, chunk_id, lesson_id, page_no, start_sec, lesson_title, heading_path, snippet}]}`; `token` = `{text}`; `done` = `{message_id, citations, content, refused}`; `error` = `{code: "AI_UNAVAILABLE", message}` (có thể là event đầu tiên khi quá hạn chót trước khi có nguồn). Response SSE có header chống buffer. Token `REFUSE` bị giữ lại, không stream ra; từ chối (chốt chặn hoặc `REFUSE`) lưu `refused = true` với câu từ chối cố định.
+- Rate limit: cửa sổ cố định 1 giờ (Redis `INCR` + `EXPIRE NX`, key `rl:tutor:<user_id>`), chỉ áp cho học viên; Redis lỗi hoặc treo (timeout socket 1 giây) thì cho qua (fail-open). Câu bị chặn không được lưu.
+- Phản hồi: `POST /tutor/messages/{id}/feedback` `{value: 1 | -1 | null}` (D1).
+
 ### 5.4 Sinh quiz (job `quiz_gen`)
 
 1. **Đầu vào:** bài học, số câu `N`, tỉ lệ độ khó.
@@ -390,6 +401,13 @@ Mọi lời gọi LLM đều đi qua lớp này:
 5. **Lọc trùng:** embed phần câu hỏi (stem). Cosine `> 0.9` so với câu đã có trong bài thì bỏ.
 6. **Tự kiểm tra:** một lời gọi LLM khác làm lại câu hỏi **chỉ dựa trên đoạn nguồn**. Nếu kết quả khác `correct_option_id` thì đặt `self_check_flag = true`.
 7. **Lưu:** `review_status = pending`, `ai_original` là bản gốc, kèm `prompt_version`. Sau đó gửi thông báo cho giáo viên.
+
+**Đã làm ở tuần 2 (A6):**
+
+- Tham số job nằm ở `jobs.payload`; body `POST .../questions/generate` là `QuizGenerateIn` chặt (`count` số nguyên 1–30, `difficulty` {easy, medium, hard}, không nhận trường lạ). Bấm sinh khi đã có job đang chạy thì nhận lại job đó.
+- Số câu đúng `N`; tỉ lệ độ khó tính trên `N` rồi chia cho các chunk theo slot; mỗi câu lưu độ khó của slot đã lên kế hoạch (`ai_original` giữ output thô của model, kể cả độ khó model tự gán); retry hỏi lại đúng độ khó của slot hỏng.
+- Lọc trùng so với mọi câu đã có của bài (kể cả câu đã `rejected`) và giữa các câu mới; mọi ứng viên bị trùng thì job `failed` với thông báo riêng. Tự kiểm tra lỗi (API/định dạng) thì gắn `self_check_flag = true`.
+- `job_timeout` của `quiz_gen` là 900 giây (hard timeout 870 giây); sweeper bao phủ qua `JOB_TIMEOUTS`. Chỉ lỗi của chính bước sinh câu hỏi (`QuizGenerationError`) mới hiện ra `jobs.error_msg` cho giảng viên; lỗi khác là `QUIZ_GEN_ERROR` chung bằng tiếng Việt. Thông báo cho giảng viên làm cùng B6.
 
 ### 5.5 Giải thích câu làm sai
 
@@ -465,14 +483,16 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | Khóa học | `GET /courses` · `GET /courses/{slug}` · `POST/PATCH/DELETE /courses` · `POST /courses/{id}/publish` · CRUD sections/lessons · `PATCH /courses/{id}/reorder` · `GET /teacher/courses?page=&size=` (khóa của giảng viên đang đăng nhập, phân trang) |
 | Học | `POST /courses/{id}/enroll` · `GET /me/courses?page=&size=` (phân trang) · `GET /lessons/{id}` (nội dung bài học) · `GET /lessons/{id}/video` (presigned GET) · `PUT /lessons/{id}/progress` |
 | Tài liệu | `POST /uploads/presign` · `POST /uploads/{id}/complete` · `POST /lessons/{id}/sources` → 202 · `GET /lessons/{id}/sources` · `GET /sources/{id}` · `POST /sources/{id}/reprocess` → 202 · `GET /sources/{id}/pages?page=&size=` (`size ≤ 100`, trả `{items, total, page, size}`) |
-| Tutor | `POST /tutor/sessions` · `GET /tutor/sessions/{id}/messages` · `POST /tutor/sessions/{id}/messages` (SSE, frontend đọc bằng `fetch` + `ReadableStream`) · `POST /tutor/messages/{id}/feedback` |
+| Tutor | `POST /tutor/sessions` · `GET /tutor/sessions?course_id=` (phiên của chính mình, phân trang) · `GET /tutor/availability?course_id=&lesson_id=` (`{available, ready_chunks, message}`) · `GET /tutor/sessions/{id}/messages` · `POST /tutor/sessions/{id}/messages` (SSE, frontend đọc bằng `fetch` + `ReadableStream`) · `POST /tutor/messages/{id}/feedback` |
 | Câu hỏi | `POST /lessons/{id}/questions/generate` → 202 · `GET /lessons/{id}/questions?review_status=` · `PATCH /questions/{id}` |
-| Quiz | CRUD `/quizzes` · `POST /quizzes/{id}/attempts` (**không trả đáp án**) · `PUT /attempts/{id}/answers/{qid}` · `POST /attempts/{id}/submit {final_answers?}` · `GET /attempts/{id}/result` (chỉ khi `completed` hoặc `timed_out`) · `POST /attempts/{id}/answers/{qid}/explain` |
+| Quiz | `POST /quizzes` · `GET /quizzes?lesson_id=` (phân trang) · `GET/PATCH/DELETE /quizzes/{id}` · `POST /quizzes/{id}/publish` · `POST /quizzes/{id}/attempts` (**không trả đáp án**) · `PUT /attempts/{id}/answers/{qid}` · `POST /attempts/{id}/submit {final_answers?}` · `GET /attempts/{id}/result` (chỉ khi `completed` hoặc `timed_out`) · `POST /attempts/{id}/answers/{qid}/explain` |
 | Assignment | CRUD `/assignments` · `PUT /assignments/{id}/submission` · `GET /assignments/{id}/submissions` · `POST /submissions/{id}/grade` |
 | Thảo luận | `GET/POST /lessons/{id}/comments` · `DELETE /comments/{id}` |
 | Thông báo | `GET /notifications` · `POST /notifications/read` · `GET /notifications/stream-token` (sống 60 giây) · `GET /notifications/stream?t=` (dùng `EventSource`) |
-| Khác | `GET /jobs/{id}` (chỉ người tạo job hoặc admin; người khác nhận `404`) · `GET /courses/{id}/analytics` · `GET /me/certificates` · `GET /certificates/verify/{code}` (công khai) |
+| Khác | `GET /jobs/{id}` (chỉ người tạo job hoặc admin; người khác nhận `404`) · `GET /courses/{id}/analytics` (giảng viên sở hữu hoặc admin) · `GET /me/certificates` · `GET /certificates/verify/{code}` (công khai) |
 | Admin | `GET/PATCH /admin/users` · `GET/PATCH /admin/courses` |
+
+**Dashboard A8 (`GET /courses/{id}/analytics`):** `enrollments`, `completed_enrollments` (có `completed_at`); `lessons[]` = `{done_count, completion_rate}` với `completion_rate = done_count / số đăng ký` (0..1); `quizzes[]` = `{attempts, students, avg_score, pass_rate}` chỉ tính bài đã nộp (`completed` + `timed_out`), `avg_score` là trung bình điểm phần trăm, `pass_rate` = số bài có `score ≥ pass_score` chia `attempts`; `tutor` = `{sessions, questions, refused_answers}`. Phân tích sâu (câu hay sai, chủ đề yếu) là B7.
 
 ### 6.5 Luật làm quiz
 
@@ -483,6 +503,11 @@ Mọi lời gọi LLM đều đi qua lớp này:
   - Upsert hàng loạt vào `attempt_answers`, với quy tắc payload thắng bản autosave, rồi mới chốt bài.
 - **Chốt bài khi hết giờ** theo 2 đường: kiểm tra ngay khi có truy vấn đọc attempt, và cron arq chạy mỗi phút.
 - **Bài đã chốt:** submit đến muộn nhận `409 ATTEMPT_CLOSED`.
+- **Đã làm ở tuần 2 (A7):**
+  - Bắt đầu làm bài khi đang có attempt `in_progress` thì trả lại attempt đó (`200`, tạo mới là `201`); quyết định dựa trên một snapshot duy nhất các attempt của học viên trong quiz (hai tab không tạo hai attempt hay báo `QUIZ_ATTEMPT_LIMIT` sai). Hết `max_attempts` → `409 QUIZ_ATTEMPT_LIMIT`.
+  - Autosave khóa dòng attempt `FOR SHARE`; submit chạy `UPDATE ... WHERE status='in_progress' RETURNING` trước, rồi upsert `final_answers` (payload thắng autosave) và chấm trong cùng transaction; `finalize_attempt()` dùng lại được cho cron B1.
+  - `GET /attempts/{id}/result` (chưa nộp → `409 INVALID_STATE`) trả đáp án đúng và `explanation` có sẵn; `score` là phần trăm làm tròn 2 chữ số, câu bỏ trống tính sai.
+  - Câu hỏi nằm trong quiz đã xuất bản không sửa/loại được. Tính giờ (`deadline_at`), xáo trộn và cron chốt bài là B1.
 
 ### 6.6 Phân quyền
 
@@ -694,3 +719,10 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-09-29 | Vision gọi song song tối đa `VISION_CONCURRENCY = 4`; worker hard timeout `job_timeout − 30 giây` → job + source `failed` "Quá thời gian xử lý (N giây)" ngay; `Retry-After` tối đa 60 giây |
 | 2026-09-29 | `PATCH /lessons/{id}` với `"video_asset_id": null` gỡ video (cột nullable nhận null tường minh; trường không gửi giữ nguyên) |
 | 2026-09-29 | Đồ án nhấn mạnh xây dựng hệ thống. Thêm tầng S (CI/CD, deploy, giám sát, hiệu năng, bảo mật, tài liệu kiến trúc) và yêu cầu frontend (responsive, 4 trạng thái, Lighthouse). Không cắt tính năng; thứ tự ưu tiên là A → B → S → C (chi tiết: `docs/specs/2026-09-29-spec-addendum-system.md`) |
+| 2026-10-04 | A5 dùng retrieval chỉ vector (giao diện `retrieve`/`RetrievalResult`/`should_refuse` giữ nguyên cho B2); `τ` tạm 0.3; lọc thêm `sources.status = ready`; HNSW `iterative_scan = strict_order` |
+| 2026-10-04 | Lớp LLM dùng chung: `LLMProvider` (`generate`/`open_stream`) + `LLMClient`; cache key gồm provider và JSON schema; chỉ cache output hợp lệ có `finish_reason` `STOP`, stream chỉ cache khi nhận hết; `LLMStream.truncated`; đóng stream Gemini phải đóng thật kết nối; timeout theo loại lời gọi bọc thêm `asyncio.timeout`; `FakeLLMProvider` mặc định khi `LLM_PROVIDER=fake` |
+| 2026-10-04 | Tutor: kiểm tra lại quyền ở mỗi câu hỏi; commit câu hỏi trước khi gọi LLM; luôn lưu tin nhắn assistant (`truncated` khi lỗi/ngắt/hủy, lưu có shield); token `REFUSE` bị giữ lại; header SSE chống buffer; rate limit cửa sổ cố định 1 giờ, chỉ học viên, Redis lỗi/treo (timeout 1 giây) thì cho qua |
+| 2026-10-04 | `jobs.payload JSONB` cho tham số job; `QuizGenerateIn` chặt; slot độ khó tính trên `N` và lưu độ khó đã lên kế hoạch (`ai_original` giữ output thô); lọc trùng cả với câu `rejected`; self-check lỗi thì gắn cờ; `quiz_gen` `job_timeout` 900 giây, sweeper qua `JOB_TIMEOUTS`; chỉ lỗi sinh câu hỏi hiện cho giảng viên |
+| 2026-10-04 | Quiz A7: attempt `in_progress` được trả lại thay vì tạo mới (một snapshot duy nhất); autosave `FOR SHARE`; submit `UPDATE`-trước-rồi-upsert trong cùng transaction; kết quả kèm đáp án đúng và giải thích; câu hỏi trong quiz đã xuất bản không sửa/loại được; `PATCH /questions/{id}` dùng `action: approve\|edit\|reject` |
+| 2026-10-04 | A8 `GET /courses/{id}/analytics`: tỉ lệ hoàn thành bài trên số đăng ký, quiz chỉ tính bài đã nộp, tỉ lệ đạt theo `pass_score`, thống kê Tutor (phiên, câu hỏi, câu bị từ chối) |
+| 2026-10-04 | Endpoint mới: `GET /tutor/sessions`, `GET /tutor/availability`, `GET /quizzes?lesson_id=`, `POST /quizzes/{id}/publish`, `GET /courses/{id}/analytics`, `POST /tutor/messages/{id}/feedback`. Không có mã lỗi mới (dùng lại `RATE_LIMITED`, `AI_UNAVAILABLE`, `QUIZ_ATTEMPT_LIMIT`, `ATTEMPT_CLOSED`, `INVALID_STATE`, `NOT_ENROLLED`) |
