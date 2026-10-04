@@ -1,0 +1,3 @@
+# Prompt và mã nguồn luôn dùng LF (front matter của prompt, so khớp chuỗi trong test).
+*.md text eol=lf
+*.py text eol=lf

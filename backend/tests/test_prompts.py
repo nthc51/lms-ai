@@ -54,3 +54,20 @@ def test_missing_front_matter_is_rejected(tmp_path, monkeypatch):
             prompts.load_prompt("bad")
     finally:
         load_prompt.cache_clear()
+
+
+def test_front_matter_with_crlf_line_endings_is_accepted(tmp_path, monkeypatch):
+    from app.ai import prompts
+
+    crlf = "---\r\nversion: v3\r\n---\r\nXin chào $name\r\n"
+    m = prompts._FRONT_MATTER.match(crlf)  # regex chấp nhận CRLF kể cả khi nội dung không qua text mode
+    assert m is not None and m.group(1) == "v3" and crlf[m.end() :] == "Xin chào $name\r\n"
+    (tmp_path / "crlf.md").write_bytes(crlf.encode("utf-8"))
+    monkeypatch.setattr(prompts, "PROMPTS_DIR", tmp_path)
+    load_prompt.cache_clear()
+    try:
+        template = prompts.load_prompt("crlf")
+        assert template.version == "v3"
+        assert template.render(name="bạn").text.strip() == "Xin chào bạn"
+    finally:
+        load_prompt.cache_clear()

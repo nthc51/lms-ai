@@ -11,7 +11,8 @@ from functools import lru_cache
 from pathlib import Path
 
 PROMPTS_DIR = Path(__file__).parent
-_FRONT_MATTER = re.compile(r"\A---[ \t]*\nversion:[ \t]*(\S+)[ \t]*\n---[ \t]*\n")
+# Chấp nhận cả CRLF (file bị checkout/sửa trên Windows); phần thân giữ nguyên như trong file.
+_FRONT_MATTER = re.compile(r"\A---[ \t]*\r?\nversion:[ \t]*(\S+)[ \t]*\r?\n---[ \t]*\r?\n")
 
 
 @dataclass(frozen=True)
