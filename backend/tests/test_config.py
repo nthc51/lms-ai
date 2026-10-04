@@ -42,3 +42,13 @@ def test_factories_raise_on_unknown_provider_instead_of_falling_back_to_fake(fac
     s = Settings(_env_file=None).model_copy(update={field: "bogus"})
     with pytest.raises(ValueError, match="bogus"):
         factory(s)
+
+
+def test_env_example_lists_every_setting_with_a_valid_value():
+    from pathlib import Path
+
+    from dotenv import dotenv_values
+
+    example = dotenv_values(Path(__file__).parents[1] / ".env.example")
+    assert {k.lower() for k in example} == set(Settings.model_fields)
+    Settings(_env_file=Path(__file__).parents[1] / ".env.example")  # mọi giá trị mẫu đều hợp lệ

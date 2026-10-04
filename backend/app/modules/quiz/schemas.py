@@ -12,6 +12,8 @@ from app.modules.quiz.validation import OptionIn
 class DifficultyMix(BaseModel):
     """Tỉ lệ độ khó mong muốn (spec 5.4 bước 1); không cần cộng đúng 1, chỉ cần có ít nhất một giá trị > 0."""
 
+    model_config = ConfigDict(extra="forbid")
+
     easy: float = Field(0.3, ge=0, le=1)
     medium: float = Field(0.5, ge=0, le=1)
     hard: float = Field(0.2, ge=0, le=1)
@@ -71,6 +73,8 @@ class QuestionPage(Page[QuestionOut]):
 class QuestionReview(BaseModel):
     """approve: duyệt; reject: loại; edit: sửa các trường gửi kèm (validate lại đủ luật, đặt edited)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     action: Literal["approve", "edit", "reject"]
     stem: str | None = None
     options: list[OptionIn] | None = None
@@ -80,6 +84,8 @@ class QuestionReview(BaseModel):
 
 
 class QuizCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     lesson_id: uuid.UUID
     title: str = Field(min_length=1, max_length=200)
     max_attempts: int = Field(1, ge=1, le=20)
@@ -88,6 +94,8 @@ class QuizCreate(BaseModel):
 
 
 class QuizUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str | None = Field(None, min_length=1, max_length=200)
     max_attempts: int | None = Field(None, ge=1, le=20)
     pass_score: float | None = Field(None, ge=0, le=100)
@@ -131,6 +139,8 @@ class AttemptOut(BaseModel):
 
 
 class AnswerIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     selected_option_id: str = Field(min_length=1, max_length=8)
 
 
@@ -141,11 +151,15 @@ class AnswerOut(BaseModel):
 
 
 class FinalAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     question_id: uuid.UUID
     selected_option_id: str = Field(min_length=1, max_length=8)
 
 
 class SubmitIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     final_answers: list[FinalAnswer] | None = Field(None, max_length=200)  # payload thắng bản autosave
 
 

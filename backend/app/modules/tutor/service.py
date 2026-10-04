@@ -23,6 +23,9 @@ from app.modules.tutor.schemas import (
 )
 
 NOT_READY_MESSAGE = "Tài liệu đang được xử lý"
+# Tìm tài liệu theo phạm vi cả khóa chỉ xét khóa đã publish; chủ khóa/admin mở được phiên trên khóa nháp nên cần
+# thông báo riêng thay vì "đang xử lý" (tài liệu có thể đã xong).
+DRAFT_COURSE_SCOPE_MESSAGE = "Hỏi cả khóa chỉ dùng được khi khóa đã xuất bản"
 HISTORY_LIMIT = 4  # số tin nhắn gần nhất dùng để viết lại câu hỏi (spec 5.3 bước 1)
 RATE_WINDOW_S = 3600
 
@@ -103,6 +106,8 @@ async def availability(
 ) -> AvailabilityOut:
     course, lesson = await resolve_scope(db, user, course_id, lesson_id)
     n = await count_ready_chunks(db, SearchScope(course.id, lesson.id if lesson else None), embedding_model)
+    if lesson is None and course.status != CourseStatus.published:
+        return AvailabilityOut(available=False, ready_chunks=n, message=DRAFT_COURSE_SCOPE_MESSAGE)
     return AvailabilityOut(available=n > 0, ready_chunks=n, message=None if n else NOT_READY_MESSAGE)
 
 

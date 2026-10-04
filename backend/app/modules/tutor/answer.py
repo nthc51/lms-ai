@@ -156,7 +156,7 @@ async def answer_stream(
     session_factory: async_sessionmaker = SessionLocal,
     settings: Settings | None = None,
 ) -> AsyncIterator[str]:
-    """Sinh các event SSE: sources → token… → done (hoặc error khi lỗi).
+    """Sinh các event SSE: sources → token… → done (hoặc error khi lỗi, hoặc khi LLM trả về rỗng).
 
     Phần trước token đầu (viết lại + tìm tài liệu + mở stream, gồm retry) chịu chung hạn chót
     tutor_prestream_deadline_s; quá hạn → event error. Khối finally luôn lưu câu trả lời — kể cả phần dở khi
@@ -203,6 +203,17 @@ async def answer_stream(
             elif tail:
                 answer.mark_first_token()
                 yield sse("token", {"text": tail})
+            if not answer.refused and not clean_citations(stream.text, len(answer.sources))[0].strip():
+                # Stream kết thúc mà không có chữ nào (bị chặn an toàn, model trả rỗng...): báo lỗi như lỗi AI
+                # thay vì một `done` rỗng; vẫn lưu tin assistant (rỗng, truncated) như mọi đường lỗi.
+                logger.warning(
+                    "AI Tutor trả lời rỗng (session %s, finish_reason=%s)",
+                    ctx.session_id,
+                    stream.finish_reason,
+                )
+                await answer.save(truncated=True)
+                yield sse("error", AI_ERROR)
+                return
         message_id, content, citations = await answer.save()
         yield sse(
             "done",

@@ -457,3 +457,15 @@ async def test_aclose_after_first_token_saves_truncated_answer(db):
     assert msg.truncated is True and msg.content == "từ0"
     assert msg.tokens_out == count_tokens("từ0")
     assert provider.streams[0].closed
+
+
+async def test_empty_completed_answer_is_an_error_not_an_empty_done(db):
+    for reply in ("", "   ", "[9]"):  # rỗng, chỉ khoảng trắng, chỉ trích dẫn không hợp lệ (bị xóa)
+        course, lesson, session = await _setup(db)
+        events = await _run(_ctx(course, lesson, session), FakeLLMProvider([reply]))
+        names = [e for e, _ in events]
+        assert names[0] == "sources" and names[-1] == "error" and "done" not in names, reply
+        assert events[-1][1]["code"] == "AI_UNAVAILABLE"
+        msg = await _assistant(db, session)
+        assert msg.truncated is True and msg.refused is False and msg.content == ""
+        assert msg.prompt_version == "tutor_answer@v1"

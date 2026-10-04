@@ -9,6 +9,8 @@ from app.modules.tutor.models import ChatRole
 
 
 class SessionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     course_id: uuid.UUID
     lesson_id: uuid.UUID | None = None  # None = hỏi trên toàn khóa
 
@@ -52,12 +54,14 @@ class MessagePage(Page[MessageOut]):
 
 
 class AskIn(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     content: str = Field(min_length=1, max_length=2000)
 
 
 class FeedbackIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     value: Literal[1, -1] | None  # None = bỏ đánh giá
 
 

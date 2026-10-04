@@ -114,3 +114,20 @@ async def test_messages_order_is_deterministic_for_same_timestamp(client, db):
     await db.commit()
     r = await client.get(f"{API}/tutor/sessions/{s['id']}/messages", headers=sv)
     assert [m["role"] for m in r.json()["items"]] == ["user", "assistant"]
+
+
+async def test_course_scope_availability_on_draft_course_has_its_own_message(client, db):
+    _, gv = await make_teacher(client)
+    course = await create_course(client, gv)
+    section = await add_section(client, gv, course["id"])
+    lesson = await add_lesson(client, gv, section["id"])
+    await seed_chunks(db, uuid.UUID(lesson["id"]), [BINARY_SEARCH])
+    r = await client.get(f"{API}/tutor/availability", params={"course_id": course["id"]}, headers=gv)
+    assert r.json()["available"] is False
+    assert r.json()["message"] == "Hỏi cả khóa chỉ dùng được khi khóa đã xuất bản"
+    params = {"course_id": course["id"], "lesson_id": lesson["id"]}  # phạm vi bài vẫn dùng được khi khóa nháp
+    assert (await client.get(f"{API}/tutor/availability", params=params, headers=gv)).json() == {
+        "available": True,
+        "ready_chunks": 1,
+        "message": None,
+    }
