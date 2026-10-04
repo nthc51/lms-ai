@@ -7065,12 +7065,12 @@ git add backend/app/modules/analytics backend/app/main.py backend/tests/test_ana
 - Consumes: `API`, `_approve`, `sample_pdf` (`backend/scripts/smoke_week1.py`); toàn bộ endpoint của Task 9–20.
 - Produces: script smoke tuần 2 (`python -m scripts.smoke_week2`), spec đã cập nhật tiến độ tuần 2.
 
-- [ ] **Step 1: Chạy toàn bộ test và lint**
+- [x] **Step 1: Chạy toàn bộ test và lint**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff `All checks passed!`, `... files already formatted`; pytest toàn bộ PASS, không có test nào bị skip.
 
-- [ ] **Step 2: Vòng migration trên `lms_test`** (bắt lỗi thiếu `DROP TYPE` trong `downgrade()`)
+- [x] **Step 2: Vòng migration trên `lms_test`** (bắt lỗi thiếu `DROP TYPE` trong `downgrade()`)
 
 Run:
 ```bash
@@ -7083,7 +7083,7 @@ Expected: không lỗi; dòng cuối `No new upgrade operations detected.` Nếu
 Chạy tiếp trên DB dev: `uv run alembic upgrade head && uv run alembic check`
 Expected: `No new upgrade operations detected.`
 
-- [ ] **Step 3: `backend/scripts/smoke_week2.py`**
+- [x] **Step 3: `backend/scripts/smoke_week2.py`**
 
 ```python
 """Smoke test tuần 2 (A5–A8) trên docker stack thật với provider giả (LLM_PROVIDER=fake, EMBED_PROVIDER=fake).
@@ -7220,7 +7220,7 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-- [ ] **Step 4: Chạy smoke trên docker stack**
+- [x] **Step 4: Chạy smoke trên docker stack**
 
 Kiểm tra `backend/.env` không đặt `LLM_PROVIDER=gemini` / `EMBED_PROVIDER=gemini` (smoke dùng provider giả).
 
@@ -7228,7 +7228,7 @@ Run (từ thư mục gốc repo): `docker compose up -d --build api worker`
 Run (từ `backend/`): `PYTHONUTF8=1 uv run python -m scripts.smoke_week1 && PYTHONUTF8=1 uv run python -m scripts.smoke_week2`
 Expected: cả hai in `SMOKE OK`. Smoke tuần 2 in `SSE: sources → N token → done · trích dẫn [1]`, `Sinh câu hỏi: done · 3 câu chờ duyệt` (số câu phụ thuộc số chunk của PDF mẫu), `lộ đáp án: False`. Nếu `Tutor khả dụng` là `False`, job xử lý tài liệu chưa `done` hoặc worker chưa được build lại; xem `docker compose logs worker`.
 
-- [ ] **Step 5: Cập nhật spec `docs/specs/2026-09-29-lms-ai-design.md`**
+- [x] **Step 5: Cập nhật spec `docs/specs/2026-09-29-lms-ai-design.md`**
 
 - **Đầu file:** `Trạng thái spec` → `Đã duyệt thiết kế (5/5 phần), đang triển khai (xong backend tuần 1 và tuần 2)`.
 - **Mục 0:** `**Tuần hiện tại:** 2 / 5`. A5, A6, A7, A8 chuyển `[~]` (backend xong, còn frontend); D1 chuyển `[~]` (backend `POST /tutor/messages/{id}/feedback` xong). M1 giữ `[ ]` cho tới khi xong frontend tầng A.
@@ -7246,7 +7246,7 @@ Expected: cả hai in `SMOKE OK`. Smoke tuần 2 in `SSE: sources → N token �
   - `jobs.payload JSONB cho tham số job; quiz_gen job_timeout 900 s, sweeper bao phủ qua JOB_TIMEOUTS, SOURCE_JOB_TYPES giữ nguyên`
   - `Quiz A7: attempt in_progress được trả lại thay vì tạo mới; autosave FOR SHARE; submit UPDATE-trước-rồi-upsert trong cùng transaction; câu hỏi trong quiz đã xuất bản không sửa/loại được`
 
-- [ ] **Step 6: Commit** (từ thư mục gốc repo)
+- [x] **Step 6: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/scripts/smoke_week2.py docs/specs/2026-09-29-lms-ai-design.md && git commit -m "docs: week-2 backend progress and smoke test for tutor and quiz"
