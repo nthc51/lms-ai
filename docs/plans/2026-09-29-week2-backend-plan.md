@@ -6788,7 +6788,7 @@ git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/attempts.py
 - Consumes: `get_owned_course(db, course_id, user)`, `require_staff`; `Enrollment`, `LessonProgress`, `ProgressStatus`; `Course`, `Lesson`, `Section`; `Quiz`, `QuizAttempt`, `AttemptStatus`; `ChatSession`, `ChatMessage`, `ChatRole`; helpers `make_published_quiz`, `make_student`, `make_teacher`, `make_admin`, `make_published_course`, `parse_sse`; factories `seed_chunks`, `BINARY_SEARCH`.
 - Produces: `LessonStat`, `QuizStat`, `TutorStat`, `CourseAnalytics`; `async course_analytics(db, course) -> CourseAnalytics`; route `GET /courses/{id}/analytics`.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_analytics.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_analytics.py`**
 
 ```python
 import uuid
@@ -6851,12 +6851,12 @@ async def test_analytics_is_for_owner_or_admin_only(client, db):
     assert empty["enrollments"] == 0 and empty["quizzes"] == [] and empty["lessons"][0]["completion_rate"] == 0.0
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_analytics.py -v`
 Expected: FAIL — `GET /courses/{id}/analytics` trả `404` (chưa có route), `KeyError: 'enrollments'`.
 
-- [ ] **Step 3: `app/modules/analytics/schemas.py`**
+- [x] **Step 3: `app/modules/analytics/schemas.py`**
 
 ```python
 import uuid
@@ -6900,7 +6900,7 @@ class CourseAnalytics(BaseModel):
     tutor: TutorStat
 ```
 
-- [ ] **Step 4: `app/modules/analytics/service.py`**
+- [x] **Step 4: `app/modules/analytics/service.py`**
 
 ```python
 """Số liệu cơ bản cho dashboard giảng viên (A8). Phân tích sâu (câu hay sai, chủ đề yếu) là B7."""
@@ -7009,7 +7009,7 @@ async def course_analytics(db: AsyncSession, course: Course) -> CourseAnalytics:
     )
 ```
 
-- [ ] **Step 5: `app/modules/analytics/router.py`**
+- [x] **Step 5: `app/modules/analytics/router.py`**
 
 ```python
 import uuid
@@ -7037,17 +7037,17 @@ async def course_analytics(
 
 Gắn router vào `app/main.py`: import `from app.modules.analytics.router import router as analytics_router` (đầu nhóm `app.modules`) và `app.include_router(analytics_router)` sau `app.include_router(quiz_router)`.
 
-- [ ] **Step 6: Chạy lại test**
+- [x] **Step 6: Chạy lại test**
 
 Run: `uv run pytest tests/test_analytics.py -v`
 Expected: PASS 2 test.
 
-- [ ] **Step 7: Chạy toàn bộ**
+- [x] **Step 7: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 8: Commit** (từ thư mục gốc repo)
+- [x] **Step 8: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/analytics backend/app/main.py backend/tests/test_analytics.py && git commit -m "feat(analytics): basic course dashboard for teachers"
