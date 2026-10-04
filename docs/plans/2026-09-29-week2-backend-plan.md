@@ -6086,7 +6086,7 @@ git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/quizzes.py 
   - `attempts.py`: `FINISHED`, `attempt_closed() -> AppError`, `async _questions(db, order) -> dict[str, Question]`, `_check_choice(questions, order, question_id, option_id)`, `async _own_attempt(db, attempt_id, user, *, lock_share=False) -> QuizAttempt`, `async attempt_view(db, attempt) -> AttemptOut`, `async start_attempt(db, user, quiz_id) -> tuple[AttemptOut, bool]`, `async save_answer(db, user, attempt_id, question_id, data) -> AnswerOut`
   - Route: `POST /quizzes/{id}/attempts` (201 mới / 200 đang làm dở), `PUT /attempts/{id}/answers/{qid}`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_attempts_api.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_attempts_api.py`**
 
 ```python
 import asyncio
@@ -6149,12 +6149,12 @@ async def test_autosave_validates_and_overwrites_and_blocks_quiz_delete(client, 
     assert (r.status_code, r.json()["error"]["code"]) == (409, "INVALID_STATE")
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_attempts_api.py -v`
 Expected: FAIL — `POST /quizzes/{id}/attempts` trả `404`/`405`, assert `status_code == 201` hỏng.
 
-- [ ] **Step 3: Thêm vào `app/modules/quiz/schemas.py`**
+- [x] **Step 3: Thêm vào `app/modules/quiz/schemas.py`**
 
 Đổi dòng import models thành `from app.modules.quiz.models import AttemptStatus, Difficulty, QuestionOrigin, QuizStatus, ReviewStatus`, rồi thêm vào cuối file:
 
@@ -6188,7 +6188,7 @@ class AnswerOut(BaseModel):
     answered_at: datetime
 ```
 
-- [ ] **Step 4: `app/modules/quiz/attempts.py`**
+- [x] **Step 4: `app/modules/quiz/attempts.py`**
 
 ```python
 """Học viên làm quiz — phần A7 (spec 4.3, 6.5): bắt đầu, autosave, nộp, chấm, xem kết quả.
@@ -6352,7 +6352,7 @@ async def save_answer(
     return AnswerOut(question_id=question_id, selected_option_id=data.selected_option_id, answered_at=now)
 ```
 
-- [ ] **Step 5: Route trong `app/modules/quiz/router.py`**
+- [x] **Step 5: Route trong `app/modules/quiz/router.py`**
 
 Trong khối import: đổi `from fastapi import APIRouter, Depends` thành `from fastapi import APIRouter, Depends, Response`; đổi `from app.core.deps import get_current_user, require_staff` thành `from app.core.deps import get_current_user, require_role, require_staff`; đổi `from app.modules.auth.models import User` thành `from app.modules.auth.models import Role, User`; đổi `from app.modules.quiz import questions, quizzes` thành `from app.modules.quiz import attempts, questions, quizzes`; thêm `AnswerIn`, `AnswerOut`, `AttemptOut` vào danh sách import từ `app.modules.quiz.schemas` (giữ thứ tự chữ cái). Thêm sau dòng `router = ...`:
 
@@ -6387,17 +6387,17 @@ async def save_answer(
     return await attempts.save_answer(db, user, attempt_id, question_id, data)
 ```
 
-- [ ] **Step 6: Chạy lại test**
+- [x] **Step 6: Chạy lại test**
 
 Run: `uv run pytest tests/test_attempts_api.py -v`
 Expected: PASS 4 test.
 
-- [ ] **Step 7: Chạy toàn bộ**
+- [x] **Step 7: Chạy toàn bộ**
 
 Run: `uv run ruff format . && uv run ruff check . && uv run ruff format --check . && uv run pytest -q`
 Expected: ruff sạch, toàn bộ test PASS.
 
-- [ ] **Step 8: Commit** (từ thư mục gốc repo)
+- [x] **Step 8: Commit** (từ thư mục gốc repo)
 
 ```bash
 git add backend/app/modules/quiz/schemas.py backend/app/modules/quiz/attempts.py backend/app/modules/quiz/router.py backend/tests/test_attempts_api.py && git commit -m "feat(quiz): start attempt without answers, concurrent-safe, with autosave"
