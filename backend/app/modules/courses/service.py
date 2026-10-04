@@ -77,7 +77,44 @@ async def update_course(db: AsyncSession, course: Course, data: CourseUpdate) ->
     return course
 
 
+async def _ensure_no_student_work(
+    db: AsyncSession, course: Course, lesson_filter, chat_filter, what: str
+) -> None:
+    """Chặn xóa khi nội dung bị xóa (cascade) kéo theo dữ liệu của học viên. Luật (tối thiểu, có chủ đích):
+    trong phạm vi bị xóa có quiz đã xuất bản, hoặc bất kỳ lượt làm quiz nào, hoặc lịch sử hỏi Tutor (phiên có
+    tin nhắn) của người khác chủ khóa. Quiz nháp, câu hỏi, tài liệu và phiên thử Tutor của chính giảng viên
+    vẫn bị xóa theo như trước. Quiz trong phạm vi bị khóa FOR UPDATE (cùng khóa với xuất bản quiz) để không có
+    quiz nào được xuất bản chen giữa lúc kiểm tra và lúc xóa."""
+    from app.modules.quiz.models import Quiz, QuizAttempt, QuizStatus
+    from app.modules.tutor.models import ChatMessage, ChatSession
+
+    lesson_ids = select(Lesson.id).join(Section, Section.id == Lesson.section_id).where(lesson_filter)
+    quizzes = (
+        await db.execute(select(Quiz.id, Quiz.status).where(Quiz.lesson_id.in_(lesson_ids)).with_for_update())
+    ).all()
+    if any(status == QuizStatus.published for _, status in quizzes):
+        raise AppError("INVALID_STATE", f"Không xóa được: {what} có quiz đã xuất bản", 409)
+    if quizzes and await db.scalar(
+        select(func.count()).select_from(QuizAttempt).where(QuizAttempt.quiz_id.in_([q for q, _ in quizzes]))
+    ):
+        raise AppError("INVALID_STATE", f"Không xóa được: {what} đã có bài làm quiz của học viên", 409)
+    has_chat = await db.scalar(
+        select(func.count())
+        .select_from(ChatSession)
+        .where(
+            chat_filter(ChatSession, lesson_ids),
+            ChatSession.user_id != course.teacher_id,
+            select(ChatMessage.id).where(ChatMessage.session_id == ChatSession.id).exists(),
+        )
+    )
+    if has_chat:
+        raise AppError("INVALID_STATE", f"Không xóa được: {what} đã có lịch sử hỏi Tutor của học viên", 409)
+
+
 async def delete_course(db: AsyncSession, course: Course) -> None:
+    await _ensure_no_student_work(
+        db, course, Section.course_id == course.id, lambda cs, _: cs.course_id == course.id, "khóa học"
+    )
     await db.execute(delete(Course).where(Course.id == course.id))
     await db.commit()
 
@@ -132,6 +169,10 @@ async def update_section(db: AsyncSession, section: Section, data: SectionUpdate
 
 
 async def delete_section(db: AsyncSession, section: Section) -> None:
+    course = await db.get(Course, section.course_id)
+    await _ensure_no_student_work(
+        db, course, Section.id == section.id, lambda cs, ids: cs.lesson_id.in_(ids), "chương này"
+    )
     await db.execute(delete(Section).where(Section.id == section.id))
     await db.commit()
 
@@ -178,7 +219,10 @@ async def update_lesson(db: AsyncSession, lesson: Lesson, data: LessonUpdate) ->
     return lesson
 
 
-async def delete_lesson(db: AsyncSession, lesson: Lesson) -> None:
+async def delete_lesson(db: AsyncSession, lesson: Lesson, course: Course) -> None:
+    await _ensure_no_student_work(
+        db, course, Lesson.id == lesson.id, lambda cs, ids: cs.lesson_id.in_(ids), "bài học này"
+    )
     await db.execute(delete(Lesson).where(Lesson.id == lesson.id))
     await db.commit()
 

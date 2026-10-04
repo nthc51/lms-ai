@@ -131,8 +131,8 @@ async def update_lesson(
 async def delete_lesson(
     lesson_id: uuid.UUID, user: User = Depends(require_staff), db: AsyncSession = Depends(get_db)
 ) -> None:
-    lesson, _ = await service.get_owned_lesson(db, lesson_id, user)
-    await service.delete_lesson(db, lesson)
+    lesson, course = await service.get_owned_lesson(db, lesson_id, user)
+    await service.delete_lesson(db, lesson, course)
 
 
 @router.patch("/courses/{course_id}/reorder", status_code=204)
