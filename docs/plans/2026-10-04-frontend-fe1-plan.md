@@ -3610,7 +3610,7 @@ Hành vi theo design-system §5.3 (AI Tutor):
 
 > **Lệch so với design-system:** design ghi "bấm nguồn → cuộn tới đúng đoạn trong bài". Thực tế nguồn RAG là các đoạn của **file PDF** (không phải nội dung markdown của bài), và học viên không có trang xem PDF. Vì vậy chip mở **thẻ trích dẫn** thay cho việc cuộn. Với nguồn video thì có nút tua.
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `src/lib/tutor/citations.test.ts`:
 
@@ -3724,7 +3724,7 @@ describe("useTutorChat", () => {
 Run: `npx vitest run src/lib/tutor`
 Expected: FAIL, lỗi `Failed to resolve import "./citations"` và `"./use-tutor-chat"`.
 
-- [ ] **Bước 2: Cài đặt**
+- [x] **Bước 2: Cài đặt**
 
 `src/lib/tutor/types.ts`:
 
@@ -3967,12 +3967,12 @@ export function useTutorChat({ courseId, lessonId }: Scope, enabled = true) {
 }
 ```
 
-- [ ] **Bước 3: Chạy, xác nhận pass**
+- [x] **Bước 3: Chạy, xác nhận pass**
 
 Run: `npx vitest run src/lib/tutor`
 Expected: PASS (7 test).
 
-- [ ] **Bước 4: Giao diện**
+- [x] **Bước 4: Giao diện**
 
 `src/components/tutor/citation-chip.tsx`:
 
@@ -4292,7 +4292,7 @@ function useCountdown(until: number | null, onDone: () => void) {
 }
 ```
 
-- [ ] **Bước 5: Kiểm tra và commit**
+- [x] **Bước 5: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
