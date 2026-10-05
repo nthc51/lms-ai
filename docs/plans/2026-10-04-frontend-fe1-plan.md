@@ -114,7 +114,7 @@ Expected: không có lỗi eslint và `tsc`, Vitest báo mọi test PASS.
 - Modify: `frontend/package.json` (scripts), `frontend/.gitignore`
 - Delete: `frontend/src/app/page.tsx`, `frontend/public/*.svg`
 
-- [ ] **Bước 1: Tạo dự án** (chạy ở thư mục gốc repo)
+- [x] **Bước 1: Tạo dự án** (chạy ở thư mục gốc repo)
 
 ```bash
 npx create-next-app@16 frontend --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --yes
@@ -122,7 +122,7 @@ npx create-next-app@16 frontend --ts --tailwind --eslint --app --src-dir --impor
 
 Expected: có thư mục `frontend/` với Next `16.x`, React `19.x`, Tailwind `^4`. Nếu `create-next-app` tự `git init` trong `frontend/` thì xóa thư mục `frontend/.git`, vì repo đã có git ở thư mục gốc.
 
-- [ ] **Bước 2: Cài thư viện**
+- [x] **Bước 2: Cài thư viện**
 
 ```bash
 cd frontend
@@ -134,7 +134,7 @@ Expected: cài không lỗi. `@types/node` phải là `^22`, vì Vitest 5 không
 
 > **Vì sao dùng Fontsource thay vì `next/font/google`?** Font được đóng gói sẵn trong `node_modules`, nên `next build` (kể cả trong Docker, CI) không cần tải từ Google, và trang không gửi request nào tới Google. Đây là lệch nhỏ so với design-system §3, kết quả hiển thị giống hệt.
 
-- [ ] **Bước 3: Thêm scripts vào `package.json`** (giữ nguyên `dev`, `build`, `start`, `lint` có sẵn)
+- [x] **Bước 3: Thêm scripts vào `package.json`** (giữ nguyên `dev`, `build`, `start`, `lint` có sẵn)
 
 ```json
 "typecheck": "tsc --noEmit",
@@ -145,7 +145,7 @@ Expected: cài không lỗi. `@types/node` phải là `^22`, vì Vitest 5 không
 "gen:api": "npm run api:export && openapi-typescript openapi.json -o src/lib/api/schema.d.ts"
 ```
 
-- [ ] **Bước 4: Ghi `next.config.ts`**
+- [x] **Bước 4: Ghi `next.config.ts`**
 
 ```ts
 import type { NextConfig } from "next";
@@ -164,7 +164,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Bước 5: Cấu hình Vitest**
+- [x] **Bước 5: Cấu hình Vitest**
 
 `vitest.config.mts`:
 
@@ -211,7 +211,7 @@ export const server = setupServer();
 export const api = (path: string) => `http://localhost:3000/api/v1${path}`;
 ```
 
-- [ ] **Bước 6: File môi trường và `.gitignore`**
+- [x] **Bước 6: File môi trường và `.gitignore`**
 
 `.env.example`:
 
@@ -233,7 +233,7 @@ Trong `.gitignore`, ngay dưới dòng `.env*`, thêm `!.env.example`. Cuối fi
 
 Copy `.env.example` thành `.env.local` (file này không commit).
 
-- [ ] **Bước 7: Dọn file mẫu**
+- [x] **Bước 7: Dọn file mẫu**
 
 ```bash
 rm -rf .next src/app/page.tsx public/*.svg && touch public/.gitkeep
@@ -241,7 +241,7 @@ rm -rf .next src/app/page.tsx public/*.svg && touch public/.gitkeep
 
 Phải xóa `.next` vì `create-next-app` đã sinh sẵn type route trỏ tới `page.tsx`. Không xóa thì `tsc` sẽ báo `Cannot find module '../../src/app/page.js'`. Trên PowerShell dùng lệnh: `Remove-Item -Recurse -Force .next, src/app/page.tsx, public/*.svg; New-Item public/.gitkeep`.
 
-- [ ] **Bước 8: Kiểm tra**
+- [x] **Bước 8: Kiểm tra**
 
 ```bash
 npm run typecheck && npx vitest run --passWithNoTests
@@ -249,7 +249,7 @@ npm run typecheck && npx vitest run --passWithNoTests
 
 Expected: `tsc` không lỗi; Vitest báo `No test files found` và thoát mã 0.
 
-- [ ] **Bước 9: Commit**
+- [x] **Bước 9: Commit**
 
 ```bash
 cd .. && git add frontend && git commit -m "chore(web): scaffold Next.js 16 frontend with Vitest and MSW"
