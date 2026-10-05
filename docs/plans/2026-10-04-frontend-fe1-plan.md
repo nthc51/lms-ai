@@ -3207,7 +3207,7 @@ Quy tắc theo design-system §8:
 - **Nhắc nghỉ mắt:** chỉ đếm khi tab đang hiển thị và có tương tác. Rời máy quá 5 phút thì đếm lại từ đầu. Không nhắc khi `paused` (quiz có giờ ở FE-2).
 - **Tự lưu:** các lần lưu chạy **tuần tự**, không bao giờ gửi 2 request song song, và không để bản cũ ghi đè bản mới.
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `src/lib/study/use-break-reminder.test.ts`:
 
@@ -3371,7 +3371,7 @@ describe("useAutosave", () => {
 Run: `npx vitest run src/lib/study src/lib/use-autosave.test.ts`
 Expected: FAIL, lỗi `Failed to resolve import "./use-break-reminder"`, `"./use-shortcuts"`, `"./use-autosave"`.
 
-- [ ] **Bước 2: Cài đặt**
+- [x] **Bước 2: Cài đặt**
 
 `src/lib/study/use-break-reminder.ts`:
 
@@ -3579,14 +3579,14 @@ export function autosaveLabel(s: AutosaveState) {
 }
 ```
 
-- [ ] **Bước 3: Chạy, xác nhận pass**
+- [x] **Bước 3: Chạy, xác nhận pass**
 
 Run: `npx vitest run src/lib/study src/lib/use-autosave.test.ts`
 Expected: PASS (12 test: 4 test nhắc nghỉ, 2 test phím tắt, 3 test tự lưu, 3 test storage đã có từ Task 10).
 
 > Nếu test autosave bị treo hoặc worker bị SIGKILL thì có vòng lặp vô hạn. Kiểm tra lại: vòng `while` trong `run()` phải `return` ngay khi lưu lỗi.
 
-- [ ] **Bước 4: Commit**
+- [x] **Bước 4: Commit**
 
 ```bash
 git add frontend/src/lib && git commit -m "feat(web): break reminder, keyboard shortcuts and sequential autosave"
