@@ -22,4 +22,36 @@ describe("useShortcuts", () => {
     fireEvent.keyDown(window, { key: "f", ctrlKey: true });
     expect(onF).not.toHaveBeenCalled();
   });
+
+  it("bỏ qua phím mũi tên trên <video> nhưng vẫn nhận Escape", () => {
+    const onRight = vi.fn();
+    const onEsc = vi.fn();
+    function H() {
+      useShortcuts({ ArrowRight: onRight, Escape: onEsc });
+      return <video aria-label="video" tabIndex={0} />;
+    }
+    const { getByLabelText } = render(<H />);
+    fireEvent.keyDown(getByLabelText("video"), { key: "ArrowRight" });
+    expect(onRight).not.toHaveBeenCalled();
+    fireEvent.keyDown(getByLabelText("video"), { key: "Escape" });
+    expect(onEsc).toHaveBeenCalledTimes(1);
+  });
+
+  it("bỏ qua mọi phím (kể cả Escape) bên trong [role=dialog]", () => {
+    const onF = vi.fn();
+    const onEsc = vi.fn();
+    function H() {
+      useShortcuts({ f: onF, Escape: onEsc });
+      return (
+        <div role="dialog">
+          <button>trong dialog</button>
+        </div>
+      );
+    }
+    const { getByText } = render(<H />);
+    fireEvent.keyDown(getByText("trong dialog"), { key: "f" });
+    fireEvent.keyDown(getByText("trong dialog"), { key: "Escape" });
+    expect(onF).not.toHaveBeenCalled();
+    expect(onEsc).not.toHaveBeenCalled();
+  });
 });
