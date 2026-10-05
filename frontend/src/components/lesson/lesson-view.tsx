@@ -27,6 +27,7 @@ import { Sheet } from "@/components/ui/dialog";
 import { Badge, Skeleton, Tip } from "@/components/ui/misc";
 import { errorMessage } from "@/lib/api/errors";
 import { useAuth } from "@/lib/auth/auth-context";
+import { attachVideoRef } from "@/lib/study/video-ref";
 import { flattenLessons, useCourse, useLesson, useLessonVideo, useSaveProgress } from "@/lib/queries";
 import { lastLesson, READER_MAX, READER_MIN, readerSize } from "@/lib/study/storage";
 import { useShortcuts } from "@/lib/study/use-shortcuts";
@@ -282,10 +283,7 @@ function LessonVideo({
 }) {
   const { bind } = useVideoProgress(lesson, track);
   const setRef = React.useCallback(
-    (el: HTMLVideoElement | null) => {
-      videoRef.current = el;
-      return bind(el);
-    },
+(el: HTMLVideoElement | null) => attachVideoRef(videoRef, bind, el),
     [bind, videoRef],
   );
   return (
