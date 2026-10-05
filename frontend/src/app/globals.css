@@ -1,26 +1,140 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ---- Design tokens (docs/design/design-system.md §2) ---- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f5f0;
+  --surface: #fffdf9;
+  --foreground: #24292f;
+  --muted-foreground: #5b6470;
+  --border: #e3ded4;
+  --muted: #efebe3;
+  --primary: #0f6e66;
+  --primary-foreground: #ffffff;
+  --accent: #a15c07;
+  --success: #2f7d4f;
+  --destructive: #b42318;
+  --ring: #0f6e66;
+  --radius: 10px;
+  --reader-size: 17px;
+}
+
+.dark {
+  --background: #171a1e;
+  --surface: #1f2328;
+  --foreground: #e4e1da;
+  --muted-foreground: #a3a8af;
+  --border: #33383f;
+  --muted: #262b31;
+  --primary: #5fbfb3;
+  --primary-foreground: #0e1a19;
+  --accent: #e0a458;
+  --success: #7cc49a;
+  --destructive: #f2867a;
+  --ring: #5fbfb3;
+  color-scheme: dark;
+}
+
+.sepia {
+  --background: #f3ead7;
+  --surface: #f9f2e3;
+  --foreground: #3a2f24;
+  --muted-foreground: #6b5b49;
+  --border: #ddcfb4;
+  --muted: #ebe0c9;
+  --primary: #2f6b5e;
+  --primary-foreground: #ffffff;
+  --accent: #8a5313;
+  --success: #3b6e45;
+  --destructive: #a3321f;
+  --ring: #2f6b5e;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+  --radius-lg: var(--radius);
+  --radius-md: 8px;
+  --font-sans: "Be Vietnam Pro", system-ui, sans-serif;
+  --font-reading: "Noto Sans Variable", "Noto Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Khung đọc nội dung bài / câu trả lời AI (design-system §3) */
+.reader {
+  font-family: var(--font-reading);
+  font-size: var(--reader-size);
+  line-height: 1.75;
+  max-width: 68ch;
+  overflow-wrap: anywhere;
+}
+.reader h1, .reader h2, .reader h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 1.6em 0 0.6em;
+  scroll-margin-top: 80px;
+}
+.reader h1 { font-size: 1.6em; }
+.reader h2 { font-size: 1.35em; }
+.reader h3 { font-size: 1.15em; }
+.reader p, .reader ul, .reader ol, .reader pre, .reader table, .reader blockquote { margin: 0 0 1em; }
+.reader ul { list-style: disc; padding-left: 1.4em; }
+.reader ol { list-style: decimal; padding-left: 1.4em; }
+.reader a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.reader code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--muted);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.reader pre {
+  background: var(--muted);
+  padding: 12px 14px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.reader pre code { background: none; padding: 0; font-size: inherit; }
+.reader blockquote { border-left: 3px solid var(--accent); padding-left: 1em; color: var(--muted-foreground); }
+.reader table { border-collapse: collapse; display: block; overflow-x: auto; }
+.reader th, .reader td { border: 1px solid var(--border); padding: 6px 10px; }
+.reader .katex-display { overflow-x: auto; overflow-y: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
