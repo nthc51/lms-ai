@@ -2210,7 +2210,7 @@ Theo design-system §5.3 (phần Chung):
 
 Phần này được kiểm thử bằng E2E ở Task 16 (kịch bản "đăng nhập sai mật khẩu").
 
-- [ ] **Bước 1: Layout cho nhóm trang auth** (`src/app/(auth)/layout.tsx`)
+- [x] **Bước 1: Layout cho nhóm trang auth** (`src/app/(auth)/layout.tsx`)
 
 ```tsx
 import Link from "next/link";
@@ -2228,7 +2228,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-- [ ] **Bước 2: Đăng nhập**
+- [x] **Bước 2: Đăng nhập**
 
 `src/app/(auth)/login/page.tsx`:
 
@@ -2314,7 +2314,7 @@ export function LoginForm() {
 }
 ```
 
-- [ ] **Bước 3: Đăng ký**
+- [x] **Bước 3: Đăng ký**
 
 Có chọn vai trò. Giảng viên mới đăng ký sẽ thấy thông báo "cần quản trị viên duyệt".
 
@@ -2437,7 +2437,7 @@ export function RegisterForm() {
 }
 ```
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm run build
