@@ -2455,7 +2455,7 @@ Expected: build liệt kê `○ /login` và `○ /register`.
 - Create pages: `frontend/src/app/(main)/page.tsx`, `explore/page.tsx`, `courses/[slug]/page.tsx`, `my/page.tsx`, `account/page.tsx`
 - Test: `frontend/src/lib/study/storage.test.ts`, `frontend/src/components/content/markdown.test.tsx`
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `src/lib/study/storage.test.ts`:
 
@@ -2510,7 +2510,7 @@ describe("Markdown", () => {
 Run: `npx vitest run src/lib/study src/components/content`
 Expected: FAIL, lỗi `Failed to resolve import "./storage"` và `"./markdown"`.
 
-- [ ] **Bước 2: Cài đặt phần lõi**
+- [x] **Bước 2: Cài đặt phần lõi**
 
 `src/lib/study/storage.ts`:
 
@@ -2609,7 +2609,7 @@ export function Markdown({
 Run: `npx vitest run src/lib/study src/components/content`
 Expected: PASS (5 test).
 
-- [ ] **Bước 3: Truy vấn dữ liệu và tiện ích**
+- [x] **Bước 3: Truy vấn dữ liệu và tiện ích**
 
 `src/lib/queries.ts` (query key tập trung ở `qk`, dùng lại ở mọi nơi):
 
@@ -2746,7 +2746,7 @@ export function resumeLessonId(course: CourseDetail): string | null {
 }
 ```
 
-- [ ] **Bước 4: Component khóa học**
+- [x] **Bước 4: Component khóa học**
 
 `src/components/course/course-card.tsx`:
 
@@ -2858,7 +2858,7 @@ export function MyCourseList({ limit }: { limit?: number }) {
 }
 ```
 
-- [ ] **Bước 5: Các trang**
+- [x] **Bước 5: Các trang**
 
 `src/app/(main)/page.tsx` (trang chủ: khách thấy phần giới thiệu, học viên thấy "Tiếp tục học"):
 
@@ -3185,7 +3185,7 @@ export default function AccountPage() {
 }
 ```
 
-- [ ] **Bước 6: Kiểm tra và commit**
+- [x] **Bước 6: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
