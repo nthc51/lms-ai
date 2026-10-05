@@ -29,7 +29,9 @@ export function RequireAuth({ staff = false, children }: { staff?: boolean; chil
         <h1 className="text-xl font-semibold">Bạn chưa có quyền giảng dạy</h1>
         <p className="mt-2 text-muted-foreground">
           {user?.role === "teacher"
-            ? "Tài khoản giảng viên của bạn đang chờ quản trị viên duyệt."
+            ? user.teacher_status === "rejected"
+              ? "Yêu cầu giảng dạy của bạn đã bị từ chối. Vui lòng liên hệ quản trị viên."
+              : "Tài khoản giảng viên của bạn đang chờ quản trị viên duyệt."
             : "Trang này chỉ dành cho giảng viên."}
         </p>
       </div>

@@ -24,4 +24,12 @@ describe("RequireAuth", () => {
     render(<RequireAuth staff>soạn khóa</RequireAuth>);
     expect(screen.getByText(/đang chờ quản trị viên duyệt/)).toBeInTheDocument();
   });
+
+  it("giảng viên bị từ chối thấy thông báo riêng, không phải chữ chờ duyệt", () => {
+    auth.status = "authenticated";
+    auth.user = { role: "teacher", teacher_status: "rejected" };
+    render(<RequireAuth staff>soạn khóa</RequireAuth>);
+    expect(screen.getByText(/đã bị từ chối/)).toBeInTheDocument();
+    expect(screen.queryByText(/đang chờ quản trị viên duyệt/)).not.toBeInTheDocument();
+  });
 });
