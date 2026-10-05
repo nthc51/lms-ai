@@ -437,7 +437,7 @@ Không dùng `shadcn` CLI (CLI phải tải registry qua mạng, mạng công ty
 - 4 cỡ: `default` 40px, `lg` 48px, `sm` 32px, `icon` 40×40.
 - Prop `loading` / `loadingText` cho trạng thái "Đang …".
 
-- [ ] **Bước 1: `src/lib/utils.ts`**
+- [x] **Bước 1: `src/lib/utils.ts`**
 
 ```ts
 import { clsx, type ClassValue } from "clsx";
@@ -448,7 +448,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 ```
 
-- [ ] **Bước 2: Viết test cho Button (sẽ fail)**
+- [x] **Bước 2: Viết test cho Button (sẽ fail)**
 
 `src/components/ui/button.test.tsx`:
 
@@ -476,12 +476,12 @@ describe("Button", () => {
 });
 ```
 
-- [ ] **Bước 3: Chạy test, xác nhận fail**
+- [x] **Bước 3: Chạy test, xác nhận fail**
 
 Run: `npx vitest run src/components/ui/button.test.tsx`
 Expected: FAIL, lỗi `Failed to resolve import "./button"`.
 
-- [ ] **Bước 4: Viết `src/components/ui/button.tsx`**
+- [x] **Bước 4: Viết `src/components/ui/button.tsx`**
 
 ```tsx
 import { cva, type VariantProps } from "class-variance-authority";
@@ -555,12 +555,12 @@ export function Button({
 }
 ```
 
-- [ ] **Bước 5: Chạy test, xác nhận pass**
+- [x] **Bước 5: Chạy test, xác nhận pass**
 
 Run: `npx vitest run src/components/ui/button.test.tsx`
 Expected: PASS (2 test).
 
-- [ ] **Bước 6: Các component còn lại**
+- [x] **Bước 6: Các component còn lại**
 
 `src/components/ui/input.tsx` gồm `Input`, `Textarea`, `Label`, và `Field`. `Field` có nhãn, lỗi hiện ngay bên dưới, tự gắn `aria-invalid` và `aria-describedby`:
 
@@ -930,7 +930,7 @@ export function MenuItem({
 }
 ```
 
-- [ ] **Bước 7: Kiểm tra và commit**
+- [x] **Bước 7: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
