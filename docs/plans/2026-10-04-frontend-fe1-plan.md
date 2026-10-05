@@ -1827,7 +1827,7 @@ Bố cục theo design-system §7.1:
 - **768–1023px:** thanh bên thu gọn còn icon, 64px.
 - **< 768px:** thanh dưới. Các mục điều hướng cộng mục Tài khoản tổng cộng **tối đa 4**.
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `src/components/app/nav-items.test.ts`:
 
@@ -1863,7 +1863,7 @@ describe("navItems", () => {
 Run: `npx vitest run src/components/app`
 Expected: FAIL, lỗi `Failed to resolve import "./nav-items"`.
 
-- [ ] **Bước 2: Cài đặt**
+- [x] **Bước 2: Cài đặt**
 
 `src/components/app/nav-items.ts`:
 
@@ -2184,12 +2184,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-- [ ] **Bước 3: Chạy, xác nhận pass**
+- [x] **Bước 3: Chạy, xác nhận pass**
 
 Run: `npx vitest run src/components/app`
 Expected: PASS (5 test).
 
-- [ ] **Bước 4: Commit**
+- [x] **Bước 4: Commit**
 
 ```bash
 git add frontend/src && git commit -m "feat(web): responsive app shell with role-based navigation"
