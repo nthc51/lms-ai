@@ -8,5 +8,11 @@ describe("safeNext", () => {
     expect(safeNext("//evil.com")).toBe("/");
     expect(safeNext("/\\evil.com")).toBe("/");
   });
+  it("chặn ký tự điều khiển mà URL parser sẽ bỏ đi", () => {
+    expect(safeNext("/\t/evil.com")).toBe("/");
+    expect(safeNext("/\n/evil.com")).toBe("/");
+    expect(safeNext("/\r/evil.com")).toBe("/");
+    expect(safeNext("/learn/a?x=1")).toBe("/learn/a?x=1");
+  });
   it("rỗng thì dùng fallback", () => expect(safeNext(null, "/my")).toBe("/my"));
 });
