@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "api:export": "uv run --directory ../backend python -m scripts.export_openapi ../frontend/openapi.json",
+    "api:export": "uv run --directory ../backend python -X utf8 -m scripts.export_openapi ../frontend/openapi.json",
     "gen:api": "npm run api:export && openapi-typescript openapi.json -o src/lib/api/schema.d.ts"
   },
   "dependencies": {
