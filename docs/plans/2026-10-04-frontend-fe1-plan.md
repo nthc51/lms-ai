@@ -264,7 +264,7 @@ cd .. && git add frontend && git commit -m "chore(web): scaffold Next.js 16 fron
 
 Token lấy đúng từ design-system §2: 3 bộ màu `:root` (Sáng), `.dark` (Tối dịu), `.sepia` (Giấy), đã kiểm tra độ tương phản. Lớp `.reader` là khung đọc dùng chung cho nội dung bài và câu trả lời AI: chữ 17px chỉnh được qua biến `--reader-size`, giãn dòng 1.75, tối đa 68 ký tự mỗi dòng.
 
-- [ ] **Bước 1: Ghi `src/app/globals.css`**
+- [x] **Bước 1: Ghi `src/app/globals.css`**
 
 ```css
 @import "tailwindcss";
@@ -409,7 +409,7 @@ Token lấy đúng từ design-system §2: 3 bộ màu `:root` (Sáng), `.dark` 
 }
 ```
 
-- [ ] **Bước 2: Kiểm tra build CSS**
+- [x] **Bước 2: Kiểm tra build CSS**
 
 ```bash
 npm run build
@@ -417,7 +417,7 @@ npm run build
 
 Expected: build thành công. Layout mặc định của `create-next-app` vẫn còn (đến Task 7 mới thay), và tạm thời chưa có route `/`, chuyện đó không sao.
 
-- [ ] **Bước 3: Commit**
+- [x] **Bước 3: Commit**
 
 ```bash
 git add frontend/src/app/globals.css && git commit -m "feat(web): design tokens for light, dim and sepia themes plus reader styles"
