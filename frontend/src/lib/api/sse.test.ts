@@ -42,7 +42,7 @@ describe("readSse", () => {
     expect(out).toEqual([{ event: "done", data: '{"content":"Đạo hàm"}' }]);
   });
 
-  it("chấp nhận \r\n và bỏ qua dòng comment", async () => {
+  it("chấp nhận \\r\\n và bỏ qua dòng comment", async () => {
     const events = await collect([": ping\r\n\r\nevent: error\r\ndata: {\"code\":\"AI_UNAVAILABLE\"}\r\n\r\n"]);
     expect(events).toEqual([{ event: "error", data: '{"code":"AI_UNAVAILABLE"}' }]);
   });
