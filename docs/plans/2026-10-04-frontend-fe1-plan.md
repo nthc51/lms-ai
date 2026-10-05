@@ -946,7 +946,7 @@ Expected: lint và tsc sạch, 2 test PASS.
 **Files:**
 - Create: `backend/scripts/export_openapi.py`, `frontend/openapi.json` (sinh ra), `frontend/src/lib/api/schema.d.ts` (sinh ra)
 
-- [ ] **Bước 1: Script xuất OpenAPI** (`backend/scripts/export_openapi.py`)
+- [x] **Bước 1: Script xuất OpenAPI** (`backend/scripts/export_openapi.py`)
 
 ```python
 """Xuất OpenAPI schema ra file JSON để frontend sinh type TypeScript.
@@ -971,7 +971,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Bước 2: Sinh type**
+- [x] **Bước 2: Sinh type**
 
 ```bash
 npm run gen:api
@@ -985,7 +985,7 @@ Expected:
 
 > Nếu `uv` báo thiếu biến môi trường thì chạy lệnh trong `backend/` với `.env` sẵn có. Script chỉ import `app.main`, không kết nối DB.
 
-- [ ] **Bước 3: Commit**
+- [x] **Bước 3: Commit**
 
 ```bash
 cd .. && git add backend/scripts/export_openapi.py frontend/openapi.json frontend/src/lib/api/schema.d.ts
