@@ -1276,7 +1276,7 @@ git add frontend/src/lib/api && git commit -m "feat(web): typed API client with 
 - Create: `frontend/src/lib/api/sse.ts`, `frontend/src/lib/api/upload.ts`
 - Test: `frontend/src/lib/api/sse.test.ts`, `frontend/src/lib/api/upload.test.ts`
 
-- [ ] **Bước 1: Viết test SSE (sẽ fail)**
+- [x] **Bước 1: Viết test SSE (sẽ fail)**
 
 Test bao gồm event bị cắt giữa 2 chunk mạng, kể cả cắt giữa một ký tự tiếng Việt nhiều byte.
 
@@ -1338,12 +1338,12 @@ describe("readSse", () => {
 });
 ```
 
-- [ ] **Bước 2: Chạy, xác nhận fail**
+- [x] **Bước 2: Chạy, xác nhận fail**
 
 Run: `npx vitest run src/lib/api/sse.test.ts`
 Expected: FAIL, lỗi `Failed to resolve import "./sse"`.
 
-- [ ] **Bước 3: Cài đặt `src/lib/api/sse.ts`**
+- [x] **Bước 3: Cài đặt `src/lib/api/sse.ts`**
 
 ```ts
 export type SseEvent = { event: string; data: string };
@@ -1390,12 +1390,12 @@ function parseBlock(raw: string): SseEvent | null {
 }
 ```
 
-- [ ] **Bước 4: Chạy, xác nhận pass**
+- [x] **Bước 4: Chạy, xác nhận pass**
 
 Run: `npx vitest run src/lib/api/sse.test.ts`
 Expected: PASS (4 test).
 
-- [ ] **Bước 5: Viết test kiểm tra file (sẽ fail)**
+- [x] **Bước 5: Viết test kiểm tra file (sẽ fail)**
 
 `src/lib/api/upload.test.ts`:
 
@@ -1425,7 +1425,7 @@ describe("validateFile", () => {
 Run: `npx vitest run src/lib/api/upload.test.ts`
 Expected: FAIL, lỗi `Failed to resolve import "./upload"`.
 
-- [ ] **Bước 6: Cài đặt `src/lib/api/upload.ts`**
+- [x] **Bước 6: Cài đặt `src/lib/api/upload.ts`**
 
 Dùng XHR vì `fetch` chưa báo được tiến trình upload. Giới hạn dung lượng và loại file khớp `SIZE_LIMITS` và `ALLOWED_MIME` ở `backend/app/modules/materials/assets.py`.
 
@@ -1479,7 +1479,7 @@ export function validateFile(kind: UploadKind, file: File): string | null {
 Run: `npx vitest run src/lib/api`
 Expected: PASS (11 test).
 
-- [ ] **Bước 7: Commit**
+- [x] **Bước 7: Commit**
 
 ```bash
 git add frontend/src/lib/api && git commit -m "feat(web): SSE reader and presigned upload with progress"
