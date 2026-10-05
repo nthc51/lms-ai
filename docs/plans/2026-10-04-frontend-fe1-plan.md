@@ -1002,7 +1002,7 @@ git commit -m "chore(web): generate API types from backend OpenAPI"
 - Create: `frontend/src/lib/api/token.ts`, `errors.ts`, `client.ts`
 - Test: `frontend/src/lib/api/client.test.ts`
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `src/lib/api/client.test.ts`:
 
@@ -1077,12 +1077,12 @@ describe("api client", () => {
 });
 ```
 
-- [ ] **Bước 2: Chạy, xác nhận fail**
+- [x] **Bước 2: Chạy, xác nhận fail**
 
 Run: `npx vitest run src/lib/api/client.test.ts`
 Expected: FAIL, lỗi `Failed to resolve import "./client"`.
 
-- [ ] **Bước 3: Cài đặt**
+- [x] **Bước 3: Cài đặt**
 
 `src/lib/api/token.ts`:
 
@@ -1257,12 +1257,12 @@ export async function unwrap<T>(p: Promise<{ data?: T; error?: unknown; response
 }
 ```
 
-- [ ] **Bước 4: Chạy, xác nhận pass**
+- [x] **Bước 4: Chạy, xác nhận pass**
 
 Run: `npx vitest run src/lib/api/client.test.ts`
 Expected: PASS (4 test). Riêng test "refresh đúng 1 lần cho nhiều request song song" chứng minh cơ chế single-flight, tránh bị backend coi là `TOKEN_REUSED`.
 
-- [ ] **Bước 5: Commit**
+- [x] **Bước 5: Commit**
 
 ```bash
 git add frontend/src/lib/api && git commit -m "feat(web): typed API client with single-flight token refresh"
