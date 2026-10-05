@@ -4316,7 +4316,7 @@ Bố cục theo design-system §7.2:
 
 Phần này được kiểm thử bằng E2E ở Task 16 (luồng học bài đầy đủ ở 375 và 1280px).
 
-- [ ] **Bước 1: Lưu tiến độ video** (`src/lib/study/use-video-progress.ts`)
+- [x] **Bước 1: Lưu tiến độ video** (`src/lib/study/use-video-progress.ts`)
 
 Lưu mỗi 15 giây xem, khi tạm dừng và khi ẩn tab. Dùng ref callback có trả về hàm cleanup (React 19).
 
@@ -4381,7 +4381,7 @@ export function useVideoProgress(lesson: LessonDetail, track: boolean) {
 }
 ```
 
-- [ ] **Bước 2: Các phần của trang**
+- [x] **Bước 2: Các phần của trang**
 
 `src/components/lesson/course-outline.tsx`. Prop `hrefFor` để trình soạn dùng lại component này với link khác:
 
@@ -4570,7 +4570,7 @@ export function ShortcutHelp({ open, onOpenChange }: { open: boolean; onOpenChan
 }
 ```
 
-- [ ] **Bước 3: Trang học bài** (`src/components/lesson/lesson-view.tsx`)
+- [x] **Bước 3: Trang học bài** (`src/components/lesson/lesson-view.tsx`)
 
 ```tsx
 "use client";
@@ -4954,7 +4954,7 @@ export default function LearnPage() {
 }
 ```
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
