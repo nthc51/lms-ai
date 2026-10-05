@@ -6,6 +6,7 @@ import { breakPrefs } from "./storage";
 export const BREAK_AFTER_MS = 45 * 60_000;
 export const SNOOZE_MS = 15 * 60_000;
 const IDLE_RESET_MS = 5 * 60_000; // rời máy > 5 phút coi như đã nghỉ
+const TICK_MS = 30_000;
 
 /**
  * Nhắc nghỉ mắt sau 45 phút học liên tục (design-system §8).
@@ -22,7 +23,10 @@ export function useBreakReminder({ paused = false }: { paused?: boolean } = {}) 
   React.useEffect(() => {
     lastActivity.current = Date.now();
     const mark = () => {
-      lastActivity.current = Date.now();
+      const now = Date.now();
+      // quay lại sau khi rời máy > 5 phút (kể cả khi chưa tới nhịp kiểm tra kế tiếp): đếm lại từ đầu
+      if (now - lastActivity.current > IDLE_RESET_MS) activeMs.current = 0;
+      lastActivity.current = now;
     };
     const events = ["pointerdown", "keydown", "scroll", "wheel"] as const;
     events.forEach((e) => window.addEventListener(e, mark, { passive: true }));
@@ -34,16 +38,19 @@ export function useBreakReminder({ paused = false }: { paused?: boolean } = {}) 
     lastTick.current = Date.now();
     const id = window.setInterval(() => {
       const now = Date.now();
-      const delta = now - lastTick.current;
-      lastTick.current = now;
+      const gap = now - lastTick.current;
+      // Chỉ nhịp lúc tab hiển thị mới làm mới lastTick: ẩn tab > 5 phút hoặc máy ngủ thì gap lớn → đếm lại.
       if (document.visibilityState !== "visible") return;
-      if (now - lastActivity.current > IDLE_RESET_MS) {
+      lastTick.current = now;
+      // Mỗi nhịp chỉ cộng tối đa một chu kỳ, tránh cộng cả quãng máy ngủ vào thời gian học.
+      const delta = Math.min(gap, TICK_MS);
+      if (gap > IDLE_RESET_MS || now - lastActivity.current > IDLE_RESET_MS) {
         activeMs.current = 0;
         return;
       }
       activeMs.current += delta;
       if (activeMs.current >= BREAK_AFTER_MS && now >= breakPrefs.get().snoozeUntil) setDue(true);
-    }, 30_000);
+    }, TICK_MS);
     return () => window.clearInterval(id);
   }, [enabled, paused]);
 

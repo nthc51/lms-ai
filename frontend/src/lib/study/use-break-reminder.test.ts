@@ -48,4 +48,41 @@ describe("useBreakReminder", () => {
     expect(result.current.due).toBe(false);
     expect(breakPrefs.get().enabled).toBe(false);
   });
+
+  it("máy ngủ lâu rồi có tương tác thì đếm lại, không nhắc ngay", () => {
+    const { result } = renderHook(() => useBreakReminder());
+    study(10);
+    act(() => {
+      vi.setSystemTime(Date.now() + 60 * 60_000); // máy ngủ 1 giờ
+      window.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(result.current.due).toBe(false);
+    study(40);
+    expect(result.current.due).toBe(false);
+  });
+
+  it("mỗi nhịp chỉ cộng tối đa một chu kỳ khi đồng hồ nhảy ngắn", () => {
+    const { result } = renderHook(() => useBreakReminder());
+    study(40);
+    act(() => {
+      vi.setSystemTime(Date.now() + 4 * 60_000); // nhảy 4 phút (< 5 phút)
+      window.dispatchEvent(new Event("scroll"));
+      vi.advanceTimersByTime(30_000);
+    });
+    study(3);
+    expect(result.current.due).toBe(false); // cộng dồn 4 phút sẽ vượt 45 phút
+  });
+
+  it("ẩn tab hơn 5 phút rồi quay lại thì đếm lại từ đầu", () => {
+    const state = vi.spyOn(document, "visibilityState", "get");
+    const { result } = renderHook(() => useBreakReminder());
+    study(40);
+    state.mockReturnValue("hidden");
+    study(6); // vẫn có tương tác nhưng tab đang ẩn
+    state.mockReturnValue("visible");
+    study(10);
+    state.mockRestore();
+    expect(result.current.due).toBe(false);
+  });
 });
