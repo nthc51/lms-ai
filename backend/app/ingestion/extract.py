@@ -1,12 +1,16 @@
 import asyncio
+import logging
 import re
 
 import pymupdf
 import pymupdf4llm
 
+from app.ai.retry import is_retryable
 from app.ai.vision import VisionExtractor
 from app.core.config import get_settings
 from app.ingestion.chunker import PageText
+
+logger = logging.getLogger(__name__)
 
 MIN_TEXT_CHARS = 50
 MIN_FORMULAS_FOR_VISION = (
@@ -61,18 +65,30 @@ def _plan_pages(
         doc.close()
 
 
-async def _vision_all(vision: VisionExtractor, pngs: dict[int, bytes], concurrency: int) -> dict[int, str]:
-    """Gọi vision song song, tối đa `concurrency` lời gọi cùng lúc. Một lời gọi lỗi → hủy các lời gọi còn
-    lại (TaskGroup) và ném lại chính exception đó (không bọc ExceptionGroup, để retry/error_text dùng được)."""
+async def _vision_all(
+    vision: VisionExtractor, pngs: dict[int, bytes], concurrency: int
+) -> dict[int, str | None]:
+    """Gọi vision song song, tối đa `concurrency` lời gọi cùng lúc.
+
+    Lỗi tạm thời của dịch vụ AI (429 hết quota, 5xx, timeout — đã hết lượt retry bên trong vision) chỉ làm
+    hỏng TRANG đó: trả None để trang dùng text thường, tài liệu vẫn xử lý tiếp (xuống cấp nhẹ nhàng).
+    Lỗi khác (sai cấu hình, lỗi lập trình…) → hủy các lời gọi còn lại (TaskGroup) và ném lại chính exception
+    đó (không bọc ExceptionGroup, để retry/error_text dùng được)."""
     sem = asyncio.Semaphore(max(1, concurrency))
 
-    async def one(png: bytes) -> str:
+    async def one(page_no: int, png: bytes) -> str | None:
         async with sem:
-            return (await vision.page_to_markdown(png)).strip()
+            try:
+                return (await vision.page_to_markdown(png)).strip()
+            except Exception as exc:
+                if not is_retryable(exc):
+                    raise
+                logger.warning("Vision lỗi tạm thời ở trang %d, dùng text thường: %r", page_no, exc)
+                return None
 
     try:
         async with asyncio.TaskGroup() as tg:
-            tasks = {n: tg.create_task(one(png)) for n, png in pngs.items()}
+            tasks = {n: tg.create_task(one(n, png)) for n, png in pngs.items()}
     except ExceptionGroup as eg:
         raise eg.exceptions[0] from None
     return {n: t.result() for n, t in tasks.items()}
@@ -87,7 +103,7 @@ async def extract_pages(
     """Trích từng trang. Tối đa max_vision_pages trang gửi vision (mặc định VISION_MAX_PAGES_PER_DOC),
     xét theo thứ tự trang; vượt trần thì dùng text và đánh dấu vision_skipped=True.
     Các trang vision được gọi song song, tối đa `concurrency` (mặc định VISION_CONCURRENCY) lời gọi cùng lúc;
-    kết quả vẫn theo đúng thứ tự trang."""
+    kết quả vẫn theo đúng thứ tự trang. Trang gọi vision lỗi tạm thời dùng text và đánh dấu vision_failed=True."""
     settings = get_settings()
     if max_vision_pages is None:
         max_vision_pages = settings.vision_max_pages_per_doc
@@ -96,9 +112,19 @@ async def extract_pages(
     # PyMuPDF là code đồng bộ, nặng CPU → chạy trong (một) thread để không chặn event loop của worker
     planned, pngs = await asyncio.to_thread(_plan_pages, pdf_bytes, max_vision_pages)
     vision_md = await _vision_all(vision, pngs, concurrency)
-    return [
-        PageText(page_no, vision_md[page_no], "vision")
-        if method == "vision"
-        else PageText(page_no, markdown.strip(), "text", vision_skipped=method == "skipped")
-        for page_no, markdown, method in planned
-    ]
+    pages: list[PageText] = []
+    for page_no, markdown, method in planned:
+        md = vision_md.get(page_no) if method == "vision" else None
+        if md is not None:
+            pages.append(PageText(page_no, md, "vision"))
+        else:
+            pages.append(
+                PageText(
+                    page_no,
+                    markdown.strip(),
+                    "text",
+                    vision_skipped=method == "skipped",
+                    vision_failed=method == "vision",
+                )
+            )
+    return pages

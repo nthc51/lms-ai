@@ -2,12 +2,18 @@ import asyncio
 import hashlib
 import math
 import re
+import time
 import unicodedata
+from collections import deque
+from collections.abc import Callable
 from functools import lru_cache
 from typing import Protocol
 
 from app.ai.retry import Sleep, call_with_retry
 from app.core.config import Settings, get_settings
+from app.ingestion.chunker import count_tokens
+
+TPM_WINDOW_S = 60.0
 
 
 class Embedder(Protocol):
@@ -53,7 +59,10 @@ class FakeEmbedder:
 
 
 class GeminiEmbedder:
-    BATCH = 100
+    """Embedding qua Gemini. Gửi theo lô (tối đa `batch_size` đoạn). Khi `tpm_limit` > 0 thì tự giãn nhịp:
+    ước lượng token mỗi lô (count_tokens), cắt lô sao cho không lô nào vượt giới hạn, và chờ trước khi gửi
+    nếu tổng token đã gửi trong 60 giây gần nhất cộng lô mới sẽ vượt giới hạn (gói miễn phí: 30K TPM).
+    Cửa sổ 60 giây gắn với instance, nên worker xử lý nhiều tài liệu liên tiếp vẫn giữ đúng nhịp."""
 
     def __init__(
         self,
@@ -63,7 +72,10 @@ class GeminiEmbedder:
         client=None,
         *,
         timeout_s: float = 30.0,
+        batch_size: int = 100,
+        tpm_limit: int = 0,
         sleep: Sleep = asyncio.sleep,
+        clock: Callable[[], float] = time.monotonic,
     ):
         if client is None:
             from google import genai
@@ -72,8 +84,42 @@ class GeminiEmbedder:
         self._client = client
         self._timeout_ms = int(timeout_s * 1000)
         self._sleep = sleep
+        self._clock = clock
+        self._batch_size = max(1, batch_size)
+        self._tpm_limit = max(0, tpm_limit)
+        self._sent: deque[tuple[float, int]] = deque()  # (thời điểm gửi, số token ước lượng)
         self.model = model
         self.dim = dim
+
+    def _batches(self, texts: list[str]) -> list[list[str]]:
+        batches: list[list[str]] = []
+        cur: list[str] = []
+        cur_tokens = 0
+        for text in texts:
+            t = count_tokens(text)
+            too_many = len(cur) >= self._batch_size
+            too_big = self._tpm_limit and cur and cur_tokens + t > self._tpm_limit
+            if too_many or too_big:
+                batches.append(cur)
+                cur, cur_tokens = [], 0
+            cur.append(text)  # một đoạn lớn hơn cả giới hạn vẫn được gửi riêng (không cắt được)
+            cur_tokens += t
+        if cur:
+            batches.append(cur)
+        return batches
+
+    async def _wait_for_budget(self, tokens: int) -> None:
+        if not self._tpm_limit:
+            return
+        while True:
+            now = self._clock()
+            while self._sent and now - self._sent[0][0] >= TPM_WINDOW_S:
+                self._sent.popleft()
+            used = sum(n for _, n in self._sent)
+            if not self._sent or used + tokens <= self._tpm_limit:
+                self._sent.append((now, tokens))
+                return
+            await self._sleep(self._sent[0][0] + TPM_WINDOW_S - now)
 
     async def _embed(self, texts: list[str], task_type: str) -> list[list[float]]:
         from google.genai import types
@@ -84,8 +130,8 @@ class GeminiEmbedder:
             http_options=types.HttpOptions(timeout=self._timeout_ms),
         )
         out: list[list[float]] = []
-        for i in range(0, len(texts), self.BATCH):
-            batch = texts[i : i + self.BATCH]
+        for batch in self._batches(texts):
+            await self._wait_for_budget(sum(count_tokens(t) for t in batch))
             resp = await call_with_retry(
                 "embed",
                 lambda b=batch: self._client.aio.models.embed_content(
@@ -106,7 +152,14 @@ class GeminiEmbedder:
 
 def get_embedder(s: Settings) -> Embedder:
     if s.embed_provider == "gemini":
-        return GeminiEmbedder(s.gemini_api_key, s.embed_model, s.embed_dim, timeout_s=s.embed_timeout_s)
+        return GeminiEmbedder(
+            s.gemini_api_key,
+            s.embed_model,
+            s.embed_dim,
+            timeout_s=s.embed_timeout_s,
+            batch_size=s.embed_batch_size,
+            tpm_limit=s.embed_tpm_limit,
+        )
     if s.embed_provider == "fake":
         return FakeEmbedder(s.embed_dim)
     raise ValueError(f"EMBED_PROVIDER không hợp lệ: {s.embed_provider!r} (chỉ nhận fake | gemini)")

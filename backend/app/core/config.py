@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     vision_model: str = "gemini-3.5-flash"
     gemini_api_key: str = ""
     embed_timeout_s: float = 30.0
+    # Số đoạn tối đa mỗi request embedding.
+    embed_batch_size: int = 100
+    # > 0: giới hạn token gửi embedding trong mỗi 60 giây (gói miễn phí Gemini: 30K TPM → đặt 25000).
+    # 0 = không giới hạn. Lô cũng bị cắt nhỏ để không lô nào vượt giới hạn này.
+    embed_tpm_limit: int = 0
     vision_timeout_s: float = 120.0
     vision_max_pages_per_doc: int = 60  # trần số trang gửi vision mỗi tài liệu (chi phí API)
     vision_concurrency: int = 4  # số lời gọi vision chạy song song tối đa trong một tài liệu

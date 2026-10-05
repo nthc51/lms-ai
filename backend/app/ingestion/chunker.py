@@ -22,6 +22,7 @@ class PageText:
     markdown: str
     method: str  # "text" | "vision"
     vision_skipped: bool = False  # cần vision nhưng đã chạm trần VISION_MAX_PAGES_PER_DOC → dùng text
+    vision_failed: bool = False  # cần vision nhưng gọi vision lỗi tạm thời (429/5xx/timeout) → dùng text
 
 
 @dataclass(frozen=True)

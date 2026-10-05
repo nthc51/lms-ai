@@ -94,3 +94,38 @@ async def test_reingest_after_failure_clears_old_error(db):
     await ingest_pdf_source(source.id, storage=storage, embedder=FakeEmbedder(768), vision=FakeVision())
     fresh = await db.get(Source, source.id, populate_existing=True)
     assert fresh.status == SourceStatus.ready and fresh.error_msg is None
+
+
+def test_vision_warning_mentions_transient_failures():
+    from app.ingestion.chunker import PageText
+    from app.ingestion.pipeline import vision_cap_warning
+
+    pages = [PageText(1, "a", "text", vision_failed=True), PageText(2, "b", "vision")]
+    msg = vision_cap_warning(pages, 10)
+    assert msg.startswith("Cảnh báo: 1 trang gọi vision bị lỗi tạm thời")
+    assert "Xử lý lại" in msg
+    assert vision_cap_warning([PageText(1, "a", "vision")], 10) is None
+
+
+async def test_vision_quota_error_keeps_source_ready_with_warning(db):
+    from tests.test_ai_retry import api_error
+
+    class QuotaVision(FakeVision):
+        async def page_to_markdown(self, png: bytes) -> str:
+            raise api_error(429)
+
+    storage = InMemoryStorage()
+    _, _, source = await _source(db, storage, make_pdf([LONG_TEXT, ""]))
+    n = await ingest_pdf_source(source.id, storage=storage, embedder=FakeEmbedder(768), vision=QuotaVision())
+    assert n >= 1
+    fresh = await db.get(Source, source.id, populate_existing=True)
+    assert fresh.status == SourceStatus.ready
+    assert "1 trang gọi vision bị lỗi tạm thời" in fresh.error_msg
+    methods = (
+        await db.scalars(
+            select(SourcePage.extraction_method)
+            .where(SourcePage.source_id == source.id)
+            .order_by(SourcePage.page_no)
+        )
+    ).all()
+    assert [m.value for m in methods] == ["text", "text"]

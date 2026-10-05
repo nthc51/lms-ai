@@ -13,6 +13,12 @@ os.environ["LLM_PROVIDER"] = "fake"
 os.environ["LLM_CACHE_ENABLED"] = "false"  # test nào cần cache tự bật bằng Settings riêng
 os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef-0123456789"
 
+# Test không đọc backend/.env của máy dev (CI cũng không có file này): cấu hình riêng của từng máy,
+# vd. VISION_CONCURRENCY=1 hay EMBED_TPM_LIMIT cho gói Gemini miễn phí, không được lọt vào test.
+from app.core.config import Settings
+
+Settings.model_config["env_file"] = None
+
 import httpx
 import pytest
 

@@ -21,14 +21,22 @@ logger = logging.getLogger(__name__)
 
 
 def vision_cap_warning(pages: list[PageText], cap: int) -> str | None:
-    """Cảnh báo ghi vào sources.error_msg khi có trang cần vision nhưng đã vượt trần (source vẫn ready)."""
+    """Cảnh báo ghi vào sources.error_msg (source vẫn ready) khi có trang cần vision nhưng phải dùng text:
+    vượt trần VISION_MAX_PAGES_PER_DOC, hoặc gọi vision lỗi tạm thời (hết quota, quá tải)."""
     skipped = sum(1 for p in pages if p.vision_skipped)
-    if not skipped:
-        return None
-    return (
-        f"Cảnh báo: vượt giới hạn {cap} trang vision (VISION_MAX_PAGES_PER_DOC); "
-        f"{skipped} trang cần vision đã dùng text thường."
-    )
+    failed = sum(1 for p in pages if p.vision_failed)
+    parts = []
+    if skipped:
+        parts.append(
+            f"vượt giới hạn {cap} trang vision (VISION_MAX_PAGES_PER_DOC); "
+            f"{skipped} trang cần vision đã dùng text thường"
+        )
+    if failed:
+        parts.append(
+            f"{failed} trang gọi vision bị lỗi tạm thời (hết quota hoặc dịch vụ AI quá tải) nên đã dùng "
+            "text thường; bấm Xử lý lại khi dịch vụ ổn định để đọc lại các trang này"
+        )
+    return f"Cảnh báo: {'; '.join(parts)}." if parts else None
 
 
 def error_text(error: BaseException) -> str:

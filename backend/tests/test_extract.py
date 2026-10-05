@@ -194,3 +194,29 @@ async def test_pymupdf_runs_in_a_single_thread_call(monkeypatch):
     monkeypatch.setattr(extract.asyncio, "to_thread", spy)
     await extract_pages(make_pdf([LONG_TEXT, "", ""]), FakeVision())
     assert calls == ["_plan_pages"]
+
+
+class QuotaVision(InFlightVision):
+    """Trang `fail_on` hết quota (429) — lỗi tạm thời, đã hết retry bên trong vision."""
+
+    async def page_to_markdown(self, png: bytes) -> str:
+        page_no = int(png.removeprefix(b"page-"))
+        if page_no == self.fail_on:
+            self.calls += 1
+            from tests.test_ai_retry import api_error
+
+            raise api_error(429)
+        self.calls += 1
+        return f"md trang {page_no}"
+
+
+async def test_transient_vision_error_falls_back_to_text_for_that_page_only(_numbered_pngs):
+    vision = QuotaVision(fail_on=2)
+    pages = await extract_pages(make_pdf([""] * 4), vision)
+    assert vision.calls == 4  # các trang khác vẫn được đọc
+    assert [(p.page_no, p.method, p.vision_failed) for p in pages] == [
+        (1, "vision", False),
+        (2, "text", True),
+        (3, "vision", False),
+        (4, "vision", False),
+    ]
