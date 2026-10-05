@@ -11,18 +11,28 @@ export function apiBase(): string {
 
 let refreshing: Promise<string | null> | null = null;
 
-/** Gọi /auth/refresh đúng 1 lần dù nhiều request cùng gặp 401 (single-flight). */
+async function doRefresh(): Promise<string | null> {
+  const res = await fetch(`${apiBase()}/api/v1/auth/refresh`, { method: "POST", credentials: "include" });
+  if (!res.ok) {
+    // Chỉ 401/403 nghĩa là phiên đã hết; 5xx thì giữ nguyên token, lần sau thử lại.
+    if (res.status === 401 || res.status === 403) setAccessToken(null);
+    return null;
+  }
+  const { access_token } = (await res.json()) as { access_token: string };
+  setAccessToken(access_token);
+  return access_token;
+}
+
+/**
+ * Gọi /auth/refresh đúng 1 lần dù nhiều request cùng gặp 401 (single-flight trong tab).
+ * Giữa các tab thì xếp hàng bằng Web Locks: backend thu hồi mọi refresh token nếu một token
+ * đã xoay vòng bị dùng lại (TOKEN_REUSED), nên tab sau phải đợi tab trước nhận cookie mới.
+ */
 export function refreshAccessToken(): Promise<string | null> {
   refreshing ??= (async () => {
     try {
-      const res = await fetch(`${apiBase()}/api/v1/auth/refresh`, { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        setAccessToken(null);
-        return null;
-      }
-      const { access_token } = (await res.json()) as { access_token: string };
-      setAccessToken(access_token);
-      return access_token;
+      const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+      return locks ? await locks.request("auth-refresh", doRefresh) : await doRefresh();
     } catch {
       return null; // lỗi mạng: giữ nguyên trạng thái, không đăng xuất
     } finally {

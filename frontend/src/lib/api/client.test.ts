@@ -52,6 +52,74 @@ describe("api client", () => {
     expect(getAccessToken()).toBeNull();
   });
 
+  it("refresh chạy bên trong Web Lock 'auth-refresh'", async () => {
+    setAccessToken("old");
+    const lockNames: string[] = [];
+    let insideLock = false;
+    let refreshedInsideLock: boolean | null = null;
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: {
+        request: async (name: string, cb: () => Promise<unknown>) => {
+          lockNames.push(name);
+          insideLock = true;
+          try {
+            return await cb();
+          } finally {
+            insideLock = false;
+          }
+        },
+      },
+    });
+    try {
+      server.use(
+        http.get(url("/me"), ({ request }) =>
+          request.headers.get("Authorization") === "Bearer new"
+            ? HttpResponse.json({ id: "u1" })
+            : HttpResponse.json({ error: { code: "INVALID_TOKEN", message: "x" } }, { status: 401 }),
+        ),
+        http.post(url("/auth/refresh"), () => {
+          refreshedInsideLock = insideLock;
+          return HttpResponse.json({ access_token: "new", token_type: "bearer" });
+        }),
+      );
+      await unwrap(api.GET("/api/v1/me"));
+      expect(lockNames).toEqual(["auth-refresh"]);
+      expect(refreshedInsideLock).toBe(true);
+      expect(getAccessToken()).toBe("new");
+    } finally {
+      delete (navigator as { locks?: unknown }).locks;
+    }
+  });
+
+  it("refresh gặp 503 thì giữ nguyên token", async () => {
+    setAccessToken("old");
+    server.use(
+      http.get(url("/me"), () =>
+        HttpResponse.json({ error: { code: "INVALID_TOKEN", message: "x" } }, { status: 401 }),
+      ),
+      http.post(url("/auth/refresh"), () =>
+        HttpResponse.json({ error: { code: "UNAVAILABLE", message: "x" } }, { status: 503 }),
+      ),
+    );
+    await expect(unwrap(api.GET("/api/v1/me"))).rejects.toMatchObject({ status: 401 });
+    expect(getAccessToken()).toBe("old");
+  });
+
+  it("refresh gặp 401 thì xóa token", async () => {
+    setAccessToken("old");
+    server.use(
+      http.get(url("/me"), () =>
+        HttpResponse.json({ error: { code: "INVALID_TOKEN", message: "x" } }, { status: 401 }),
+      ),
+      http.post(url("/auth/refresh"), () =>
+        HttpResponse.json({ error: { code: "INVALID_TOKEN", message: "x" } }, { status: 401 }),
+      ),
+    );
+    await expect(unwrap(api.GET("/api/v1/me"))).rejects.toMatchObject({ status: 401 });
+    expect(getAccessToken()).toBeNull();
+  });
+
   it("đọc code, message, request_id và Retry-After từ thân lỗi", async () => {
     server.use(
       http.get(url("/me"), () =>
