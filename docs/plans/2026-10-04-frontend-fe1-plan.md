@@ -1494,7 +1494,7 @@ git add frontend/src/lib/api && git commit -m "feat(web): SSE reader and presign
 - Modify: `frontend/src/app/layout.tsx` (thay toàn bộ)
 - Test: `frontend/src/lib/auth/require-auth.test.tsx`, `frontend/src/lib/auth/safe-next.test.ts`
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `src/lib/auth/safe-next.test.ts`. Test này chặn open redirect qua `?next=`:
 
@@ -1548,7 +1548,7 @@ describe("RequireAuth", () => {
 Run: `npx vitest run src/lib/auth`
 Expected: FAIL, lỗi `Failed to resolve import "./safe-next"` và `"./require-auth"`.
 
-- [ ] **Bước 2: Cài đặt**
+- [x] **Bước 2: Cài đặt**
 
 `src/lib/auth/safe-next.ts`:
 
@@ -1802,12 +1802,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-- [ ] **Bước 3: Chạy, xác nhận pass**
+- [x] **Bước 3: Chạy, xác nhận pass**
 
 Run: `npx vitest run src/lib/auth`
 Expected: PASS (5 test).
 
-- [ ] **Bước 4: Commit**
+- [x] **Bước 4: Commit**
 
 ```bash
 git add frontend/src && git commit -m "feat(web): auth provider, route guard and root layout"
