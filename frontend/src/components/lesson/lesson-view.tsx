@@ -283,7 +283,7 @@ function LessonVideo({
 }) {
   const { bind } = useVideoProgress(lesson, track);
   const setRef = React.useCallback(
-(el: HTMLVideoElement | null) => attachVideoRef(videoRef, bind, el),
+    (el: HTMLVideoElement | null) => attachVideoRef(videoRef, bind, el),
     [bind, videoRef],
   );
   return (
