@@ -291,7 +291,7 @@ git add backend && git commit -m "feat(api): admin columns (review_note, hidden_
 - Modify: `backend/app/main.py`
 - Test: `backend/tests/test_admin.py`
 
-- [ ] **Bước 1: Viết test (sẽ fail)** (`tests/test_admin.py`)
+- [x] **Bước 1: Viết test (sẽ fail)** (`tests/test_admin.py`)
 
 ```python
 """Khu quản trị: duyệt giảng viên, khóa tài khoản, ẩn khóa học, số liệu tổng quan, nhật ký."""
@@ -553,7 +553,7 @@ Chạy `uv run pytest tests/test_admin.py -q`. Expected: fail ở bước import
 
 > Test cuối (`test_seed_admin_rejects_emails_login_would_refuse`) sẽ pass sau Task 3. Ở task này, chạy kèm `--deselect tests/test_admin.py::test_seed_admin_rejects_emails_login_would_refuse`.
 
-- [ ] **Bước 2: Schemas** (`app/modules/admin/schemas.py`)
+- [x] **Bước 2: Schemas** (`app/modules/admin/schemas.py`)
 
 ```python
 import uuid
@@ -664,7 +664,7 @@ class AdminActionPage(Page[AdminActionOut]):
     pass
 ```
 
-- [ ] **Bước 3: Service** (`app/modules/admin/service.py`)
+- [x] **Bước 3: Service** (`app/modules/admin/service.py`)
 
 ```python
 import uuid
@@ -1036,7 +1036,7 @@ Ghi chú:
 - `func.immutable_unaccent` là hàm SQL đã có từ migration tìm kiếm danh mục: tìm "nguyen van" ra "Nguyễn Văn".
 - Số liệu 14 ngày dùng `timezone('Asia/Ho_Chi_Minh', created_at)`, để người đăng ký lúc 6h sáng giờ Việt Nam không bị tính sang ngày hôm trước theo giờ UTC.
 
-- [ ] **Bước 4: Router** (`app/modules/admin/router.py`)
+- [x] **Bước 4: Router** (`app/modules/admin/router.py`)
 
 ```python
 import uuid
@@ -1160,7 +1160,7 @@ from app.modules.admin.router import router as admin_router
     app.include_router(admin_router)
 ```
 
-- [ ] **Bước 5: Chạy test**
+- [x] **Bước 5: Chạy test**
 
 ```bash
 uv run pytest tests/test_admin.py -q --deselect tests/test_admin.py::test_seed_admin_rejects_emails_login_would_refuse
@@ -1170,7 +1170,7 @@ uv run ruff check . && uv run ruff format --check .
 
 Expected: 16 passed; toàn bộ 627 passed (thiếu 1 test seed, thêm ở Task 3); ruff sạch.
 
-- [ ] **Bước 6: Commit**
+- [x] **Bước 6: Commit**
 
 ```bash
 git add backend && git commit -m "feat(api): admin endpoints for teacher review, account lock, course moderation, stats and audit log"
