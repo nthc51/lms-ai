@@ -2199,7 +2199,7 @@ git add frontend/src && git commit -m "feat(web): create, edit, publish and dele
 - Create: `frontend/src/components/teach/course-analytics.tsx`, `frontend/src/app/(main)/teach/[slug]/analytics/page.tsx`
 - Modify: `frontend/src/components/teach/course-editor.tsx`
 
-- [ ] **Bước 1: `src/components/teach/course-analytics.tsx`**
+- [x] **Bước 1: `src/components/teach/course-analytics.tsx`**
 
 ```tsx
 "use client";
@@ -2355,7 +2355,7 @@ function Meter({ value, label }: { value: number; label: string }) {
 }
 ```
 
-- [ ] **Bước 2: Trang** (`src/app/(main)/teach/[slug]/analytics/page.tsx`)
+- [x] **Bước 2: Trang** (`src/app/(main)/teach/[slug]/analytics/page.tsx`)
 
 ```tsx
 "use client";
@@ -2374,7 +2374,7 @@ export default function CourseAnalyticsPage() {
 }
 ```
 
-- [ ] **Bước 3: Nút "Thống kê" trong trình soạn khóa** (`course-editor.tsx`)
+- [x] **Bước 3: Nút "Thống kê" trong trình soạn khóa** (`course-editor.tsx`)
 
 Thêm `BarChart3` vào import `lucide-react`. Ở thanh trên cùng, chèn nút này ngay **trước** khối `{firstLesson ? (` (nút "Xem như học viên"):
 
@@ -2388,7 +2388,7 @@ Thêm `BarChart3` vào import `lucide-react`. Ở thanh trên cùng, chèn nút 
 
 Đây là nút phụ, nên nút chính duy nhất của thanh vẫn là "Xuất bản".
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
