@@ -65,4 +65,33 @@ describe("AnswerSaver", () => {
     saver.enqueue("q2", "B");
     expect(await saver.flush()).toEqual(["q2"]);
   });
+
+  it("flush trên hàng đợi rỗng rồi enqueue vẫn gửi được", async () => {
+    const states: string[] = [];
+    const save = vi.fn(async () => {});
+    const saver = new AnswerSaver(save, (q, s) => states.push(`${q}:${s}`));
+    expect(await saver.flush()).toEqual([]);
+    saver.enqueue("q1", "A");
+    expect(await saver.flush()).toEqual([]);
+    expect(save).toHaveBeenCalledWith("q1", "A");
+    expect(states.at(-1)).toBe("q1:saved");
+  });
+
+  it("save ném lỗi đồng bộ → error, và enqueue sau đó vẫn gửi", async () => {
+    const states: string[] = [];
+    let fail = true;
+    const save = vi.fn((() => {
+      if (fail) throw new Error("sync");
+      return Promise.resolve();
+    }) as () => Promise<unknown>);
+    const saver = new AnswerSaver(save, (q, s) => states.push(`${q}:${s}`));
+    saver.enqueue("q1", "A");
+    expect(await saver.flush()).toEqual(["q1"]);
+    expect(states.at(-1)).toBe("q1:error");
+    fail = false;
+    saver.enqueue("q2", "B");
+    expect(await saver.flush()).toEqual([]);
+    expect(save).toHaveBeenCalledWith("q2", "B"); // flush cũng gửi lại q1 lỗi trước đó
+    expect(states).toContain("q2:saved");
+  });
 });

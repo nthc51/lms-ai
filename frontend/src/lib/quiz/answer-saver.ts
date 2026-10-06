@@ -11,6 +11,7 @@ export class AnswerSaver {
   private pending = new Map<string, string>();
   private failed = new Map<string, string>();
   private running: Promise<void> | null = null;
+  private active = false;
 
   constructor(
     private save: SaveFn,
@@ -33,26 +34,31 @@ export class AnswerSaver {
   }
 
   private run(): Promise<void> {
-    this.running ??= (async () => {
+    if (this.running) return this.running;
+    this.active = true;
+    const p = this.loop();
+    // Vòng lặp có thể xong ngay (đồng bộ) trước khi tới đây: khi đó không giữ promise cũ.
+    if (this.active) this.running = p;
+    return p;
+  }
+
+  private async loop(): Promise<void> {
+    while (this.pending.size) {
+      const [questionId, optionId] = this.pending.entries().next().value as [string, string];
+      this.pending.delete(questionId);
       try {
-        while (this.pending.size) {
-          const [questionId, optionId] = this.pending.entries().next().value as [string, string];
-          this.pending.delete(questionId);
-          try {
-            await this.save(questionId, optionId);
-            // trong lúc gửi người dùng đã chọn lại → vẫn còn "saving", vòng sau gửi bản mới
-            if (!this.pending.has(questionId)) this.onState(questionId, "saved");
-          } catch {
-            if (!this.pending.has(questionId)) {
-              this.failed.set(questionId, optionId);
-              this.onState(questionId, "error");
-            }
-          }
+        await this.save(questionId, optionId);
+        // trong lúc gửi người dùng đã chọn lại → vẫn còn "saving", vòng sau gửi bản mới
+        if (!this.pending.has(questionId)) this.onState(questionId, "saved");
+      } catch {
+        if (!this.pending.has(questionId)) {
+          this.failed.set(questionId, optionId);
+          this.onState(questionId, "error");
         }
-      } finally {
-        this.running = null;
       }
-    })();
-    return this.running;
+    }
+    // xóa đồng bộ ngay khi hết việc: không có khe hở cho enqueue bị nuốt
+    this.active = false;
+    this.running = null;
   }
 }
