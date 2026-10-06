@@ -153,6 +153,7 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
   const chosen = selected ?? new Set((detail.data?.questions ?? []).map((q) => q.id));
   const approved = (bank.data?.items ?? []).filter((q) => q.review_status === "approved" || q.review_status === "edited");
   const loading = bank.isPending || (!!quiz && detail.isPending);
+  const loadError = (quiz && detail.isError ? detail.error : null) ?? (bank.isError ? bank.error : null);
 
   function toggle(id: string) {
     const next = new Set(chosen);
@@ -201,7 +202,22 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
             <legend className="mb-2 text-sm font-medium">
               Câu hỏi đã duyệt ({chosen.size}/{approved.length} được chọn)
             </legend>
-            {loading ? (
+            {loadError ? (
+              <div role="alert" className="space-y-2 text-sm text-destructive">
+                <p>{errorMessage(loadError)}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (bank.isError) void bank.refetch();
+                    if (quiz && detail.isError) void detail.refetch();
+                  }}
+                >
+                  Thử lại
+                </Button>
+              </div>
+            ) : loading ? (
               <Skeleton className="h-32 w-full" />
             ) : approved.length === 0 ? (
               <p className="text-sm text-muted-foreground">Chưa có câu nào được duyệt. Duyệt câu hỏi ở tab “Câu hỏi” trước.</p>
@@ -228,7 +244,7 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
             <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
               Hủy
             </Button>
-            <Button type="submit" loading={pending} loadingText="Đang lưu…">
+            <Button type="submit" loading={pending} loadingText="Đang lưu…" disabled={!!loadError}>
               {quiz ? "Lưu quiz" : "Tạo quiz"}
             </Button>
           </div>

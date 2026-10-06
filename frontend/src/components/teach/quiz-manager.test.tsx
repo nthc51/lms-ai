@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { quizKeys } from "@/lib/quiz/queries";
 import { api as url, server } from "@/test/msw";
 import { QuizManager } from "./quiz-manager";
 
@@ -21,7 +22,7 @@ const quiz = (id: string, status: "draft" | "published", question_count: number)
 });
 
 function setup(items: ReturnType<typeof quiz>[]) {
-    server.use(
+  server.use(
     http.get(url("/quizzes"), () => HttpResponse.json({ items, total: items.length, page: 1, size: 50 })),
     http.get(url("/quizzes/:id"), ({ params }) => {
       return HttpResponse.json({ ...items.find((q) => q.id === params.id), questions: [] });
@@ -65,12 +66,34 @@ describe("QuizManager", () => {
     const user = userEvent.setup();
     const { qc } = setup([quiz("full", "draft", 2)]);
     await screen.findByText("Quiz full");
-    await qc.fetchQuery({ queryKey: ["quiz", "full"], queryFn: () => fetch(url("/quizzes/full")).then((r) => r.json()) });
-    expect(qc.getQueryState(["quiz", "full"])?.isInvalidated).toBe(false);
+    await qc.fetchQuery({ queryKey: quizKeys.quiz("full"), queryFn: () => fetch(url("/quizzes/full")).then((r) => r.json()) });
+    expect(qc.getQueryState(quizKeys.quiz("full"))?.isInvalidated).toBe(false);
     await user.click(screen.getByRole("button", { name: /Xuất bản/ }));
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: "Xuất bản" }));
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Đã xuất bản quiz"));
-    expect(qc.getQueryState(["quiz", "full"])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(quizKeys.quiz("full"))?.isInvalidated).toBe(true);
+  });
+
+  it("edit dialog does not allow saving when the quiz detail fails to load", async () => {
+    const user = userEvent.setup();
+    let patched = false;
+    setup([quiz("dra", "draft", 2)]);
+    server.use(
+      http.get(url("/quizzes/dra"), () => HttpResponse.json({ error: { code: "INTERNAL", message: "Lỗi máy chủ" } }, { status: 500 })),
+      http.patch(url("/quizzes/dra"), () => {
+        patched = true;
+        return HttpResponse.json(quiz("dra", "draft", 0));
+      }),
+    );
+    await screen.findByText("Quiz dra");
+    await user.click(screen.getByRole("button", { name: "Sửa" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Thử lại" })).toBeInTheDocument();
+    const save = within(dialog).getByRole("button", { name: "Lưu quiz" });
+    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(patched).toBe(false);
   });
 });
