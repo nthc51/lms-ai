@@ -56,6 +56,17 @@ services:
         condition: service_started
       minio:
         condition: service_started
+  web:
+    # Chạy cả frontend trong Docker: docker compose --profile web up -d --build
+    # (khi phát triển thường chạy `npm run dev` ngoài Docker cho nhanh).
+    profiles: ["web"]
+    build:
+      context: ./frontend
+      args:
+        API_ORIGIN: http://api:8000
+    ports: ["127.0.0.1:3000:3000", "[::1]:3000:3000"]
+    depends_on:
+      - api
 volumes:
   pgdata:
   miniodata:

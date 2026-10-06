@@ -60,6 +60,36 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pytest -q
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.20"
+      - run: npm ci
+      - name: Type API khớp với backend (quên chạy gen:api thì fail)
+        run: npm run gen:api && git diff --exit-code -- openapi.json src/lib/api/schema.d.ts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results
+          retention-days: 7
+
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -72,3 +102,11 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Build frontend image (không push)
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: false
+          build-args: API_ORIGIN=http://api:8000
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
