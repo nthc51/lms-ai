@@ -4978,7 +4978,7 @@ Quy tắc theo design-system §5.3 (Giảng viên):
 - Xóa nằm trong menu `⋯`. Hộp xác nhận ghi rõ số bài sẽ mất. Xóa cả khóa thì phải gõ lại tên khóa.
 - Thông tin khóa tự lưu, có dòng "Đã lưu lúc …".
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `src/lib/teach-queries.test.ts`:
 
@@ -5002,7 +5002,7 @@ describe("moveItem", () => {
 Run: `npx vitest run src/lib/teach-queries.test.ts`
 Expected: FAIL, lỗi `Failed to resolve import "./teach-queries"`.
 
-- [ ] **Bước 2: Cài đặt `src/lib/teach-queries.ts`**
+- [x] **Bước 2: Cài đặt `src/lib/teach-queries.ts`**
 
 ```ts
 "use client";
@@ -5128,7 +5128,7 @@ export function useSourcePages(sourceId: string | null, page: number) {
 Run: `npx vitest run src/lib/teach-queries.test.ts`
 Expected: PASS (2 test).
 
-- [ ] **Bước 3: Giao diện**
+- [x] **Bước 3: Giao diện**
 
 `src/components/teach/inline-add.tsx`:
 
@@ -5758,7 +5758,7 @@ export default function CourseEditorPage() {
 }
 ```
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
