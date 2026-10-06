@@ -12,20 +12,20 @@
 
 > Cập nhật mục này mỗi khi xong việc. Ký hiệu: `[ ]` chưa làm · `[~]` đang làm · `[x]` xong · `[-]` đã cắt.
 
-**Tuần hiện tại:** 2 / 5  **Tổng tiến độ:** 0 / 40 hạng mục
+**Tuần hiện tại:** 2 / 5  **Tổng tiến độ:** 8 / 40 hạng mục
 
 **Thứ tự ưu tiên:** A (lõi) → B (mức Khá) → S (chất lượng hệ thống) → C (điểm nhấn). Hết thời gian mà vẫn còn việc thì phần bị trễ là tầng C, không phải S. Tuần 5 vẫn giữ cho báo cáo và bộ đánh giá.
 
 ### Tầng A: lõi (bắt buộc xong trước cuối tuần 2)
 
-- [~] A1. Auth, phân quyền 3 vai trò (Student / Teacher / Admin)
-- [~] A2. Khóa học, chương, bài học; upload PDF và video (presign MinIO)
-- [~] A3. Đăng ký khóa, tiến độ học
-- [~] A4. Pipeline xử lý tài liệu: parse → chunk → embed (có fallback vision)
-- [~] A5. AI Tutor: RAG, trích nguồn, streaming SSE, giới hạn phạm vi
-- [~] A6. AI sinh quiz + màn duyệt của giáo viên
-- [~] A7. Học viên làm quiz, chấm tự động
-- [~] A8. Dashboard giáo viên cơ bản
+- [x] A1. Auth, phân quyền 3 vai trò (Student / Teacher / Admin)
+- [x] A2. Khóa học, chương, bài học; upload PDF và video (presign MinIO)
+- [x] A3. Đăng ký khóa, tiến độ học
+- [x] A4. Pipeline xử lý tài liệu: parse → chunk → embed (có fallback vision)
+- [x] A5. AI Tutor: RAG, trích nguồn, streaming SSE, giới hạn phạm vi
+- [x] A6. AI sinh quiz + màn duyệt của giáo viên
+- [x] A7. Học viên làm quiz, chấm tự động
+- [x] A8. Dashboard giáo viên cơ bản
 
 ### Tầng B: mức "Khá" (tuần 3)
 
@@ -86,7 +86,7 @@
 
 ### Mốc
 
-- [ ] M1. Cuối tuần 2: bản chạy được đầu tiên (xong tầng A)
+- [x] M1. Cuối tuần 2: bản chạy được đầu tiên (xong tầng A)
 - [ ] M2. Cuối tuần 4: **chốt tính năng**, deploy xong
 - [ ] M3. Cuối tuần 5: nộp
 
@@ -755,3 +755,4 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-04 | Xóa khóa/chương/bài trả `409 INVALID_STATE` chỉ khi có dữ liệu học viên: lượt làm quiz, lịch sử Tutor của người không phải staff (bỏ qua chủ khóa và admin), đăng ký (xóa khóa), tiến độ học của học viên đang đăng ký (xóa chương/bài); quiz đã xuất bản chưa ai làm không còn chặn xóa |
 | 2026-10-04 | Tutor: stream xong mà rỗng → `error AI_UNAVAILABLE` (lưu tin rỗng `truncated`); availability phạm vi cả khóa trên khóa nháp có thông báo riêng; body request Tutor/Quiz không nhận trường lạ (`422`) |
 | 2026-10-04 | Hợp đồng frontend: thay text đã stream bằng `done.content`; `sources` gửi cả khi từ chối; đạt/không đạt theo điểm đã làm tròn; autosave cùng câu gửi tuần tự (lần sau thắng); lịch sử/phản hồi Tutor đọc được sau khi hủy đăng ký; giới hạn CRUD quiz và chỉ câu `approved`/`edited` |
+| 2026-10-06 | FE-2: tự lưu đáp án bằng hàng đợi tuần tự, nộp bài luôn kèm final_answers; loại câu hỏi có Hoàn tác 5 giây (gửi trễ thay vì gọi API khôi phục); bài làm gần nhất lưu ở localStorage vì chưa có API danh sách bài làm (để B1 bổ sung `GET /quizzes/{id}/attempts/me`). |
