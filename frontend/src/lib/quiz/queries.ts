@@ -90,7 +90,7 @@ export function useQuizMutations(lessonId: string) {
     }),
     publish: useMutation({
       mutationFn: (id: string) => unwrap(api.POST("/api/v1/quizzes/{quiz_id}/publish", path(id))),
-      onSuccess: refresh,
+      onSuccess: (q) => Promise.all([refresh(), qc.invalidateQueries({ queryKey: quizKeys.quiz(q.id) })]),
     }),
     remove: useMutation({
       mutationFn: (id: string) => unwrap(api.DELETE("/api/v1/quizzes/{quiz_id}", path(id))),
