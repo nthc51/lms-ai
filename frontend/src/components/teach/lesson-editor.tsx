@@ -19,6 +19,7 @@ import { type LessonDetail, qk, useCourse, useLesson, useLessonVideo } from "@/l
 import { autosaveLabel, useAutosave } from "@/lib/use-autosave";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileDrop, readVideoDuration } from "./file-drop";
+import { LessonTabs } from "./lesson-tabs";
 import { SourceList } from "./source-list";
 
 export function LessonEditor({ slug, lessonId }: { slug: string; lessonId: string }) {
@@ -29,28 +30,31 @@ export function LessonEditor({ slug, lessonId }: { slug: string; lessonId: strin
     return <ErrorState error={course.error ?? lesson.error} onRetry={() => (course.refetch(), lesson.refetch())} />;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr_320px]">
-      <aside className="hidden lg:block">
-        <Link href={`/teach/${slug}`} className="mb-2 flex items-center gap-1 text-sm text-muted-foreground hover:underline">
-          <ArrowLeft className="size-4" aria-hidden /> {course.data?.title ?? "Khóa học"}
-        </Link>
-        {course.data ? <EditorOutline course={course.data} slug={slug} lessonId={lessonId} /> : <Skeleton className="h-60" />}
-      </aside>
-      {lesson.isPending ? (
-        <div className="space-y-4" aria-busy="true" aria-label="Đang tải">
-          <Skeleton className="h-10 w-2/3" />
-          <Skeleton className="h-80 w-full" />
-        </div>
-      ) : (
-        <>
-          <Content key={lesson.data.id} lesson={lesson.data} slug={slug} />
-          <div className="space-y-8">
-            <VideoBox lessonId={lessonId} />
-            <SourceList lessonId={lessonId} />
+    <>
+      <LessonTabs slug={slug} lessonId={lessonId} />
+      <div className="grid gap-6 lg:grid-cols-[240px_1fr_320px]">
+        <aside className="hidden lg:block">
+          <Link href={`/teach/${slug}`} className="mb-2 flex items-center gap-1 text-sm text-muted-foreground hover:underline">
+            <ArrowLeft className="size-4" aria-hidden /> {course.data?.title ?? "Khóa học"}
+          </Link>
+          {course.data ? <EditorOutline course={course.data} slug={slug} lessonId={lessonId} /> : <Skeleton className="h-60" />}
+        </aside>
+        {lesson.isPending ? (
+          <div className="space-y-4" aria-busy="true" aria-label="Đang tải">
+            <Skeleton className="h-10 w-2/3" />
+            <Skeleton className="h-80 w-full" />
           </div>
-        </>
-      )}
-    </div>
+        ) : (
+          <>
+            <Content key={lesson.data.id} lesson={lesson.data} slug={slug} />
+            <div className="space-y-8">
+              <VideoBox lessonId={lessonId} />
+              <SourceList lessonId={lessonId} />
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 

@@ -9,7 +9,10 @@ import { LessonEditor } from "./lesson-editor";
 vi.mock("@/lib/auth/auth-context", () => ({
   useAuth: () => ({ status: "authenticated", user: { role: "teacher", teacher_status: "approved" } }),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/teach/toan/lessons/l1", // thanh LessonTabs (FE-2)
+}));
 
 const lessonOf = (id: string) => ({ id, title: `Bài ${id}`, content_md: `Nội dung ${id}`, position: 0, duration_sec: null });
 const course = {
