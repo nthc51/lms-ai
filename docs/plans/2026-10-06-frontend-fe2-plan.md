@@ -1160,7 +1160,7 @@ Expected: build liệt kê `ƒ /learn/[slug]/[lessonId]/quiz/[quizId]` và `…/
 - Create: `frontend/src/components/lesson/lesson-quizzes.tsx`
 - Modify: `frontend/src/components/lesson/lesson-view.tsx`, `frontend/e2e/mock-api.ts`
 
-- [ ] **Bước 1: `src/components/lesson/lesson-quizzes.tsx`**
+- [x] **Bước 1: `src/components/lesson/lesson-quizzes.tsx`**
 
 ```tsx
 "use client";
@@ -1237,7 +1237,7 @@ export function LessonQuizzes({ slug, lessonId, isStudent }: { slug: string; les
 }
 ```
 
-- [ ] **Bước 2: Sửa `src/components/lesson/lesson-view.tsx`** (3 chỗ)
+- [x] **Bước 2: Sửa `src/components/lesson/lesson-view.tsx`** (3 chỗ)
 
 (a) Thêm import ngay dưới dòng `import { BreakReminder } from "./break-reminder";`:
 
@@ -1259,7 +1259,7 @@ import { LessonQuizzes } from "./lesson-quizzes";
       // không bật toast: dòng "Đã học xong bài này" đã báo, và toast góc dưới phải sẽ che nút "Bài tiếp"
 ```
 
-- [ ] **Bước 3: Sửa `e2e/mock-api.ts`**
+- [x] **Bước 3: Sửa `e2e/mock-api.ts`**
 
 Thêm handler mặc định (ngay trước `...opts.extra,`) để các kịch bản FE-1 không gặp lỗi `UNMOCKED`:
 
@@ -1267,7 +1267,7 @@ Thêm handler mặc định (ngay trước `...opts.extra,`) để các kịch b
     "GET /quizzes": (r) => json(r, { items: [], total: 0, page: 1, size: 50 }),
 ```
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
