@@ -1931,7 +1931,7 @@ git add frontend/src && git commit -m "feat(web): AI question generation and rev
 **Files:**
 - Create: `frontend/src/components/teach/quiz-manager.tsx`, `frontend/src/app/(main)/teach/[slug]/lessons/[lessonId]/quizzes/page.tsx`
 
-- [ ] **Bước 1: `src/components/teach/quiz-manager.tsx`**
+- [x] **Bước 1: `src/components/teach/quiz-manager.tsx`**
 
 Hộp thoại Tạo / Sửa chỉ liệt kê câu `approved` / `edited`. Khi sửa, các câu đang có trong quiz được chọn sẵn.
 
@@ -2162,7 +2162,7 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
 }
 ```
 
-- [ ] **Bước 2: Trang** (`src/app/(main)/teach/[slug]/lessons/[lessonId]/quizzes/page.tsx`)
+- [x] **Bước 2: Trang** (`src/app/(main)/teach/[slug]/lessons/[lessonId]/quizzes/page.tsx`)
 
 ```tsx
 "use client";
@@ -2184,7 +2184,7 @@ export default function LessonQuizzesPage() {
 }
 ```
 
-- [ ] **Bước 3: Kiểm tra và commit**
+- [x] **Bước 3: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck
