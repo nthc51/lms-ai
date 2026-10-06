@@ -2404,7 +2404,7 @@ Expected: build có thêm các route `ƒ /teach/[slug]/analytics`, `…/lessons/
 **Files:**
 - Create: `frontend/e2e/quiz-data.ts`, `frontend/e2e/quiz.spec.ts`, `frontend/e2e/teacher-quiz.spec.ts`
 
-- [ ] **Bước 1: Dữ liệu giả** (`e2e/quiz-data.ts`)
+- [x] **Bước 1: Dữ liệu giả** (`e2e/quiz-data.ts`)
 
 ```ts
 import { L1 } from "./mock-api";
@@ -2497,7 +2497,7 @@ export const bankQuestion = (id: string, review_status: string, over: Record<str
 });
 ```
 
-- [ ] **Bước 2: Kịch bản học viên** (`e2e/quiz.spec.ts`)
+- [x] **Bước 2: Kịch bản học viên** (`e2e/quiz.spec.ts`)
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -2599,7 +2599,7 @@ test.describe("học viên làm quiz", () => {
 });
 ```
 
-- [ ] **Bước 3: Kịch bản giảng viên** (`e2e/teacher-quiz.spec.ts`)
+- [x] **Bước 3: Kịch bản giảng viên** (`e2e/teacher-quiz.spec.ts`)
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -2743,7 +2743,7 @@ test.describe("giảng viên: câu hỏi, quiz, thống kê", () => {
 });
 ```
 
-- [ ] **Bước 4: Chạy**
+- [x] **Bước 4: Chạy**
 
 Run: `npm run e2e`
 Expected: `28 passed` (18 test cũ, 10 test mới).
@@ -2752,7 +2752,7 @@ Kịch bản "Hoàn tác" chờ 5,5 giây có chủ đích, để chứng minh k
 
 Nếu axe báo `color-contrast` ở dòng "Đáp án đúng", kiểm tra lại rằng chữ dùng màu chữ thường, chỉ icon mang màu `text-success` (xem §0.3).
 
-- [ ] **Bước 5: Commit và push**
+- [x] **Bước 5: Commit và push**
 
 ```bash
 git add frontend/e2e && git commit -m "test(web): E2E for quiz taking, question review and analytics"
