@@ -491,7 +491,7 @@ Thiết kế:
 - `AnswerSaver` được tạo lười theo `attempt.id`.
 - Request mở bài (`POST /attempts`) chạy trong `useQuery` với `staleTime: Infinity`, `gcTime: 0`, `retry: false`. Nhờ vậy React StrictMode không gửi 2 lần, và mở lại trang thì gọi lại để nhận bài đang làm dở.
 
-- [ ] **Bước 1: Viết test (sẽ fail)** (`src/lib/quiz/use-quiz-attempt.test.tsx`)
+- [x] **Bước 1: Viết test (sẽ fail)** (`src/lib/quiz/use-quiz-attempt.test.tsx`)
 
 ```tsx
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -583,7 +583,7 @@ describe("useQuizAttempt", () => {
 Run: `npx vitest run src/lib/quiz/use-quiz-attempt.test.tsx`
 Expected: FAIL với lỗi `Failed to resolve import "./use-quiz-attempt"`.
 
-- [ ] **Bước 2: Cài đặt `src/lib/quiz/use-quiz-attempt.ts`**
+- [x] **Bước 2: Cài đặt `src/lib/quiz/use-quiz-attempt.ts`**
 
 ```ts
 "use client";
@@ -664,7 +664,7 @@ export function useQuizAttempt(quizId: string) {
 Run: `npx vitest run src/lib/quiz`
 Expected: PASS (5 test).
 
-- [ ] **Bước 3: Commit**
+- [x] **Bước 3: Commit**
 
 ```bash
 npm run lint && git add frontend/src/lib/quiz && git commit -m "feat(web): quiz attempt hook with resume, autosave and submit"
