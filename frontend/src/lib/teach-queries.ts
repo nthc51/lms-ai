@@ -15,7 +15,7 @@ export function useTeacherCourses(page = 1) {
 }
 
 /** Danh sách khóa của giảng viên (mọi trang) cần tải lại sau khi tạo, xuất bản hoặc xóa khóa. */
-const TEACHER_COURSES_KEY = ["teacher-courses"] as const;
+const TEACHER_COURSES_KEY = qk.teacherCoursesAll;
 
 export function useCreateCourse() {
   const qc = useQueryClient();

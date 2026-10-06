@@ -9,13 +9,17 @@ import { useAuth } from "@/lib/auth/auth-context";
 export type CourseDetail = components["schemas"]["CourseDetail"];
 export type LessonDetail = components["schemas"]["LessonDetail"];
 
+/** Tiền tố khóa của mọi trang danh sách khóa giảng viên (dùng để invalidate). */
+const TEACHER_COURSES = ["teacher-courses"] as const;
+
 export const qk = {
+  teacherCoursesAll: TEACHER_COURSES,
   catalog: (q: string, page: number) => ["catalog", q, page] as const,
   course: (slug: string) => ["course", slug] as const,
   myCourses: (page: number) => ["my-courses", page] as const,
   lesson: (id: string) => ["lesson", id] as const,
   lessonVideo: (id: string) => ["lesson-video", id] as const,
-  teacherCourses: (page: number) => ["teacher-courses", page] as const,
+  teacherCourses: (page: number) => [...TEACHER_COURSES, page] as const,
   sources: (lessonId: string) => ["sources", lessonId] as const,
   job: (id: string) => ["job", id] as const,
 };

@@ -34,6 +34,7 @@ function Editor({ course }: { course: CourseDetail }) {
   const mut = useCourseMutations(course);
   const [publishOpen, setPublishOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const deleted = React.useRef(false); // khóa đã xóa thì CourseInfo không lưu nốt khi đóng trình soạn
   const firstLesson = flattenLessons(course)[0];
   const empty = !firstLesson;
 
@@ -79,7 +80,7 @@ function Editor({ course }: { course: CourseDetail }) {
       <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
         <Curriculum course={course} mut={mut} />
         <div className="space-y-8">
-          <CourseInfo course={course} mut={mut} />
+          <CourseInfo course={course} mut={mut} deleted={deleted} />
           <section className="rounded-lg border border-destructive/30 p-4">
             <h2 className="font-semibold">Vùng nguy hiểm</h2>
             <p className="mt-1 text-sm text-muted-foreground">Xóa khóa học cùng toàn bộ chương, bài và tài liệu.</p>
@@ -119,6 +120,7 @@ function Editor({ course }: { course: CourseDetail }) {
         onConfirm={async () => {
           try {
             await mut.deleteCourse.mutateAsync();
+            deleted.current = true;
             toast.success("Đã xóa khóa học");
             router.replace("/teach");
           } catch (err) {
@@ -131,7 +133,15 @@ function Editor({ course }: { course: CourseDetail }) {
   );
 }
 
-function CourseInfo({ course, mut }: { course: CourseDetail; mut: ReturnType<typeof useCourseMutations> }) {
+function CourseInfo({
+  course,
+  mut,
+  deleted,
+}: {
+  course: CourseDetail;
+  mut: ReturnType<typeof useCourseMutations>;
+  deleted: React.RefObject<boolean>;
+}) {
   const [value, setValue] = React.useState({ title: course.title, description: course.description });
   const tooShort = value.title.trim().length < 3;
   const autosave = useAutosave(value, (v) => mut.updateCourse.mutateAsync({ title: v.title.trim(), description: v.description }), {
@@ -147,9 +157,9 @@ function CourseInfo({ course, mut }: { course: CourseDetail; mut: ReturnType<typ
   });
   React.useEffect(
     () => () => {
-      if (!tooShortRef.current) void flushRef.current();
+      if (!tooShortRef.current && !deleted.current) void flushRef.current();
     },
-    [],
+    [deleted],
   );
 
   return (
