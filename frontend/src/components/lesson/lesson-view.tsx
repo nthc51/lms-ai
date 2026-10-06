@@ -35,6 +35,7 @@ import { useVideoProgress } from "@/lib/study/use-video-progress";
 import { useTutorChat } from "@/lib/tutor/use-tutor-chat";
 import { cn } from "@/lib/utils";
 import { BreakReminder } from "./break-reminder";
+import { LessonQuizzes } from "./lesson-quizzes";
 import { CourseOutline } from "./course-outline";
 import { ReadingProgress } from "./reading-progress";
 import { ShortcutHelp } from "./shortcut-help";
@@ -218,6 +219,8 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
                   <p className="mt-6 text-muted-foreground">Bài này chưa có nội dung đọc.</p>
                 )}
 
+                <LessonQuizzes slug={slug} lessonId={lessonId} isStudent={isStudent} />
+
                 <LessonFooter
                   lesson={lesson.data}
                   isStudent={isStudent}
@@ -317,7 +320,7 @@ function LessonFooter({
   async function markDone() {
     try {
       await save.mutateAsync({ status: "done", video_position_sec: Math.floor(videoRef.current?.currentTime ?? lesson.progress?.video_position_sec ?? 0) });
-      toast.success("Đã đánh dấu học xong");
+      // không bật toast: dòng "Đã học xong bài này" đã báo, và toast góc dưới phải sẽ che nút "Bài tiếp"
     } catch (err) {
       toast.error(errorMessage(err));
     }

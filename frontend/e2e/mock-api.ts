@@ -98,6 +98,7 @@ export async function mockApi(page: Page, opts: { user?: typeof student | typeof
       });
     },
     "POST /tutor/messages/*/feedback": (r) => json(r, {}),
+    "GET /quizzes": (r) => json(r, { items: [], total: 0, page: 1, size: 50 }),
     ...opts.extra,
   };
 
