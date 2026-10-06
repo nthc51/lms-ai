@@ -5776,7 +5776,7 @@ Theo design-system §7.3, trình soạn bài trên desktop có 3 vùng: mục l�
 
 Trạng thái tài liệu đi theo chuỗi: Đang tải (%) → Đang xử lý (vòng xoay) → Sẵn sàng ✓ / Lỗi (có nút "Xử lý lại"). Danh sách tự hỏi lại mỗi 3 giây khi còn tài liệu đang xử lý, xong hết thì dừng hỏi.
 
-- [ ] **Bước 1: Vùng kéo thả file** (`src/components/teach/file-drop.tsx`)
+- [x] **Bước 1: Vùng kéo thả file** (`src/components/teach/file-drop.tsx`)
 
 ```tsx
 "use client";
@@ -5904,7 +5904,7 @@ export function readVideoDuration(file: File): Promise<number | null> {
 }
 ```
 
-- [ ] **Bước 2: Danh sách tài liệu** (`src/components/teach/source-list.tsx`)
+- [x] **Bước 2: Danh sách tài liệu** (`src/components/teach/source-list.tsx`)
 
 Có hộp xem các trang đã trích, kèm huy hiệu Text / Vision.
 
@@ -6066,7 +6066,7 @@ function SourcePagesDialog({ source, onClose }: { source: SourceOut | null; onCl
 }
 ```
 
-- [ ] **Bước 3: Trình soạn bài**
+- [x] **Bước 3: Trình soạn bài**
 
 `src/components/teach/lesson-editor.tsx`. Có cảnh báo `beforeunload` khi còn thay đổi chưa lưu:
 
@@ -6330,7 +6330,7 @@ export default function LessonEditorPage() {
 }
 ```
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
