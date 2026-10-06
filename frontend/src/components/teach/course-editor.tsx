@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Globe, Trash2 } from "lucide-react";
+import { BarChart3, Eye, Globe, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -52,6 +52,11 @@ function Editor({ course }: { course: CourseDetail }) {
           <h1 className="truncate text-2xl font-semibold md:text-3xl">{course.title}</h1>
         </div>
         {course.status === "published" ? <Badge tone="success">Đã xuất bản</Badge> : <Badge>Nháp</Badge>}
+        <Button asChild variant="outline">
+          <Link href={`/teach/${course.slug}/analytics`}>
+            <BarChart3 /> Thống kê
+          </Link>
+        </Button>
         {firstLesson ? (
           <Button asChild variant="outline">
             <Link href={`/learn/${course.slug}/${firstLesson.id}`}>
