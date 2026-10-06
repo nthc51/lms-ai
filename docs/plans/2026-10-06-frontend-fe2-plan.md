@@ -962,7 +962,7 @@ git add frontend/src && git commit -m "feat(web): quiz player page"
 **Files:**
 - Create: `frontend/src/components/quiz/quiz-result.tsx`, `frontend/src/app/learn/[slug]/[lessonId]/quiz/[quizId]/result/[attemptId]/page.tsx`
 
-- [ ] **Bước 1: `src/components/quiz/quiz-result.tsx`**
+- [x] **Bước 1: `src/components/quiz/quiz-result.tsx`**
 
 ```tsx
 "use client";
@@ -1124,7 +1124,7 @@ export function formatScore(score: number) {
 }
 ```
 
-- [ ] **Bước 2: Trang** (`src/app/learn/[slug]/[lessonId]/quiz/[quizId]/result/[attemptId]/page.tsx`)
+- [x] **Bước 2: Trang** (`src/app/learn/[slug]/[lessonId]/quiz/[quizId]/result/[attemptId]/page.tsx`)
 
 ```tsx
 "use client";
@@ -1143,7 +1143,7 @@ export default function QuizResultPage() {
 }
 ```
 
-- [ ] **Bước 3: Kiểm tra và commit**
+- [x] **Bước 3: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm run build
