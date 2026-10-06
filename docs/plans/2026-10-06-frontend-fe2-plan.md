@@ -1400,7 +1400,7 @@ git add frontend/src && git commit -m "feat(web): lesson editor tabs for content
 **Files:**
 - Create: `frontend/src/components/teach/question-card.tsx`, `frontend/src/components/teach/question-bank.tsx`, `frontend/src/app/(main)/teach/[slug]/lessons/[lessonId]/questions/page.tsx`
 
-- [ ] **Bước 1: `src/components/teach/question-card.tsx`**
+- [x] **Bước 1: `src/components/teach/question-card.tsx`**
 
 Form sửa hiện câu lỗi 422 của backend ngay tại chỗ.
 
@@ -1634,7 +1634,7 @@ function EditForm({
 }
 ```
 
-- [ ] **Bước 2: `src/components/teach/question-bank.tsx`**
+- [x] **Bước 2: `src/components/teach/question-bank.tsx`**
 
 ```tsx
 "use client";
@@ -1895,7 +1895,7 @@ function GeneratePanel({ lessonId }: { lessonId: string }) {
 }
 ```
 
-- [ ] **Bước 3: Trang** (`src/app/(main)/teach/[slug]/lessons/[lessonId]/questions/page.tsx`)
+- [x] **Bước 3: Trang** (`src/app/(main)/teach/[slug]/lessons/[lessonId]/questions/page.tsx`)
 
 ```tsx
 "use client";
@@ -1917,7 +1917,7 @@ export default function LessonQuestionsPage() {
 }
 ```
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck
