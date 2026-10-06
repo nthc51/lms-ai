@@ -1282,7 +1282,7 @@ git add frontend/src frontend/e2e/mock-api.ts && git commit -m "feat(web): list 
 - Create: `frontend/src/components/teach/lesson-tabs.tsx`, `frontend/src/components/teach/lesson-subpage.tsx`
 - Modify: `frontend/src/components/teach/lesson-editor.tsx`, `frontend/src/components/teach/lesson-editor.test.tsx`
 
-- [ ] **Bước 1: `src/components/teach/lesson-tabs.tsx`**
+- [x] **Bước 1: `src/components/teach/lesson-tabs.tsx`**
 
 ```tsx
 "use client";
@@ -1325,7 +1325,7 @@ export function LessonTabs({ slug, lessonId }: { slug: string; lessonId: string 
 }
 ```
 
-- [ ] **Bước 2: `src/components/teach/lesson-subpage.tsx`**
+- [x] **Bước 2: `src/components/teach/lesson-subpage.tsx`**
 
 ```tsx
 "use client";
@@ -1358,7 +1358,7 @@ export function LessonSubpage({ slug, lessonId, children }: { slug: string; less
 }
 ```
 
-- [ ] **Bước 3: Gắn tab vào trình soạn nội dung** (`lesson-editor.tsx`)
+- [x] **Bước 3: Gắn tab vào trình soạn nội dung** (`lesson-editor.tsx`)
 
 Thêm import `import { LessonTabs } from "./lesson-tabs";`. Trong `LessonEditor`, bọc phần `return` trong fragment để thanh tab nằm phía trên lưới 3 cột:
 
@@ -1373,7 +1373,7 @@ Thêm import `import { LessonTabs } from "./lesson-tabs";`. Trong `LessonEditor`
   );
 ```
 
-- [ ] **Bước 4: Sửa mock trong `lesson-editor.test.tsx`**
+- [x] **Bước 4: Sửa mock trong `lesson-editor.test.tsx`**
 
 `LessonTabs` dùng `usePathname`, nên mock `next/navigation` phải có thêm hàm này. Thay dòng `vi.mock("next/navigation", …)` bằng:
 
@@ -1387,7 +1387,7 @@ vi.mock("next/navigation", () => ({
 Run: `npx vitest run src/components/teach`
 Expected: PASS. Nếu quên bước này, 4 test của `lesson-editor.test.tsx` sẽ fail với lỗi `No "usePathname" export is defined on the "next/navigation" mock`.
 
-- [ ] **Bước 5: Commit**
+- [x] **Bước 5: Commit**
 
 ```bash
 git add frontend/src && git commit -m "feat(web): lesson editor tabs for content, questions and quizzes"
