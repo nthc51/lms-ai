@@ -6352,7 +6352,7 @@ E2E dùng **API giả** (`page.route`) nên chạy được trên CI mà không 
 - Mỗi kịch bản chạy ở 2 project: `mobile-375` và `desktop-1280`.
 - Mỗi kịch bản kiểm tra axe (WCAG 2.1 AA) và kiểm tra không có cuộn ngang.
 
-- [ ] **Bước 1: Cài trình duyệt cho Playwright**
+- [x] **Bước 1: Cài trình duyệt cho Playwright**
 
 ```bash
 npx playwright install chromium
@@ -6360,7 +6360,7 @@ npx playwright install chromium
 
 (Trên Linux/CI dùng `npx playwright install --with-deps chromium`. Nếu máy đã có sẵn Chromium khác phiên bản thì đặt `PW_CHROMIUM=<đường dẫn chrome>`.)
 
-- [ ] **Bước 2: Cấu hình**
+- [x] **Bước 2: Cấu hình**
 
 `playwright.config.ts`:
 
@@ -6539,7 +6539,7 @@ export async function expectNoHorizontalScroll(page: Page) {
 }
 ```
 
-- [ ] **Bước 3: Kịch bản học viên** (`e2e/student.spec.ts`)
+- [x] **Bước 3: Kịch bản học viên** (`e2e/student.spec.ts`)
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -6642,7 +6642,7 @@ test("trang bài học đạt chuẩn tương phản ở cả 3 chế độ màu
 });
 ```
 
-- [ ] **Bước 4: Kịch bản giảng viên** (`e2e/teacher.spec.ts`)
+- [x] **Bước 4: Kịch bản giảng viên** (`e2e/teacher.spec.ts`)
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -6718,14 +6718,14 @@ test.describe("giảng viên", () => {
 });
 ```
 
-- [ ] **Bước 5: Chạy**
+- [x] **Bước 5: Chạy**
 
 Run: `npm run e2e`
 Expected: `18 passed`. Lần đầu mất khoảng 1–2 phút vì phải build.
 
 Nếu axe báo lỗi, test in ra `"<rule-id>: <selector>"`. Sửa đúng phần tử đó, **không tắt rule**. Ví dụ gặp khi viết plan: `link-in-text-block` với link "Đăng ký" chỉ phân biệt bằng màu, sửa bằng cách thêm gạch chân.
 
-- [ ] **Bước 6: Commit**
+- [x] **Bước 6: Commit**
 
 ```bash
 git add frontend/playwright.config.ts frontend/e2e && git commit -m "test(web): Playwright E2E at 375/1280 with axe checks"
