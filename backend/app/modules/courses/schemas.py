@@ -27,6 +27,7 @@ class CourseOut(BaseModel):
     description: str
     status: CourseStatus
     created_at: datetime
+    hidden_reason: str | None = None  # quản trị viên đã ẩn khóa (status = archived)
 
 
 class SectionCreate(BaseModel):

@@ -968,6 +968,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Hidden Reason */
+            hidden_reason?: string | null;
             /** Teacher Name */
             teacher_name: string;
             /** Sections */
@@ -1001,6 +1003,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Hidden Reason */
+            hidden_reason?: string | null;
         };
         /** CoursePage */
         CoursePage: {
@@ -1836,6 +1840,8 @@ export interface components {
             full_name: string;
             role: components["schemas"]["Role"];
             teacher_status: components["schemas"]["TeacherStatus"] | null;
+            /** Review Note */
+            review_note?: string | null;
         };
         /** ValidationError */
         ValidationError: {

@@ -43,3 +43,4 @@ class UserOut(BaseModel):
     full_name: str
     role: Role
     teacher_status: TeacherStatus | None
+    review_note: str | None = None  # lý do bị từ chối duyệt giảng viên (nếu có)

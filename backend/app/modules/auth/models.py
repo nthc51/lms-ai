@@ -35,6 +35,8 @@ class User(IdMixin, TimestampMixin, Base):
     role: Mapped[Role] = mapped_column(SAEnum(Role, name="user_role"))
     teacher_status: Mapped[TeacherStatus | None] = mapped_column(SAEnum(TeacherStatus, name="teacher_status"))
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Lý do quản trị viên ghi khi từ chối giảng viên hoặc khóa tài khoản (hiện cho chính người dùng).
+    review_note: Mapped[str | None] = mapped_column(String(500))
 
 
 class RefreshToken(IdMixin, TimestampMixin, Base):

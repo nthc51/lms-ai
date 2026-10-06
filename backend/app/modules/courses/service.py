@@ -153,6 +153,9 @@ async def count_lessons(db: AsyncSession, course_id: uuid.UUID) -> int:
 
 
 async def publish_course(db: AsyncSession, course: Course) -> Course:
+    # Khóa bị quản trị viên ẩn chỉ được hiện lại qua POST /admin/courses/{id}/unhide.
+    if course.hidden_at is not None:
+        raise AppError("COURSE_HIDDEN", "Khóa học đã bị quản trị viên ẩn, không thể tự xuất bản lại", 409)
     if await count_lessons(db, course.id) == 0:
         raise AppError("COURSE_EMPTY", "Khóa học cần ít nhất một bài học trước khi xuất bản", 409)
     course.status = CourseStatus.published

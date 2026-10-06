@@ -3299,6 +3299,17 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "hidden_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden Reason"
+          },
           "teacher_name": {
             "type": "string",
             "title": "Teacher Name"
@@ -3366,6 +3377,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "hidden_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden Reason"
           }
         },
         "type": "object",
@@ -5479,6 +5501,17 @@
                 "type": "null"
               }
             ]
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
           }
         },
         "type": "object",

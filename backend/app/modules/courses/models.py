@@ -1,8 +1,9 @@
 import enum
 import uuid
+from datetime import datetime
 
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, IdMixin, TimestampMixin
@@ -25,6 +26,9 @@ class Course(IdMixin, TimestampMixin, Base):
     status: Mapped[CourseStatus] = mapped_column(
         SAEnum(CourseStatus, name="course_status"), default=CourseStatus.draft
     )
+    # Quản trị viên ẩn khóa vi phạm: status chuyển sang archived và giảng viên không tự xuất bản lại được.
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    hidden_reason: Mapped[str | None] = mapped_column(String(500))
 
     sections: Mapped[list["Section"]] = relationship(
         back_populates="course", order_by="Section.position", passive_deletes=True
