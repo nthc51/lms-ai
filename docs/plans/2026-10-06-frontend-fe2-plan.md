@@ -291,7 +291,7 @@ git add frontend/src/lib/quiz && git commit -m "feat(web): sequential answer aut
 **Files:**
 - Create: `frontend/src/lib/quiz/queries.ts`, `frontend/src/lib/quiz/attempt-store.ts`
 
-- [ ] **Bước 1: `src/lib/quiz/queries.ts`**
+- [x] **Bước 1: `src/lib/quiz/queries.ts`**
 
 `useJob` hỏi lại trạng thái mỗi 2 giây cho tới khi job xong. `submitAttempt` luôn gửi `final_answers`.
 
@@ -439,7 +439,7 @@ export function useCourseAnalytics(courseId: string | undefined) {
 }
 ```
 
-- [ ] **Bước 2: `src/lib/quiz/attempt-store.ts`**
+- [x] **Bước 2: `src/lib/quiz/attempt-store.ts`**
 
 ```ts
 // Bài làm gần nhất của mỗi quiz trên máy này. Backend chưa có API "danh sách bài làm của tôi"
@@ -468,7 +468,7 @@ export const lastAttempt = {
 };
 ```
 
-- [ ] **Bước 3: Kiểm tra và commit**
+- [x] **Bước 3: Kiểm tra và commit**
 
 ```bash
 npm run typecheck
