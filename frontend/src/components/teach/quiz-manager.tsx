@@ -244,7 +244,7 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
             <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
               Hủy
             </Button>
-            <Button type="submit" loading={pending} loadingText="Đang lưu…" disabled={!!loadError}>
+            <Button type="submit" loading={pending} loadingText="Đang lưu…" disabled={!!loadError || loading}>
               {quiz ? "Lưu quiz" : "Tạo quiz"}
             </Button>
           </div>

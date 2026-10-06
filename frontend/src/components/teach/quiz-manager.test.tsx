@@ -96,4 +96,14 @@ describe("QuizManager", () => {
     await user.click(save);
     expect(patched).toBe(false);
   });
+
+  it("edit dialog does not allow saving while the quiz detail is still loading", async () => {
+    const user = userEvent.setup();
+    setup([quiz("dra", "draft", 2)]);
+    server.use(http.get(url("/quizzes/dra"), () => new Promise<never>(() => {})));
+    await screen.findByText("Quiz dra");
+    await user.click(screen.getByRole("button", { name: "Sửa" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Lưu quiz" })).toBeDisabled();
+  });
 });
