@@ -130,7 +130,7 @@ Docs: docs/plans/2026-09-30-tier-s-system-plan.md (email admin)
 - Create: `backend/app/modules/admin/__init__.py` (rỗng), `backend/app/modules/admin/models.py`, `backend/alembic/versions/b81e4c7a2d90_admin.py`
 - Modify: `backend/app/models_registry.py`
 
-- [ ] **Bước 1: `users.review_note`** (`app/modules/auth/models.py`, ngay dưới `locked_at`)
+- [x] **Bước 1: `users.review_note`** (`app/modules/auth/models.py`, ngay dưới `locked_at`)
 
 ```python
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -138,7 +138,7 @@ Docs: docs/plans/2026-09-30-tier-s-system-plan.md (email admin)
     review_note: Mapped[str | None] = mapped_column(String(500))
 ```
 
-- [ ] **Bước 2: `courses.hidden_at`, `courses.hidden_reason`** (`app/modules/courses/models.py`)
+- [x] **Bước 2: `courses.hidden_at`, `courses.hidden_reason`** (`app/modules/courses/models.py`)
 
 Thêm `from datetime import datetime` và `DateTime` vào import (`from sqlalchemy import DateTime, ForeignKey, Integer, String, Text`), rồi thêm ngay dưới cột `status`:
 
@@ -148,7 +148,7 @@ Thêm `from datetime import datetime` và `DateTime` vào import (`from sqlalche
     hidden_reason: Mapped[str | None] = mapped_column(String(500))
 ```
 
-- [ ] **Bước 3: Bảng nhật ký** (`app/modules/admin/models.py`)
+- [x] **Bước 3: Bảng nhật ký** (`app/modules/admin/models.py`)
 
 ```python
 import uuid
@@ -179,7 +179,7 @@ Thêm vào `app/models_registry.py` (giữ thứ tự chữ cái):
 from app.modules.admin import models as admin_models  # noqa: F401
 ```
 
-- [ ] **Bước 4: Migration** (`alembic/versions/b81e4c7a2d90_admin.py`)
+- [x] **Bước 4: Migration** (`alembic/versions/b81e4c7a2d90_admin.py`)
 
 ```python
 """admin: users.review_note, courses.hidden_*, admin_actions
@@ -234,7 +234,7 @@ def downgrade() -> None:
 
 Kiểm tra `down_revision` là head hiện tại: chạy `uv run alembic heads`, phải ra `d2a7f3e81b64`. Nếu khác thì sửa `down_revision` theo head thật và ghi vào commit.
 
-- [ ] **Bước 5: Thêm trường vào API cũ**
+- [x] **Bước 5: Thêm trường vào API cũ**
 
 `app/modules/auth/schemas.py`, cuối `UserOut`:
 
@@ -258,7 +258,7 @@ async def publish_course(db: AsyncSession, course: Course) -> Course:
     if await count_lessons(db, course.id) == 0:
 ```
 
-- [ ] **Bước 6: Chạy migration và kiểm tra khớp models**
+- [x] **Bước 6: Chạy migration và kiểm tra khớp models**
 
 Container `api` không mount code, nên phải build lại. Lệnh khởi động của `api` tự chạy `alembic upgrade head`.
 
@@ -276,7 +276,7 @@ uv run pytest -q
 
 Expected: toàn bộ test cũ vẫn pass (611, chưa có test mới).
 
-- [ ] **Bước 7: Commit**
+- [x] **Bước 7: Commit**
 
 ```bash
 git add backend && git commit -m "feat(api): admin columns (review_note, hidden_at/reason) and admin_actions table"
