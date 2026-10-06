@@ -23,6 +23,7 @@ const course = {
 
 function setup(lessonId = "l1") {
   const patches: { id: string; body: Record<string, unknown> }[] = [];
+  const deletes: string[] = [];
   server.use(
     http.get(url("/courses/toan"), () => HttpResponse.json(course)),
     http.get(url("/lessons/:id"), ({ params }) => HttpResponse.json(lessonOf(params.id as string))),
@@ -32,6 +33,10 @@ function setup(lessonId = "l1") {
       patches.push({ id: params.id as string, body: (await request.json()) as Record<string, unknown> });
       return HttpResponse.json(lessonOf(params.id as string));
     }),
+    http.delete(url("/lessons/:id"), ({ params }) => {
+      deletes.push(params.id as string);
+      return new HttpResponse(null, { status: 204 });
+    }),
   );
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ui = (id: string) => (
@@ -40,7 +45,7 @@ function setup(lessonId = "l1") {
     </QueryClientProvider>
   );
   const view = render(ui(lessonId));
-  return { patches, view, ui, user: userEvent.setup({ delay: null }) };
+  return { patches, deletes, view, ui, user: userEvent.setup({ delay: null }) };
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 50));
@@ -69,7 +74,18 @@ describe("tự lưu khi rời trình soạn bài", () => {
     await waitFor(() => expect(screen.getByLabelText("Tên bài")).toHaveValue("Bài l2"));
     await settle();
     expect(patches).toHaveLength(1);
-    expect(patches[0].id).toBe("l1");
+    expect(patches[0]).toMatchObject({ id: "l1", body: { content_md: "Nội dung l1 thêm" } });
     expect(screen.getByLabelText("Nội dung bài (markdown)")).toHaveValue("Nội dung l2");
+  });
+
+  it("không lưu nốt sau khi xóa bài thành công", async () => {
+    const { patches, deletes, view, user } = setup();
+    await user.type(await screen.findByLabelText("Nội dung bài (markdown)"), " thêm");
+    await user.click(screen.getByRole("button", { name: /Xóa bài này/ }));
+    await user.click(await screen.findByRole("button", { name: "Xóa bài" }));
+    await waitFor(() => expect(deletes).toEqual(["l1"]));
+    view.unmount();
+    await settle();
+    expect(patches).toHaveLength(0);
   });
 });
