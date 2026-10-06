@@ -119,7 +119,7 @@ Giống FE-1 §0.5:
 - Create: `frontend/src/lib/quiz/types.ts`, `frontend/src/lib/quiz/answer-saver.ts`
 - Test: `frontend/src/lib/quiz/answer-saver.test.ts`
 
-- [ ] **Bước 1: `src/lib/quiz/types.ts`**
+- [x] **Bước 1: `src/lib/quiz/types.ts`**
 
 ```ts
 import type { components } from "@/lib/api/schema";
@@ -136,7 +136,7 @@ export type CourseAnalytics = S["CourseAnalytics"];
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: "Dễ", medium: "Vừa", hard: "Khó" };
 ```
 
-- [ ] **Bước 2: Viết test (sẽ fail)** (`src/lib/quiz/answer-saver.test.ts`)
+- [x] **Bước 2: Viết test (sẽ fail)** (`src/lib/quiz/answer-saver.test.ts`)
 
 ```ts
 import { describe, expect, it, vi } from "vitest";
@@ -212,7 +212,7 @@ describe("AnswerSaver", () => {
 Run: `npx vitest run src/lib/quiz/answer-saver.test.ts`
 Expected: FAIL với lỗi `Failed to resolve import "./answer-saver"`.
 
-- [ ] **Bước 3: Cài đặt `src/lib/quiz/answer-saver.ts`**
+- [x] **Bước 3: Cài đặt `src/lib/quiz/answer-saver.ts`**
 
 ```ts
 export type SaveState = "saving" | "saved" | "error";
@@ -278,7 +278,7 @@ export class AnswerSaver {
 Run: `npx vitest run src/lib/quiz/answer-saver.test.ts`
 Expected: PASS (3 test). Test đầu tiên chứng minh hai điều: không bao giờ có 2 request cùng lúc (`maxInFlight === 1`), và lựa chọn bị ghi đè trong lúc chờ không bao giờ được gửi (`q1=B`).
 
-- [ ] **Bước 4: Commit**
+- [x] **Bước 4: Commit**
 
 ```bash
 git add frontend/src/lib/quiz && git commit -m "feat(web): sequential answer autosave queue for quizzes"
