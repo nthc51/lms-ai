@@ -16,6 +16,25 @@ const STATUS_BADGE = {
   rejected: { label: "Đã loại", tone: "neutral" },
 } as const;
 
+type FieldError = { loc?: (string | number)[]; msg: string; type?: string };
+
+const FIELD_LABEL: Record<string, { short: string; long: string }> = {
+  stem: { short: "Đề bài phải có ít nhất 10 ký tự", long: "Đề bài tối đa 1000 ký tự" },
+  text: { short: "Lựa chọn không được để trống", long: "Mỗi lựa chọn tối đa 300 ký tự" },
+  explanation: { short: "Giải thích quá ngắn", long: "Giải thích tối đa 2000 ký tự" },
+};
+
+/** Đổi lỗi 422 (Pydantic, tiếng Anh) của backend thành câu tiếng Việt cho form sửa câu hỏi. */
+export function questionErrorText(e: FieldError): string {
+  const loc = e.loc ?? [];
+  const field = [...loc].reverse().find((p): p is string => typeof p === "string" && p !== "body");
+  const label = field ? FIELD_LABEL[field] : undefined;
+  if (e.type === "string_too_short" && label) return label.short;
+  if (e.type === "string_too_long" && label) return label.long;
+  if (e.type === "missing") return "Thiếu thông tin bắt buộc";
+  return e.msg.replace(/^Value error, /, "");
+}
+
 export type ReviewAction =
   | { action: "approve" }
   | { action: "reject" }
@@ -152,10 +171,20 @@ function EditForm({
     setPending(true);
     setError(null);
     try {
-      await onSave({ action: "edit", stem, options, correct_option_id: correct, explanation, difficulty });
+      const unchanged =
+        stem === q.stem &&
+        correct === q.correct_option_id &&
+        explanation === q.explanation &&
+        difficulty === q.difficulty &&
+        options.every((o, i) => o.text === q.options[i]?.text);
+      // Không sửa gì thì chỉ duyệt, để thống kê không tính là "đã sửa"
+      await onSave(
+        unchanged ? { action: "approve" } : { action: "edit", stem, options, correct_option_id: correct, explanation, difficulty },
+      );
     } catch (err) {
       // 422: luật câu hỏi (đúng 4 lựa chọn khác nhau, đề ≥ 10 ký tự…) — hiện câu backend trả về
-      const detail = err instanceof ApiError ? (err.details.errors as { msg: string }[] | undefined)?.[0]?.msg : undefined;
+      const first = err instanceof ApiError ? (err.details.errors as FieldError[] | undefined)?.[0] : undefined;
+      const detail = first ? questionErrorText(first) : undefined;
       setError(detail ? `${errorMessage(err)}: ${detail}` : errorMessage(err));
     } finally {
       setPending(false);
@@ -165,7 +194,7 @@ function EditForm({
   return (
     <form onSubmit={submit} className="mt-3 space-y-4">
       <Field id={`stem-${q.id}`} label="Đề bài">
-        <Textarea rows={3} value={stem} maxLength={1000} onChange={(e) => setStem(e.target.value)} />
+        <Textarea rows={3} value={stem} required minLength={10} maxLength={1000} onChange={(e) => setStem(e.target.value)} />
       </Field>
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm font-medium">Các lựa chọn (chọn ô tròn ở đáp án đúng)</legend>
@@ -183,6 +212,7 @@ function EditForm({
             <Input
               aria-label={`Lựa chọn ${o.id}`}
               value={o.text}
+              required
               maxLength={300}
               onChange={(e) => setOptions((prev) => prev.map((p, j) => (j === i ? { ...p, text: e.target.value } : p)))}
             />

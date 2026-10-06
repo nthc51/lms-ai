@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api as url, server } from "@/test/msw";
 import { QuestionBank } from "./question-bank";
 
-const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }));
+const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 const question = (id: string, review_status = "pending") => ({
@@ -33,8 +33,11 @@ function setup(initial = [question("q1")]) {
   server.use(
     http.get(url("/lessons/l1/questions"), () => HttpResponse.json({ items, total: items.length, page: 1, size: 100 })),
     http.patch(url("/questions/:id"), async ({ params, request }) => {
-      patches.push({ id: params.id as string, body: (await request.json()) as Record<string, unknown> });
-      return patchReply();
+      const body = (await request.json()) as Record<string, unknown>;
+      patches.push({ id: params.id as string, body });
+      const res = patchReply();
+      if (res.ok && body.action === "reject") items = items.map((q) => (q.id === params.id ? { ...q, review_status: "rejected" } : q));
+      return res;
     }),
     http.post(url("/lessons/l1/questions/generate"), () => HttpResponse.json({ job_id: "j1" }, { status: 202 })),
     http.get(url("/jobs/j1"), () =>
@@ -62,6 +65,7 @@ describe("QuestionBank", () => {
     toastMock.mockClear();
     toastMock.success.mockClear();
     toastMock.error.mockClear();
+    toastMock.dismiss.mockClear();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -117,24 +121,61 @@ describe("QuestionBank", () => {
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("AI đã soạn xong. Có 2 câu chờ duyệt."));
   });
 
-  it("422 khi sửa: hiện lỗi của backend ngay trong form", async () => {
-    const { setPatchReply } = setup();
-    setPatchReply(() =>
-      HttpResponse.json(
-        {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "Dữ liệu không hợp lệ",
-            details: { errors: [{ loc: ["body", "options"], msg: "Cần đúng 4 lựa chọn khác nhau", type: "value_error" }] },
-          },
-        },
-        { status: 422 },
-      ),
+  const err422 = (msg: string, type: string, loc: (string | number)[]) => () =>
+    HttpResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Câu hỏi không hợp lệ", details: { errors: [{ loc, msg, type }] } } },
+      { status: 422 },
     );
+
+  async function editAndSave() {
+    await user().click(await screen.findByRole("button", { name: "Sửa" }));
+    await user().type(screen.getByLabelText("Lựa chọn B"), " sửa");
+    await user().click(screen.getByRole("button", { name: "Lưu và duyệt" }));
+  }
+
+  it("422 khi sửa: hiện lỗi bằng tiếng Việt ngay trong form", async () => {
+    const { setPatchReply, patches } = setup();
+    setPatchReply(err422("String should have at least 10 characters", "string_too_short", ["stem"]));
+    await editAndSave();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Câu hỏi không hợp lệ: Đề bài phải có ít nhất 10 ký tự");
+    expect(patches[0].body.action).toBe("edit");
+    expect(screen.getByRole("button", { name: "Lưu và duyệt" })).toBeInTheDocument();
+  });
+
+  it("422 từ luật câu hỏi: bỏ tiền tố 'Value error, '", async () => {
+    const { setPatchReply } = setup();
+    setPatchReply(err422("Value error, Có lựa chọn trùng nhau", "value_error", []));
+    await editAndSave();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Câu hỏi không hợp lệ: Có lựa chọn trùng nhau$/);
+  });
+
+  it("lưu form sửa mà không đổi gì thì gửi approve, không gửi edit", async () => {
+    const { patches } = setup();
     await user().click(await screen.findByRole("button", { name: "Sửa" }));
     await user().click(screen.getByRole("button", { name: "Lưu và duyệt" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Dữ liệu không hợp lệ: Cần đúng 4 lựa chọn khác nhau");
-    expect(screen.getByRole("button", { name: "Lưu và duyệt" })).toBeInTheDocument();
+    await waitFor(() => expect(patches).toEqual([{ id: "q1", body: { action: "approve" } }]));
+  });
+
+  it("Hoàn tác sau khi đã gửi loại: không hiện lại câu, báo không hoàn tác được; toast được đóng khi gửi", async () => {
+    const { patches } = setup();
+    await user().click(await screen.findByRole("button", { name: "Loại" }));
+    const [, opts] = toastMock.mock.calls[0] as [string, { id: string; action: { onClick: () => void } }];
+    await act(() => vi.advanceTimersByTimeAsync(5100));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(toastMock.dismiss).toHaveBeenCalledWith(opts.id);
+    act(() => opts.action.onClick());
+    expect(toastMock).toHaveBeenLastCalledWith("Đã gửi yêu cầu loại, không hoàn tác được nữa");
+    expect(screen.queryByText("Đề bài câu q1 đủ dài")).not.toBeInTheDocument();
+  });
+
+  it("rời trang khi đang chờ loại: đóng toast, và báo lỗi nếu request thất bại", async () => {
+    const { setPatchReply, view } = setup();
+    setPatchReply(() => HttpResponse.json({ error: { code: "CONFLICT", message: "Câu hỏi đang nằm trong quiz" } }, { status: 409 }));
+    await user().click(await screen.findByRole("button", { name: "Loại" }));
+    const [, opts] = toastMock.mock.calls[0] as [string, { id: string }];
+    view.unmount();
+    expect(toastMock.dismiss).toHaveBeenCalledWith(opts.id);
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Câu hỏi đang nằm trong quiz"));
   });
 
   it("409 khi duyệt: báo lỗi bằng toast", async () => {

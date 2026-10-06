@@ -58,8 +58,10 @@ export function QuestionBank({ lessonId }: { lessonId: string }) {
           next.delete(q.id);
           return next;
         });
+      const toastId = `reject-${q.id}`;
       const timer = window.setTimeout(async () => {
         timers.current.delete(q.id);
+        toast.dismiss(toastId); // toast của sonner dừng đếm khi rê chuột / ẩn tab, còn timer này thì không
         try {
           await send(q.id, { action: "reject" });
         } catch (err) {
@@ -70,10 +72,15 @@ export function QuestionBank({ lessonId }: { lessonId: string }) {
       }, UNDO_MS);
       timers.current.set(q.id, timer);
       toast("Đã loại câu hỏi", {
+        id: toastId,
         duration: UNDO_MS,
         action: {
           label: "Hoàn tác",
           onClick: () => {
+            if (!timers.current.has(q.id)) {
+              toast("Đã gửi yêu cầu loại, không hoàn tác được nữa");
+              return;
+            }
             window.clearTimeout(timers.current.get(q.id));
             timers.current.delete(q.id);
             unhide();
@@ -90,7 +97,8 @@ export function QuestionBank({ lessonId }: { lessonId: string }) {
     return () => {
       for (const [id, t] of pending) {
         window.clearTimeout(t);
-        void review.mutateAsync({ id, body: { action: "reject" } }).catch(() => undefined);
+        toast.dismiss(`reject-${id}`);
+        void review.mutateAsync({ id, body: { action: "reject" } }).catch((err) => toast.error(errorMessage(err)));
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
