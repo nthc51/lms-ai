@@ -679,7 +679,7 @@ npm run lint && git add frontend/src/lib/quiz && git commit -m "feat(web): quiz 
 
 Phần này được kiểm thử bằng E2E ở Task 11.
 
-- [ ] **Bước 1: `src/components/quiz/quiz-player.tsx`**
+- [x] **Bước 1: `src/components/quiz/quiz-player.tsx`**
 
 Màn này dùng `BreakReminder` (prop `paused`) từ FE-1.
 
@@ -929,7 +929,7 @@ function Shell({ title, lessonHref, children }: { title?: string; lessonHref: st
 }
 ```
 
-- [ ] **Bước 2: Trang** (`src/app/learn/[slug]/[lessonId]/quiz/[quizId]/page.tsx`)
+- [x] **Bước 2: Trang** (`src/app/learn/[slug]/[lessonId]/quiz/[quizId]/page.tsx`)
 
 ```tsx
 "use client";
@@ -948,7 +948,7 @@ export default function QuizPage() {
 }
 ```
 
-- [ ] **Bước 3: Kiểm tra và commit**
+- [x] **Bước 3: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck
