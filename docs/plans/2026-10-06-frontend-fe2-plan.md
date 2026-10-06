@@ -2767,14 +2767,14 @@ Expected: CI xanh, kể cả job `frontend` (gồm cả E2E).
 
 Task này **người dùng tự làm**. Chạy backend với `LLM_PROVIDER=fake` cho nhanh. Riêng bước sinh câu hỏi bằng AI có thể bật Gemini nếu còn quota.
 
-- [ ] Đăng nhập giảng viên → mở một bài đã có PDF ở trạng thái "Sẵn sàng" → tab **Câu hỏi** → **Sinh câu hỏi bằng AI** (5 câu). Thấy dòng "AI đang soạn…", trang vẫn thao tác được. Khi xong có toast báo số câu chờ duyệt.
-- [ ] Duyệt 3 câu. Sửa 1 câu, thử xóa trắng một lựa chọn để thấy lỗi 422 hiện tại chỗ, sửa lại rồi lưu. Loại 1 câu rồi bấm Hoàn tác, sau đó loại hẳn.
-- [ ] Tab **Quiz** → **Tạo quiz** với 3–4 câu đã duyệt, đặt 2 lượt và điểm đạt 60% → **Xuất bản**.
-- [ ] Đăng nhập học viên → mở bài → mục "Kiểm tra nhanh" → **Làm bài** → chọn đáp án, thấy "Đã lưu" → tải lại trang (F5), đáp án vẫn còn → nộp với 1 câu bỏ trống, hộp xác nhận báo "Còn 1 câu…" → xem kết quả, câu sai có mở sẵn giải thích → **Làm lại** → nộp lần 2 → quay lại bài học, thấy "Đã hết lượt" và "Điểm gần nhất".
-- [ ] Giảng viên → trình soạn khóa → **Thống kê**: thấy 1 học viên, tỉ lệ hoàn thành bài, quiz có 2 bài nộp với điểm TB, tỉ lệ đạt, số câu hỏi AI Tutor.
-- [ ] Thử xóa quiz đã có bài làm: hộp thoại vẫn mở và hiện thông báo 409 "Quiz đã xuất bản, không xóa được".
-- [ ] Chuyển DevTools sang 375px: lưới câu hỏi vừa màn hình, bảng thống kê cuộn ngang được, không có cuộn ngang cả trang.
-- [ ] Cập nhật `docs/specs/2026-09-29-lms-ai-design.md`:
+- [x] Đăng nhập giảng viên → mở một bài đã có PDF ở trạng thái "Sẵn sàng" → tab **Câu hỏi** → **Sinh câu hỏi bằng AI** (5 câu). Thấy dòng "AI đang soạn…", trang vẫn thao tác được. Khi xong có toast báo số câu chờ duyệt.
+- [x] Duyệt 3 câu. Sửa 1 câu, thử xóa trắng một lựa chọn để thấy lỗi 422 hiện tại chỗ, sửa lại rồi lưu. Loại 1 câu rồi bấm Hoàn tác, sau đó loại hẳn.
+- [x] Tab **Quiz** → **Tạo quiz** với 3–4 câu đã duyệt, đặt 2 lượt và điểm đạt 60% → **Xuất bản**.
+- [x] Đăng nhập học viên → mở bài → mục "Kiểm tra nhanh" → **Làm bài** → chọn đáp án, thấy "Đã lưu" → tải lại trang (F5), đáp án vẫn còn → nộp với 1 câu bỏ trống, hộp xác nhận báo "Còn 1 câu…" → xem kết quả, câu sai có mở sẵn giải thích → **Làm lại** → nộp lần 2 → quay lại bài học, thấy "Đã hết lượt" và "Điểm gần nhất".
+- [x] Giảng viên → trình soạn khóa → **Thống kê**: thấy 1 học viên, tỉ lệ hoàn thành bài, quiz có 2 bài nộp với điểm TB, tỉ lệ đạt, số câu hỏi AI Tutor.
+- [x] Thử xóa quiz đã có bài làm: hộp thoại vẫn mở và hiện thông báo 409 "Quiz đã xuất bản, không xóa được".
+- [x] Chuyển DevTools sang 375px: lưới câu hỏi vừa màn hình, bảng thống kê cuộn ngang được, không có cuộn ngang cả trang.
+- [x] Cập nhật `docs/specs/2026-09-29-lms-ai-design.md`:
   - Đánh dấu xong các mục frontend của A5–A8 trong bảng tiến độ, và **mốc M1** (bản chạy được đầu tiên, xong tầng A).
   - Thêm vào nhật ký quyết định:
 
