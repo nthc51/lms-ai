@@ -1,8 +1,21 @@
 import argparse
 import asyncio
+import sys
+
+from pydantic import EmailStr, TypeAdapter, ValidationError
 
 from app.core.db import SessionLocal
 from app.modules.auth.service import create_admin
+
+
+def valid_email(email: str) -> str:
+    """Cùng kiểu kiểm tra với trang đăng nhập (EmailStr): email như admin@lms.local sẽ không đăng nhập được."""
+    try:
+        return TypeAdapter(EmailStr).validate_python(email).lower()
+    except ValidationError:
+        sys.exit(
+            f"Email không hợp lệ để đăng nhập: {email} (dùng đuôi tên miền thật, ví dụ admin@example.com)"
+        )
 
 
 async def main(email: str, password: str) -> None:
@@ -16,4 +29,6 @@ if __name__ == "__main__":
     p.add_argument("--email", required=True)
     p.add_argument("--password", required=True)
     a = p.parse_args()
-    asyncio.run(main(a.email, a.password))
+    if len(a.password) < 8:
+        sys.exit("Mật khẩu cần ít nhất 8 ký tự")
+    asyncio.run(main(valid_email(a.email), a.password))

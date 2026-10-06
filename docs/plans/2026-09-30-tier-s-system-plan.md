@@ -1863,9 +1863,11 @@ cp .env.prod.example .env.prod && nano .env.prod
 ./infra/prod.sh up -d --build
 ./infra/prod.sh ps
 curl -fsS "https://$(grep ^APP_DOMAIN .env.prod | cut -d= -f2)/api/v1/ready"
-./infra/prod.sh exec api python -m app.scripts.seed_admin --email admin@lms.local --password '<mật khẩu mạnh>'
+./infra/prod.sh exec api python -m app.scripts.seed_admin --email admin@<tên miền của bạn> --password '<mật khẩu mạnh>'
 git rev-parse HEAD > .deploy/last_good_sha 2>/dev/null || (mkdir -p .deploy && git rev-parse HEAD > .deploy/last_good_sha)
 ```
+
+> Email phải có đuôi tên miền thật: `.local`, `.test`, `.localhost` không đăng nhập được (trang đăng nhập dùng `EmailStr`). Script sẽ từ chối các email này.
 
 ## 4. Bật CD trên GitHub (một lần)
 
