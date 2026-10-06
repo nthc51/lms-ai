@@ -6739,7 +6739,7 @@ git add frontend/playwright.config.ts frontend/e2e && git commit -m "test(web): 
 - Create: `frontend/Dockerfile`, `frontend/.dockerignore`
 - Modify: `docker-compose.yml` (thêm service `web`), `.github/workflows/ci.yml` (thêm job `frontend` và build image web)
 
-- [ ] **Bước 1: `frontend/Dockerfile`** (standalone, chạy bằng user thường)
+- [x] **Bước 1: `frontend/Dockerfile`** (standalone, chạy bằng user thường)
 
 ```dockerfile
 # syntax=docker/dockerfile:1
@@ -6782,7 +6782,7 @@ playwright-report
 .env*
 ```
 
-- [ ] **Bước 2: Thêm service `web` vào `docker-compose.yml`** (đặt sau service `worker`)
+- [x] **Bước 2: Thêm service `web` vào `docker-compose.yml`** (đặt sau service `worker`)
 
 ```yaml
   web:
@@ -6798,7 +6798,7 @@ playwright-report
       - api
 ```
 
-- [ ] **Bước 3: Thêm job vào `.github/workflows/ci.yml`**
+- [x] **Bước 3: Thêm job vào `.github/workflows/ci.yml`**
 
 Job mới `frontend`. Đặt ngang hàng với `lint`, `test`, `docker`. Job có `defaults` riêng vì `defaults` gốc của file là `backend`:
 
@@ -6847,7 +6847,7 @@ Trong job `docker` có sẵn, thêm bước build image web ngay sau bước bui
           cache-to: type=gha,mode=max,scope=web
 ```
 
-- [ ] **Bước 4: Kiểm tra local**
+- [x] **Bước 4: Kiểm tra local**
 
 ```bash
 docker compose --profile web up -d --build
@@ -6855,7 +6855,7 @@ docker compose --profile web up -d --build
 
 Mở `http://localhost:3000`, thấy trang chủ. Đăng nhập bằng tài khoản thật vẫn hoạt động, vì `/api/v1` được chuyển tới service `api`.
 
-- [ ] **Bước 5: Commit, push và xem CI**
+- [x] **Bước 5: Commit, push và xem CI**
 
 ```bash
 git add frontend/Dockerfile frontend/.dockerignore docker-compose.yml .github/workflows/ci.yml
