@@ -1183,7 +1183,7 @@ git add backend && git commit -m "feat(api): admin endpoints for teacher review,
 **Files:**
 - Modify: `backend/app/scripts/seed_admin.py`, `docs/plans/2026-09-30-tier-s-system-plan.md`
 
-- [ ] **Bước 1: `app/scripts/seed_admin.py`** (thay toàn bộ)
+- [x] **Bước 1: `app/scripts/seed_admin.py`** (thay toàn bộ)
 
 ```python
 import argparse
@@ -1222,7 +1222,7 @@ if __name__ == "__main__":
     asyncio.run(main(valid_email(a.email), a.password))
 ```
 
-- [ ] **Bước 2: Chạy test**
+- [x] **Bước 2: Chạy test**
 
 ```bash
 uv run pytest tests/test_admin.py -q
@@ -1231,7 +1231,7 @@ uv run pytest -q
 
 Expected: 17 passed; toàn bộ **628 passed**.
 
-- [ ] **Bước 3: Thử bằng tay**
+- [x] **Bước 3: Thử bằng tay**
 
 ```bash
 docker compose exec api python -m app.scripts.seed_admin --email admin@lms.local --password Admin12345
@@ -1239,7 +1239,7 @@ docker compose exec api python -m app.scripts.seed_admin --email admin@lms.local
 
 Expected: báo `Email không hợp lệ để đăng nhập: admin@lms.local …`, mã thoát khác 0.
 
-- [ ] **Bước 4: Sửa plan tầng S**
+- [x] **Bước 4: Sửa plan tầng S**
 
 Trong `docs/plans/2026-09-30-tier-s-system-plan.md`, tìm dòng gọi `seed_admin --email admin@lms.local` và đổi email thành `admin@<tên miền của bạn>`. Thêm ngay dưới dòng đó:
 
@@ -1247,7 +1247,7 @@ Trong `docs/plans/2026-09-30-tier-s-system-plan.md`, tìm dòng gọi `seed_admi
 > Email phải có đuôi tên miền thật: `.local`, `.test`, `.localhost` không đăng nhập được (trang đăng nhập dùng `EmailStr`). Script sẽ từ chối các email này.
 ```
 
-- [ ] **Bước 5: Commit**
+- [x] **Bước 5: Commit**
 
 ```bash
 git add backend docs && git commit -m "fix(api): seed_admin rejects emails the login form would refuse"
