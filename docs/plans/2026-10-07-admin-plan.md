@@ -2357,7 +2357,7 @@ Expected: phần cuối của `next build` có `○ /admin`, `○ /admin/activit
 **Files:**
 - Modify: `frontend/src/app/(main)/page.tsx`, `frontend/src/app/(main)/teach/page.tsx` (+test), `frontend/src/components/teach/course-editor.tsx`
 
-- [ ] **Bước 1: Trang chủ** (`src/app/(main)/page.tsx`, thay toàn bộ)
+- [x] **Bước 1: Trang chủ** (`src/app/(main)/page.tsx`, thay toàn bộ)
 
 Admin được chuyển sang `/admin`. Giảng viên chưa duyệt thấy khung "đang chờ" hoặc "bị từ chối" kèm lý do. Tên gọi tách theo khoảng trắng bất kỳ.
 
@@ -2455,7 +2455,7 @@ export default function HomePage() {
 }
 ```
 
-- [ ] **Bước 2: `/teach` khi admin mở** (`src/app/(main)/teach/page.tsx`)
+- [x] **Bước 2: `/teach` khi admin mở** (`src/app/(main)/teach/page.tsx`)
 
 Trong `TeachGate`, đổi đoạn chữ và nút:
 
@@ -2484,7 +2484,7 @@ Trong `src/app/(main)/teach/page.test.tsx`, test "admin thấy thông báo…" �
     expect(screen.getByRole("link", { name: /danh sách khóa học/ })).toHaveAttribute("href", "/admin/courses");
 ```
 
-- [ ] **Bước 3: Trình soạn khóa bị ẩn** (`src/components/teach/course-editor.tsx`)
+- [x] **Bước 3: Trình soạn khóa bị ẩn** (`src/components/teach/course-editor.tsx`)
 
 Import thêm `EyeOff`:
 
@@ -2527,7 +2527,7 @@ Chèn ngay **trước** đoạn `<p className="mb-6 rounded-md border border-das
 
 ```
 
-- [ ] **Bước 4: Kiểm tra và commit**
+- [x] **Bước 4: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
