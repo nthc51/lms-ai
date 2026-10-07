@@ -1542,7 +1542,7 @@ Expected: test mới pass, không test cũ nào fail.
 - Create: `frontend/src/components/admin/{reason-dialog, user-table, course-table, overview, action-log, filter-tabs}.tsx`
 - Test: `frontend/src/components/admin/reason-dialog.test.tsx`
 
-- [ ] **Bước 1: Viết test (sẽ fail)** (`src/components/admin/reason-dialog.test.tsx`)
+- [x] **Bước 1: Viết test (sẽ fail)** (`src/components/admin/reason-dialog.test.tsx`)
 
 ```tsx
 import { render, screen } from "@testing-library/react";
@@ -1587,7 +1587,7 @@ describe("ReasonDialog", () => {
 });
 ```
 
-- [ ] **Bước 2: `reason-dialog.tsx`**
+- [x] **Bước 2: `reason-dialog.tsx`**
 
 ```tsx
 "use client";
@@ -1667,7 +1667,7 @@ export function ReasonDialog({
 }
 ```
 
-- [ ] **Bước 3: `filter-tabs.tsx`**
+- [x] **Bước 3: `filter-tabs.tsx`**
 
 ```tsx
 "use client";
@@ -1697,7 +1697,7 @@ export function FilterTabs<T extends string>({ label, value, options, onChange }
 }
 ```
 
-- [ ] **Bước 4: `user-table.tsx`**
+- [x] **Bước 4: `user-table.tsx`**
 
 ```tsx
 "use client";
@@ -1826,7 +1826,7 @@ export function UserTable({ users, caption }: { users: AdminUser[]; caption: str
 
 > `target` được giữ lại cả khi hộp thoại đã đóng: nếu xóa ngay thì tiêu đề "Từ chối …?" bị trống trong lúc hộp thoại chạy hiệu ứng đóng.
 
-- [ ] **Bước 5: `course-table.tsx`**
+- [x] **Bước 5: `course-table.tsx`**
 
 ```tsx
 "use client";
@@ -1944,7 +1944,7 @@ export function CourseTable({ courses }: { courses: AdminCourse[] }) {
 }
 ```
 
-- [ ] **Bước 6: `overview.tsx`**
+- [x] **Bước 6: `overview.tsx`**
 
 ```tsx
 "use client";
@@ -2030,7 +2030,7 @@ export function SignupChart({ days }: { days: AdminStats["signups_14d"] }) {
 }
 ```
 
-- [ ] **Bước 7: `action-log.tsx`**
+- [x] **Bước 7: `action-log.tsx`**
 
 ```tsx
 "use client";
@@ -2064,7 +2064,7 @@ export function ActionLog({ items }: { items: AdminAction[] }) {
 }
 ```
 
-- [ ] **Bước 8: Kiểm tra và commit**
+- [x] **Bước 8: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
