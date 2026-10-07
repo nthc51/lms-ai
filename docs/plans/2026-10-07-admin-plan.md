@@ -2543,7 +2543,7 @@ Expected: **100 passed**.
 **Files:**
 - Create: `frontend/e2e/admin-data.ts`, `frontend/e2e/admin.spec.ts`
 
-- [ ] **Bước 1: `e2e/admin-data.ts`**
+- [x] **Bước 1: `e2e/admin-data.ts`**
 
 ```ts
 /** Dữ liệu giả cho khu quản trị (E2E). */
@@ -2607,7 +2607,7 @@ export const adminCourse = (over: Record<string, unknown> = {}) => ({
 export const page = <T,>(items: T[]) => ({ items, total: items.length, page: 1, size: 20 });
 ```
 
-- [ ] **Bước 2: `e2e/admin.spec.ts`**
+- [x] **Bước 2: `e2e/admin.spec.ts`**
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -2777,7 +2777,7 @@ Ghi chú:
 - Dùng `getByRole("cell", { name: /cuong@gv\.vn/ })` thay vì tìm theo tên: tên người còn nằm trong `aria-label` của nút ở ô Thao tác, nên tìm theo tên sẽ ra 2 ô.
 - "Đã khóa" vừa là huy hiệu vừa là nút lọc, nên tìm theo `cell`.
 
-- [ ] **Bước 3: Chạy**
+- [x] **Bước 3: Chạy**
 
 ```bash
 npx playwright test e2e/admin.spec.ts
@@ -2786,7 +2786,7 @@ npx playwright test
 
 Expected: 14 passed; toàn bộ **42 passed**.
 
-- [ ] **Bước 4: Commit và push**
+- [x] **Bước 4: Commit và push**
 
 ```bash
 git add frontend/e2e && git commit -m "test(web): E2E for admin area"
