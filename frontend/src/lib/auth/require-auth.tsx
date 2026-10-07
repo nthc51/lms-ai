@@ -5,8 +5,8 @@ import * as React from "react";
 import { Skeleton } from "@/components/ui/misc";
 import { isStaff, useAuth } from "./auth-context";
 
-/** Chặn trang cần đăng nhập. Chưa đăng nhập → /login?next=<trang hiện tại>. */
-export function RequireAuth({ staff = false, children }: { staff?: boolean; children: React.ReactNode }) {
+/** Chặn trang cần đăng nhập. Chưa đăng nhập → /login?next=<trang hiện tại>. `admin`: chỉ quản trị viên. */
+export function RequireAuth({ staff = false, admin = false, children }: { staff?: boolean; admin?: boolean; children: React.ReactNode }) {
   const { status, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -20,6 +20,14 @@ export function RequireAuth({ staff = false, children }: { staff?: boolean; chil
       <div className="space-y-3 p-6" aria-busy="true" aria-label="Đang tải">
         <Skeleton className="h-8 w-1/3" />
         <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+  if (admin && user?.role !== "admin") {
+    return (
+      <div className="mx-auto max-w-md p-6 text-center">
+        <h1 className="text-xl font-semibold">Không có quyền truy cập</h1>
+        <p className="mt-2 text-muted-foreground">Trang này chỉ dành cho quản trị viên.</p>
       </div>
     );
   }

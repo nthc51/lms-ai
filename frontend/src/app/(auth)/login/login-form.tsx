@@ -27,7 +27,7 @@ export function LoginForm() {
   async function onSubmit(values: Values) {
     try {
       const user = await login(values.email, values.password);
-      const fallback = user.role === "student" ? "/" : "/teach";
+      const fallback = user.role === "student" ? "/" : user.role === "admin" ? "/admin" : "/teach";
       router.replace(safeNext(params.get("next"), fallback));
     } catch (err) {
       // sai mật khẩu: báo ngay dưới ô mật khẩu và đưa con trỏ về đó (design-system §5.3)

@@ -23,8 +23,12 @@ describe("navItems", () => {
     expect(isActive("/teach/abc", "/teach")).toBe(true);
     expect(isActive("/explore", "/")).toBe(false);
   });
-  it("quản trị viên không có Khóa đang dạy (API /teacher/courses chỉ cho giảng viên)", () => {
-    expect(navItems(user("admin")).map((i) => i.href)).toEqual(["/", "/explore"]);
-    expect(navItems(user("admin", "approved")).map((i) => i.href)).toEqual(["/", "/explore"]);
+  it("quản trị viên có khu quản trị, không có Khóa đang dạy (API /teacher/courses chỉ cho giảng viên)", () => {
+    expect(navItems(user("admin")).map((i) => i.href)).toEqual(["/admin", "/admin/users", "/admin/courses"]);
+  });
+  it("/admin chỉ sáng ở chính trang tổng quan, không sáng khi ở /admin/users", () => {
+    expect(isActive("/admin", "/admin")).toBe(true);
+    expect(isActive("/admin/users", "/admin")).toBe(false);
+    expect(isActive("/admin/users", "/admin/users")).toBe(true);
   });
 });

@@ -32,4 +32,16 @@ describe("RequireAuth", () => {
     expect(screen.getByText(/đã bị từ chối/)).toBeInTheDocument();
     expect(screen.queryByText(/đang chờ quản trị viên duyệt/)).not.toBeInTheDocument();
   });
+
+  it("trang quản trị: giảng viên đã duyệt cũng bị chặn, admin thì vào được", () => {
+    auth.status = "authenticated";
+    auth.user = { role: "teacher", teacher_status: "approved" };
+    const { unmount } = render(<RequireAuth admin>khu quản trị</RequireAuth>);
+    expect(screen.getByText(/chỉ dành cho quản trị viên/)).toBeInTheDocument();
+    expect(screen.queryByText("khu quản trị")).not.toBeInTheDocument();
+    unmount();
+    auth.user = { role: "admin", teacher_status: null };
+    render(<RequireAuth admin>khu quản trị</RequireAuth>);
+    expect(screen.getByText("khu quản trị")).toBeInTheDocument();
+  });
 });
