@@ -30,9 +30,9 @@ function TeachGate() {
       <>
         <PageHeader title="Khóa đang dạy" />
         <div className="rounded-lg border p-6 text-center">
-          <p className="text-muted-foreground">Trang này dành cho giảng viên. Quản trị viên có thể mở khóa học từ trang Khám phá.</p>
+          <p className="text-muted-foreground">Trang này dành cho giảng viên. Quản trị viên xem mọi khóa học ở khu quản trị.</p>
           <Button asChild variant="outline" className="mt-4">
-            <Link href="/explore">Đến trang Khám phá</Link>
+            <Link href="/admin/courses">Đến danh sách khóa học</Link>
           </Button>
         </div>
       </>
@@ -64,7 +64,13 @@ function TeacherCourses() {
             <li key={c.id}>
               <Link href={`/teach/${c.slug}`} className="flex items-center justify-between gap-3 px-4 py-4 hover:bg-muted">
                 <span className="font-medium">{c.title}</span>
-                {c.status === "published" ? <Badge tone="success">Đã xuất bản</Badge> : <Badge>Nháp</Badge>}
+                {c.hidden_reason ? (
+                  <Badge tone="destructive">Đã bị ẩn</Badge>
+                ) : c.status === "published" ? (
+                  <Badge tone="success">Đã xuất bản</Badge>
+                ) : (
+                  <Badge>Nháp</Badge>
+                )}
               </Link>
             </li>
           ))}

@@ -31,7 +31,7 @@ describe("/teach", () => {
     auth.user = { role: "admin" };
     renderPage();
     expect(await screen.findByText(/Trang này dành cho giảng viên/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Khám phá/ })).toHaveAttribute("href", "/explore");
+    expect(screen.getByRole("link", { name: /danh sách khóa học/ })).toHaveAttribute("href", "/admin/courses");
     await new Promise((r) => setTimeout(r, 50));
     expect(list).not.toHaveBeenCalled();
   });

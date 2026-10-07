@@ -1,16 +1,47 @@
 "use client";
 
-import { ArrowRight, Compass } from "lucide-react";
+import { ArrowRight, Clock, Compass, XCircle } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { PageHeader } from "@/components/app/states";
 import { MyCourseList } from "@/components/course/my-course-list";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
-import { useAuth } from "@/lib/auth/auth-context";
+import { type User, useAuth } from "@/lib/auth/auth-context";
+
+/** Tên gọi: chữ cuối của họ tên Việt ("Nguyễn Văn An" → "An"). */
+const givenName = (fullName: string) => fullName.trim().split(/\s+/).slice(-1)[0] ?? fullName;
+
+/** Giảng viên chưa được duyệt: nói rõ đang chờ hay đã bị từ chối (kèm lý do quản trị viên ghi). */
+function TeacherReviewNotice({ user }: { user: User }) {
+  if (user.role !== "teacher" || user.teacher_status === "approved") return null;
+  const rejected = user.teacher_status === "rejected";
+  const Icon = rejected ? XCircle : Clock;
+  return (
+    <div role="status" className="mb-6 flex gap-3 rounded-lg border p-4">
+      <Icon className={rejected ? "mt-0.5 size-5 shrink-0 text-destructive" : "mt-0.5 size-5 shrink-0 text-accent"} aria-hidden />
+      <div>
+        <p className="font-medium">{rejected ? "Yêu cầu giảng dạy chưa được chấp nhận" : "Tài khoản giảng viên đang chờ duyệt"}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {rejected
+            ? `Lý do: ${user.review_note ?? "không ghi"}. Liên hệ quản trị viên nếu bạn cần xem xét lại.`
+            : "Quản trị viên sẽ duyệt sớm. Trong lúc chờ, bạn vẫn xem được các khóa học đã xuất bản."}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const { user, status } = useAuth();
-  if (status === "loading") return <Skeleton className="h-40 w-full" />;
+  const router = useRouter();
+  const isAdmin = user?.role === "admin";
+  // Quản trị viên không học cũng không dạy: trang chủ của họ là khu quản trị.
+  React.useEffect(() => {
+    if (isAdmin) router.replace("/admin");
+  }, [isAdmin, router]);
+  if (status === "loading" || isAdmin) return <Skeleton className="h-40 w-full" />;
 
   if (!user)
     return (
@@ -32,14 +63,15 @@ export default function HomePage() {
       </section>
     );
 
-  // Chỉ giảng viên đã duyệt mới vào được /teach (admin gọi API soạn khóa sẽ nhận 403).
+  // Chỉ giảng viên đã duyệt mới vào được /teach.
   const canTeach = user.role === "teacher" && user.teacher_status === "approved";
 
   return (
     <>
-      <PageHeader title={`Chào ${user.full_name.split(" ").slice(-1)[0]}`}>
-        {user.role === "student" ? "Tiếp tục từ chỗ bạn đã dừng." : "Quản lý các khóa bạn đang dạy."}
+      <PageHeader title={`Chào ${givenName(user.full_name)}`}>
+        {user.role === "student" ? "Tiếp tục từ chỗ bạn đã dừng." : canTeach ? "Quản lý các khóa bạn đang dạy." : "Chào mừng bạn đến với LMS-AI."}
       </PageHeader>
+      <TeacherReviewNotice user={user} />
       {user.role === "student" ? (
         <>
           <MyCourseList limit={3} />

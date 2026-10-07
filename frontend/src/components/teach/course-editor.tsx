@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Eye, Globe, Trash2 } from "lucide-react";
+import { BarChart3, Eye, EyeOff, Globe, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -51,7 +51,13 @@ function Editor({ course }: { course: CourseDetail }) {
           </p>
           <h1 className="truncate text-2xl font-semibold md:text-3xl">{course.title}</h1>
         </div>
-        {course.status === "published" ? <Badge tone="success">Đã xuất bản</Badge> : <Badge>Nháp</Badge>}
+        {course.hidden_reason ? (
+          <Badge tone="destructive">Đã bị ẩn</Badge>
+        ) : course.status === "published" ? (
+          <Badge tone="success">Đã xuất bản</Badge>
+        ) : (
+          <Badge>Nháp</Badge>
+        )}
         <Button asChild variant="outline">
           <Link href={`/teach/${course.slug}/analytics`}>
             <BarChart3 /> Thống kê
@@ -64,7 +70,7 @@ function Editor({ course }: { course: CourseDetail }) {
             </Link>
           </Button>
         ) : null}
-        {course.status !== "published" ? (
+        {course.status !== "published" && !course.hidden_reason ? (
           <div className="flex flex-col items-end gap-1">
             <Button onClick={() => setPublishOpen(true)} disabled={empty} aria-describedby={empty ? "publish-hint" : undefined}>
               <Globe /> Xuất bản
@@ -77,6 +83,18 @@ function Editor({ course }: { course: CourseDetail }) {
           </div>
         ) : null}
       </div>
+
+      {course.hidden_reason ? (
+        <div role="alert" className="mb-6 flex gap-3 rounded-lg border border-destructive/50 p-4">
+          <EyeOff className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
+          <div>
+            <p className="font-medium">Quản trị viên đã ẩn khóa học này</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Lý do: {course.hidden_reason}. Học viên tạm thời không vào học được. Hãy chỉnh sửa nội dung rồi liên hệ quản trị viên để được hiện lại.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <p className="mb-6 rounded-md border border-dashed p-3 text-sm text-muted-foreground md:hidden">
         Soạn nội dung dài nên dùng máy tính. Trên điện thoại bạn vẫn sửa tên, nội dung ngắn và thứ tự được.
