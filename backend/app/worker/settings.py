@@ -9,7 +9,8 @@ from app.ai.llm_client import LLMClient
 from app.ai.vision import get_vision
 from app.core.config import get_settings
 from app.core.storage import MinioStorage
-from app.worker.tasks import JOB_TIMEOUTS, ingest_pdf, quiz_gen, sweep_stale_jobs
+from app.modules.notify.mailer import SmtpMailer
+from app.worker.tasks import JOB_TIMEOUTS, ingest_pdf, quiz_gen, send_pending_emails, sweep_stale_jobs
 
 
 async def startup(ctx: dict) -> None:
@@ -20,6 +21,7 @@ async def startup(ctx: dict) -> None:
     ctx["embedder"] = get_embedder(s)
     ctx["vision"] = get_vision(s)
     ctx["llm"] = LLMClient(get_llm_provider(s), s)
+    ctx["mailer"] = SmtpMailer(s)
 
 
 class WorkerSettings:
@@ -27,6 +29,7 @@ class WorkerSettings:
     functions: ClassVar = [
         func(ingest_pdf, name="ingest_pdf", timeout=JOB_TIMEOUTS["ingest_pdf"]),
         func(quiz_gen, name="quiz_gen", timeout=JOB_TIMEOUTS["quiz_gen"]),
+        func(send_pending_emails, name="send_pending_emails", timeout=120),
     ]
     # 5 phút một lần: job processing quá timeout + 5 phút → failed "Worker bị gián đoạn";
     # job pending bị kẹt → enqueue lại một lần, vẫn kẹt → failed "Không đưa được job vào hàng đợi"
@@ -37,7 +40,15 @@ class WorkerSettings:
             minute=set(range(0, 60, 5)),
             run_at_startup=True,
             timeout=60,
-        )
+        ),
+        # Vét email còn trong outbox (kick từ API bị lỡ, SMTP lỗi cần thử lại)
+        cron(
+            send_pending_emails,
+            name="send_pending_emails_cron",
+            minute=set(range(60)),
+            run_at_startup=True,
+            timeout=120,
+        ),
     ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

@@ -63,6 +63,20 @@ class Settings(BaseSettings):
     tutor_rewrite_deadline_s: float = 20.0
     # Hạn chót tổng trước token đầu tiên: viết lại + tìm tài liệu + mở stream (gồm retry). Quá hạn → event error.
     tutor_prestream_deadline_s: float = 60.0
+    # Địa chỉ frontend, dùng để tạo link trong email (xác nhận email...). Không có dấu / ở cuối.
+    app_base_url: str = "http://localhost:3000"
+    # Bắt buộc bấm link xác nhận email trước khi đăng nhập được.
+    email_verification_required: bool = True
+    verify_token_hours: int = 24
+    # SMTP. Mặc định trỏ vào Mailpit (docker compose) để dev không gửi mail thật; chạy thật thì dùng Brevo.
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = False  # Brevo cổng 587: true
+    smtp_timeout_s: float = 20.0
+    mail_from: str = "LMS-AI <no-reply@example.com>"
+    mail_max_attempts: int = 5  # gửi lỗi quá số lần này thì bỏ (status failed)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

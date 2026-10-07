@@ -255,3 +255,10 @@ async def sweep_stale_jobs(ctx: dict) -> int:
     if requeued:
         logger.warning("Đã enqueue lại %d job pending bị kẹt", requeued)
     return swept
+
+
+async def send_pending_emails(ctx: dict) -> int:
+    """Gửi email trong outbox. API gọi ngay sau khi commit (kick), cron chạy mỗi phút để vét phần còn sót."""
+    from app.modules.notify.outbox import send_pending
+
+    return await send_pending(ctx.get("session_factory", SessionLocal), ctx["mailer"])

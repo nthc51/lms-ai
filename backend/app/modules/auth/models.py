@@ -38,6 +38,13 @@ class User(IdMixin, TimestampMixin, Base):
     # Lý do quản trị viên ghi khi từ chối giảng viên hoặc khóa tài khoản (hiện cho chính người dùng).
     review_note: Mapped[str | None] = mapped_column(String(500))
 
+    # NULL = chưa bấm link xác nhận email (không đăng nhập được khi EMAIL_VERIFICATION_REQUIRED=true).
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def email_verified(self) -> bool:
+        return self.email_verified_at is not None
+
 
 class RefreshToken(IdMixin, TimestampMixin, Base):
     __tablename__ = "refresh_tokens"
@@ -46,3 +53,15 @@ class RefreshToken(IdMixin, TimestampMixin, Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class EmailToken(IdMixin, TimestampMixin, Base):
+    """Token một lần gửi qua email (hiện chỉ dùng để xác nhận email). Chỉ lưu hash, giống refresh token."""
+
+    __tablename__ = "email_tokens"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(20))  # verify_email
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
