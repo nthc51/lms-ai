@@ -1262,7 +1262,7 @@ git add backend docs && git commit -m "fix(api): seed_admin rejects emails the l
 - Create: `frontend/src/lib/admin-queries.ts`
 - Test: `frontend/src/lib/admin-queries.test.ts`
 
-- [ ] **Bước 1: Sinh lại kiểu API**
+- [x] **Bước 1: Sinh lại kiểu API**
 
 ```bash
 npm run gen:api
@@ -1271,7 +1271,7 @@ git diff --stat src/lib/api/schema.d.ts
 
 Expected: chỉ **thêm** dòng (các route `/api/v1/admin/*`, schema `Admin*`, `DayCount`, `ReasonIn`, `OptionalReasonIn`, trường `review_note` và `hidden_reason`), không có dòng nào bị xóa.
 
-- [ ] **Bước 2: Viết test (sẽ fail)** (`src/lib/admin-queries.test.ts`)
+- [x] **Bước 2: Viết test (sẽ fail)** (`src/lib/admin-queries.test.ts`)
 
 ```ts
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -1328,7 +1328,7 @@ describe("admin-queries", () => {
 });
 ```
 
-- [ ] **Bước 3: `src/lib/admin-queries.ts`**
+- [x] **Bước 3: `src/lib/admin-queries.ts`**
 
 ```ts
 "use client";
@@ -1432,7 +1432,7 @@ export const fmtDate = (iso: string) => dateFmt.format(new Date(iso));
 export const fmtDateTime = (iso: string) => timeFmt.format(new Date(iso));
 ```
 
-- [ ] **Bước 4: `RequireAuth admin`** (`src/lib/auth/require-auth.tsx`)
+- [x] **Bước 4: `RequireAuth admin`** (`src/lib/auth/require-auth.tsx`)
 
 Đổi chữ ký và chú thích:
 
@@ -1470,7 +1470,7 @@ Thêm test cuối `describe` trong `src/lib/auth/require-auth.test.tsx`:
   });
 ```
 
-- [ ] **Bước 5: Menu admin** (`src/components/app/nav-items.ts`, thay toàn bộ)
+- [x] **Bước 5: Menu admin** (`src/components/app/nav-items.ts`, thay toàn bộ)
 
 ```ts
 import { BookMarked, Compass, GraduationCap, Home, LayoutDashboard, Library, type LucideIcon, Users } from "lucide-react";
@@ -1519,13 +1519,13 @@ Trong `src/components/app/nav-items.test.ts`, thay test `"quản trị viên kh�
   });
 ```
 
-- [ ] **Bước 6: Đăng nhập xong admin vào `/admin`** (`src/app/(auth)/login/login-form.tsx`)
+- [x] **Bước 6: Đăng nhập xong admin vào `/admin`** (`src/app/(auth)/login/login-form.tsx`)
 
 ```tsx
       const fallback = user.role === "student" ? "/" : user.role === "admin" ? "/admin" : "/teach";
 ```
 
-- [ ] **Bước 7: Kiểm tra và commit**
+- [x] **Bước 7: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
