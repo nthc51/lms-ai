@@ -2078,7 +2078,7 @@ git add frontend && git commit -m "feat(web): admin tables, reason dialog, overv
 **Files:**
 - Create: `frontend/src/app/(main)/admin/layout.tsx`, `page.tsx`, `users/page.tsx`, `courses/page.tsx`, `activity/page.tsx`
 
-- [ ] **Bước 1: `admin/layout.tsx`** (một chỗ chặn quyền cho cả khu)
+- [x] **Bước 1: `admin/layout.tsx`** (một chỗ chặn quyền cho cả khu)
 
 ```tsx
 import { RequireAuth } from "@/lib/auth/require-auth";
@@ -2090,7 +2090,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 }
 ```
 
-- [ ] **Bước 2: `admin/page.tsx`** (Tổng quan)
+- [x] **Bước 2: `admin/page.tsx`** (Tổng quan)
 
 ```tsx
 "use client";
@@ -2164,7 +2164,7 @@ export default function AdminHome() {
 }
 ```
 
-- [ ] **Bước 3: `admin/users/page.tsx`**
+- [x] **Bước 3: `admin/users/page.tsx`**
 
 Tab nằm trên URL (`?tab=pending`), để link "Chờ duyệt" ở Tổng quan mở đúng tab và F5 không mất tab. `useSearchParams` phải nằm trong `Suspense`, nếu không `next build` báo lỗi.
 
@@ -2245,7 +2245,7 @@ function UsersView() {
 }
 ```
 
-- [ ] **Bước 4: `admin/courses/page.tsx`**
+- [x] **Bước 4: `admin/courses/page.tsx`**
 
 ```tsx
 "use client";
@@ -2308,7 +2308,7 @@ export default function AdminCoursesPage() {
 }
 ```
 
-- [ ] **Bước 5: `admin/activity/page.tsx`**
+- [x] **Bước 5: `admin/activity/page.tsx`**
 
 ```tsx
 "use client";
@@ -2341,7 +2341,7 @@ export default function AdminActivityPage() {
 }
 ```
 
-- [ ] **Bước 6: Kiểm tra và commit**
+- [x] **Bước 6: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
