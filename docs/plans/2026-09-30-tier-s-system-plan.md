@@ -204,7 +204,7 @@ git add backend && git commit -m "feat(security): security headers middleware fo
 
 Đăng ký và gửi lại email xác minh **đã có** giới hạn theo IP từ plan admin (`register-ip`, `verify-resend-ip` trong `auth/router.py`). Task này chỉ thêm đăng nhập, dùng lại `_limit`, `_ip`, `_too_many` sẵn có. Fixture `limiter` (rate limiter giả, mới cho mỗi test) cũng đã có trong `tests/conftest.py`.
 
-- [ ] **Step 1: Setting**: thêm vào `Settings` trong `app/core/config.py`, ngay dưới `tutor_rate_limit_per_hour`:
+- [x] **Step 1: Setting**: thêm vào `Settings` trong `app/core/config.py`, ngay dưới `tutor_rate_limit_per_hour`:
 
 ```python
     # Đếm cả lần sai mật khẩu. Rộng tay vì cả lớp dùng chung một IP khi ở WiFi trường (NAT)
@@ -213,7 +213,7 @@ git add backend && git commit -m "feat(security): security headers middleware fo
 
 Thêm vào cuối `backend/.env.example`: `LOGIN_RATE_LIMIT_PER_MIN=20`
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_auth_ratelimit.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_auth_ratelimit.py`**
 
 ```python
 from app.core.config import get_settings
@@ -243,12 +243,12 @@ async def test_wrong_password_attempts_also_count(client):
 
 `register_user` mặc định đánh dấu đã xác minh email, nên đăng nhập trả 200 chứ không phải 403.
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_auth_ratelimit.py -v`
 Expected: FAIL (lần đăng nhập thứ 21 vẫn trả 200)
 
-- [ ] **Step 4: Sửa `app/modules/auth/router.py`**
+- [x] **Step 4: Sửa `app/modules/auth/router.py`**
   - Hàm `_limit` nhận thêm cửa sổ thời gian:
 
 ```python
@@ -278,12 +278,12 @@ async def login(
 
 Giới hạn chạy **trước** khi kiểm mật khẩu, nên lần đăng nhập sai cũng bị đếm. Đây chính là điều cần để chống dò mật khẩu. `_ip()` đọc `request.client.host`: ở production uvicorn chạy `--proxy-headers` sau Caddy nên đây là IP thật (Task 9).
 
-- [ ] **Step 5: Chạy toàn bộ test**
+- [x] **Step 5: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
 Expected: PASS hết
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend && git commit -m "feat(security): per-IP rate limit on login"
