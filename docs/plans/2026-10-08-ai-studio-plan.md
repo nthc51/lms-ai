@@ -6383,7 +6383,7 @@ git add frontend && git commit -m "feat(web): notes page, account links, admin A
 - Modify: `frontend/e2e/mock-api.ts`, `frontend/e2e/admin-data.ts`
 - Create: `frontend/e2e/studio.spec.ts`
 
-- [ ] **Bước 1: Mock mặc định cho API mới** (`mock-api.ts`): mọi trang bài học giờ gọi `/studio`, `/lessons/*/documents`, `/notes`; thiếu mock là lỗi 500 `UNMOCKED`.
+- [x] **Bước 1: Mock mặc định cho API mới** (`mock-api.ts`): mọi trang bài học giờ gọi `/studio`, `/lessons/*/documents`, `/notes`; thiếu mock là lỗi 500 `UNMOCKED`.
 
 ```diff
 --- a/e2e/mock-api.ts
@@ -6459,7 +6459,7 @@ git add frontend && git commit -m "feat(web): notes page, account links, admin A
  });
 ```
 
-- [ ] **Bước 2: Kịch bản** (`e2e/studio.spec.ts`)
+- [x] **Bước 2: Kịch bản** (`e2e/studio.spec.ts`)
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -6661,7 +6661,7 @@ test.describe("AI Studio", () => {
 });
 ```
 
-- [ ] **Bước 3: Chạy hết**
+- [x] **Bước 3: Chạy hết**
 
 ```bash
 cd frontend
