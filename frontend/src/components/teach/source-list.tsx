@@ -31,9 +31,11 @@ export function SourceList({ lessonId }: { lessonId: string }) {
   return (
     <section aria-labelledby="sources-title" className="space-y-3">
       <h2 id="sources-title" className="font-semibold">
-        Tài liệu cho AI Tutor
+        Tài liệu của bài
       </h2>
-      <p className="text-sm text-muted-foreground">AI Tutor chỉ trả lời dựa trên các tài liệu ở trạng thái Sẵn sàng.</p>
+      <p className="text-sm text-muted-foreground">
+        Học viên xem và tải được ngay sau khi tải lên. AI Tutor và Studio chỉ dùng tài liệu ở trạng thái Sẵn sàng.
+      </p>
 
       {sources.isPending ? (
         <Skeleton className="h-16 w-full" />
@@ -45,7 +47,7 @@ export function SourceList({ lessonId }: { lessonId: string }) {
             <li key={s.id} className="rounded-md border p-3 text-sm">
               <div className="flex items-center gap-2">
                 <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="flex-1">Tài liệu {i + 1}</span>
+                <span className="min-w-0 flex-1 break-words">{s.file_name ?? `Tài liệu ${i + 1}`}</span>
                 <Badge tone={STATUS[s.status].tone}>
                   {s.status === "processing" || s.status === "pending" ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                   {s.status === "ready" ? <CheckCircle2 className="size-3" aria-hidden /> : null}

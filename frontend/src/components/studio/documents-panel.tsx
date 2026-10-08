@@ -36,13 +36,19 @@ export function DocumentsPanel({ lessonId, onAsk, disabled = false }: { lessonId
             <FileText className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold">{d.title}</h3>
-              <p className="text-xs text-muted-foreground">{d.page_count} trang</p>
+              <p className="text-xs text-muted-foreground">{d.status === "ready" ? `${d.page_count} trang` : d.file_name}</p>
             </div>
             <Button size="sm" variant="outline" onClick={() => openSourcePdf(d.source_id).catch((err) => toast.error(errorMessage(err)))}>
               Mở PDF
             </Button>
           </div>
-          {!d.guide || d.guide.status === "generating" ? (
+          {d.status === "pending" || d.status === "processing" ? (
+            <p role="status" className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden /> AI đang đọc tài liệu. Bạn vẫn mở PDF được ngay.
+            </p>
+          ) : d.status === "failed" ? (
+            <p className="mt-3 text-sm text-destructive">AI không đọc được tài liệu này. Tải lại file ở trang soạn bài.</p>
+          ) : !d.guide || d.guide.status === "generating" ? (
             <p role="status" className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" aria-hidden /> AI đang đọc tài liệu để viết hướng dẫn…
             </p>

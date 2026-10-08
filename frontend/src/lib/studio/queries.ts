@@ -119,16 +119,41 @@ export function useLessonDocuments(lessonId: string, enabled = true) {
     queryKey: studioKeys.documents(lessonId),
     enabled,
     queryFn: () => unwrap(api.GET("/api/v1/lessons/{lesson_id}/documents", { params: { path: { lesson_id: lessonId } } })),
-    // hướng dẫn tài liệu được sinh nền sau khi xử lý PDF: còn tài liệu chưa có hướng dẫn thì hỏi lại
-    refetchInterval: (q) => (q.state.data?.some((d) => !d.guide || d.guide.status === "generating") ? POLL_MS * 2 : false),
+    // PDF còn đang xử lý, hoặc hướng dẫn tài liệu (sinh nền sau khi xử lý xong) chưa có: hỏi lại
+    refetchInterval: (q) => documentsPollInterval(q.state.data, q.state.dataUpdateCount),
   });
+}
+
+/** Số lần hỏi lại tối đa cho tài liệu đã sẵn sàng mà chưa có hướng dẫn (~2 phút ở 6 giây/lần): PDF cũ không có hướng dẫn thì thôi hỏi. */
+export const GUIDE_WAIT_POLLS = 20;
+
+/** Khoảng hỏi lại danh sách tài liệu, hoặc false khi không cần hỏi nữa. */
+export function documentsPollInterval(docs: LessonDocument[] | undefined, updateCount: number): number | false {
+  if (!docs) return false;
+  const busy = docs.some((d) => d.status === "pending" || d.status === "processing" || (d.status === "ready" && d.guide?.status === "generating"));
+  if (busy) return POLL_MS * 2;
+  const waitingGuide = docs.some((d) => d.status === "ready" && !d.guide);
+  return waitingGuide && updateCount <= GUIDE_WAIT_POLLS ? POLL_MS * 2 : false;
+}
+
+/** URL ký sẵn để xem PDF (download=true: tải về với tên file gốc). Chỉ sống 1 giờ nên lấy lúc bấm. */
+export async function sourceFileUrl(sourceId: string, download = false) {
+  const { url } = await unwrap(
+    api.GET("/api/v1/sources/{source_id}/file", { params: { path: { source_id: sourceId }, query: { download } } }),
+  );
+  return url;
+}
+
+/** Tải PDF về máy: server ký URL kèm Content-Disposition attachment nên trình duyệt tải, không rời trang. */
+export async function downloadSourcePdf(sourceId: string) {
+  window.location.assign(await sourceFileUrl(sourceId, true));
 }
 
 /** Mở PDF ở trang N trong thẻ mới (URL ký sẵn chỉ sống 1 giờ nên lấy lúc bấm). */
 export async function openSourcePdf(sourceId: string, page?: number | null) {
   const win = window.open("", "_blank"); // mở trước khi await để trình duyệt không chặn popup
   try {
-    const { url } = await unwrap(api.GET("/api/v1/sources/{source_id}/file", { params: { path: { source_id: sourceId } } }));
+    const url = await sourceFileUrl(sourceId);
     const target = page ? `${url}#page=${page}` : url;
     if (win) win.location.href = target;
     else window.location.href = target;

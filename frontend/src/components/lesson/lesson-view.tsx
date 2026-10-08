@@ -36,9 +36,11 @@ import { flattenLessons, useCourse, useLesson, useLessonVideo, useSaveProgress }
 import { lastLesson, READER_MAX, READER_MIN, readerSize } from "@/lib/study/storage";
 import { useShortcuts } from "@/lib/study/use-shortcuts";
 import { useVideoProgress } from "@/lib/study/use-video-progress";
+import { useLessonDocuments } from "@/lib/studio/queries";
 import { canAskTutor, useTutorChat } from "@/lib/tutor/use-tutor-chat";
 import { cn } from "@/lib/utils";
 import { BreakReminder } from "./break-reminder";
+import { LessonMaterials } from "./lesson-materials";
 import { LessonQuizzes } from "./lesson-quizzes";
 import { CourseOutline } from "./course-outline";
 import { ReadingProgress } from "./reading-progress";
@@ -62,6 +64,7 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
   const course = useCourse(slug);
   const lesson = useLesson(lessonId);
   const video = useLessonVideo(lessonId);
+  const documents = useLessonDocuments(lessonId);
   const desktop = useIsDesktop();
 
   // LessonView chỉ render trên trình duyệt (sau RequireAuth) nên đọc localStorage lúc khởi tạo được
@@ -241,11 +244,13 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
                   />
                 ) : null}
 
-                {lesson.data.content_md ? (
-                  <Markdown className="mt-6">{lesson.data.content_md}</Markdown>
-                ) : (
+                {lesson.data.content_md ? <Markdown className="mt-6">{lesson.data.content_md}</Markdown> : null}
+                {/* Chỉ báo "trống" khi bài thật sự không có gì: không chữ, không video, không tài liệu */}
+                {!lesson.data.content_md && !video.data && documents.isSuccess && documents.data.length === 0 ? (
                   <p className="mt-6 text-muted-foreground">Bài này chưa có nội dung đọc.</p>
-                )}
+                ) : null}
+
+                <LessonMaterials lessonId={lessonId} />
 
                 <LessonQuizzes slug={slug} lessonId={lessonId} isStudent={isStudent} />
 

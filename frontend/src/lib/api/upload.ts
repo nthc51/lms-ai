@@ -23,7 +23,7 @@ export function putWithProgress(url: string, file: File, onProgress: UploadProgr
 /** presign → PUT (có tiến trình) → complete. Trả về asset_id đã được server xác minh. */
 export async function uploadAsset(kind: UploadKind, file: File, onProgress: UploadProgress, signal?: AbortSignal) {
   const { asset_id, put_url } = await unwrap(
-    api.POST("/api/v1/uploads/presign", { body: { kind, mime: file.type, size: file.size } }),
+    api.POST("/api/v1/uploads/presign", { body: { kind, mime: file.type, size: file.size, filename: file.name } }),
   );
   await putWithProgress(put_url, file, onProgress, signal);
   await unwrap(api.POST("/api/v1/uploads/{asset_id}/complete", { params: { path: { asset_id } } }));
