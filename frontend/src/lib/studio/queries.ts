@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpenCheck, CalendarClock, HelpCircle, Layers, type LucideIcon, Zap } from "lucide-react";
+import * as React from "react";
 import { api, unwrap } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 
@@ -115,25 +116,36 @@ export function useReviewCard(id: string) {
 }
 
 export function useLessonDocuments(lessonId: string, enabled = true) {
+  // thời điểm mỗi tài liệu lần đầu ở trạng thái "ready mà chưa có hướng dẫn": cửa sổ chờ tính từ đó, không từ lúc tạo truy vấn
+  const firstSeen = React.useRef(new Map<string, number>());
   return useQuery({
     queryKey: studioKeys.documents(lessonId),
     enabled,
     queryFn: () => unwrap(api.GET("/api/v1/lessons/{lesson_id}/documents", { params: { path: { lesson_id: lessonId } } })),
     // PDF còn đang xử lý, hoặc hướng dẫn tài liệu (sinh nền sau khi xử lý xong) chưa có: hỏi lại
-    refetchInterval: (q) => documentsPollInterval(q.state.data, q.state.dataUpdateCount),
+    refetchInterval: (q) => documentsPollInterval(q.state.data, Date.now(), firstSeen.current),
   });
 }
 
-/** Số lần hỏi lại tối đa cho tài liệu đã sẵn sàng mà chưa có hướng dẫn (~2 phút ở 6 giây/lần): PDF cũ không có hướng dẫn thì thôi hỏi. */
-export const GUIDE_WAIT_POLLS = 20;
+/** Thời gian chờ tối đa (từ lúc tài liệu sẵn sàng) cho hướng dẫn chưa có: PDF cũ không có hướng dẫn thì thôi hỏi. */
+export const GUIDE_WAIT_MS = 120_000;
 
-/** Khoảng hỏi lại danh sách tài liệu, hoặc false khi không cần hỏi nữa. */
-export function documentsPollInterval(docs: LessonDocument[] | undefined, updateCount: number): number | false {
+/** Khoảng hỏi lại danh sách tài liệu, hoặc false khi không cần hỏi nữa. Cập nhật `firstSeen` (id -> mốc ms). */
+export function documentsPollInterval(docs: LessonDocument[] | undefined, now: number, firstSeen: Map<string, number>): number | false {
   if (!docs) return false;
-  const busy = docs.some((d) => d.status === "pending" || d.status === "processing" || (d.status === "ready" && d.guide?.status === "generating"));
-  if (busy) return POLL_MS * 2;
-  const waitingGuide = docs.some((d) => d.status === "ready" && !d.guide);
-  return waitingGuide && updateCount <= GUIDE_WAIT_POLLS ? POLL_MS * 2 : false;
+  let busy = false;
+  let waiting = false;
+  const noGuide = new Set<string>();
+  for (const d of docs) {
+    if (d.status === "pending" || d.status === "processing" || (d.status === "ready" && d.guide?.status === "generating")) busy = true;
+    else if (d.status === "ready" && !d.guide) {
+      noGuide.add(d.source_id);
+      if (!firstSeen.has(d.source_id)) firstSeen.set(d.source_id, now);
+      if (now - firstSeen.get(d.source_id)! < GUIDE_WAIT_MS) waiting = true;
+    }
+  }
+  for (const id of [...firstSeen.keys()]) if (!noGuide.has(id)) firstSeen.delete(id);
+  return busy || waiting ? POLL_MS * 2 : false;
 }
 
 /** URL ký sẵn để xem PDF (download=true: tải về với tên file gốc). Chỉ sống 1 giờ nên lấy lúc bấm. */

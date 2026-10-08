@@ -4,7 +4,7 @@ import { http, HttpResponse } from "msw";
 import * as React from "react";
 import { describe, expect, it } from "vitest";
 import { api as url, server } from "@/test/msw";
-import { type Artifact, documentsPollInterval, GUIDE_WAIT_POLLS, type LessonDocument, studioKeys, useReviewCard, useStudioOverview } from "./queries";
+import { type Artifact, documentsPollInterval, GUIDE_WAIT_MS, type LessonDocument, studioKeys, useReviewCard, useStudioOverview } from "./queries";
 
 function setup() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -61,24 +61,37 @@ describe("studio queries", () => {
 
 describe("documentsPollInterval", () => {
   const doc = (over: Record<string, unknown>) => ({ source_id: "s1", status: "ready", guide: null, ...over }) as unknown as LessonDocument;
+  const T = 1_000_000;
 
   it("còn processing/pending thì hỏi lại mãi", () => {
-    expect(documentsPollInterval([doc({ status: "processing" })], 999)).toBeGreaterThan(0);
-    expect(documentsPollInterval([doc({ status: "pending" })], 999)).toBeGreaterThan(0);
+    expect(documentsPollInterval([doc({ status: "processing" })], T + 10 * GUIDE_WAIT_MS, new Map())).toBeGreaterThan(0);
+    expect(documentsPollInterval([doc({ status: "pending" })], T + 10 * GUIDE_WAIT_MS, new Map())).toBeGreaterThan(0);
   });
 
   it("hướng dẫn đang sinh thì hỏi lại", () => {
-    expect(documentsPollInterval([doc({ guide: { status: "generating" } })], 999)).toBeGreaterThan(0);
+    expect(documentsPollInterval([doc({ guide: { status: "generating" } })], T, new Map())).toBeGreaterThan(0);
   });
 
-  it("ready chưa có hướng dẫn: hỏi trong cửa sổ giới hạn rồi dừng", () => {
-    expect(documentsPollInterval([doc({})], 1)).toBeGreaterThan(0);
-    expect(documentsPollInterval([doc({})], GUIDE_WAIT_POLLS)).toBeGreaterThan(0);
-    expect(documentsPollInterval([doc({})], GUIDE_WAIT_POLLS + 1)).toBe(false);
+  it("ready chưa có hướng dẫn: hỏi trong cửa sổ rồi dừng", () => {
+    const seen = new Map<string, number>();
+    expect(documentsPollInterval([doc({})], T, seen)).toBeGreaterThan(0);
+    expect(documentsPollInterval([doc({})], T + GUIDE_WAIT_MS - 1, seen)).toBeGreaterThan(0);
+    expect(documentsPollInterval([doc({})], T + GUIDE_WAIT_MS, seen)).toBe(false);
   });
 
-  it("không có gì chờ thì dừng", () => {
-    expect(documentsPollInterval([doc({ guide: { status: "ready" } }), doc({ status: "failed" })], 1)).toBe(false);
-    expect(documentsPollInterval(undefined, 1)).toBe(false);
+  it("xử lý lâu rồi mới ready: cửa sổ tính từ lúc ready", () => {
+    const seen = new Map<string, number>();
+    for (let i = 0; i < 100; i++) expect(documentsPollInterval([doc({ status: "processing" })], T + i * 6000, seen)).toBeGreaterThan(0);
+    const ready = T + 100 * 6000; // > 2 phút sau lần đầu
+    expect(documentsPollInterval([doc({})], ready, seen)).toBeGreaterThan(0);
+    expect(documentsPollInterval([doc({})], ready + GUIDE_WAIT_MS - 1, seen)).toBeGreaterThan(0);
+    expect(documentsPollInterval([doc({})], ready + GUIDE_WAIT_MS, seen)).toBe(false);
+  });
+
+  it("có hướng dẫn thì bỏ mốc; không có gì chờ thì dừng", () => {
+    const seen = new Map<string, number>([["s1", T]]);
+    expect(documentsPollInterval([doc({ guide: { status: "ready" } }), doc({ source_id: "s2", status: "failed" })], T + 1, seen)).toBe(false);
+    expect(seen.size).toBe(0);
+    expect(documentsPollInterval(undefined, T, seen)).toBe(false);
   });
 });
