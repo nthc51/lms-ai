@@ -110,3 +110,18 @@ jobs:
           build-args: API_ORIGIN=http://api:8000
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.20"
+      - name: Xuất danh sách thư viện production
+        run: uv export --frozen --no-dev --no-hashes --no-emit-project --format requirements-txt -o /tmp/req.txt
+      - name: Quét lỗ hổng đã công bố (OSV/PyPI advisory)
+        run: uvx pip-audit -r /tmp/req.txt
+      - name: Quét lỗ hổng thư viện frontend (chỉ thư viện chạy production, mức high trở lên)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
