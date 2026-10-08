@@ -3000,7 +3000,7 @@ git add backend && git commit -m "feat(studio): source guides, reports, flashcar
 - Create: `backend/app/modules/studio/notes.py`
 - Test: `backend/tests/test_notes.py`
 
-- [ ] **Bước 1: Viết test** (`tests/test_notes.py`). Test cuối bật `AI_USAGE_LOG_ENABLED` và kiểm cả bảng token của admin (Task 1).
+- [x] **Bước 1: Viết test** (`tests/test_notes.py`). Test cuối bật `AI_USAGE_LOG_ENABLED` và kiểm cả bảng token của admin (Task 1).
 
 ```python
 """Sổ ghi chú (AI Studio S4) và nhật ký token ai_calls."""
@@ -3224,7 +3224,7 @@ async def test_llm_calls_are_logged_and_shown_to_admin(client):
     assert get_settings().ai_usage_log_enabled is False
 ```
 
-- [ ] **Bước 2: Service** (`app/modules/studio/notes.py`)
+- [x] **Bước 2: Service** (`app/modules/studio/notes.py`)
 
 ```python
 """Sổ ghi chú của học viên (S4): mỗi người chỉ thấy ghi chú của mình."""
@@ -3401,7 +3401,7 @@ async def synthesize(db: AsyncSession, queue: JobQueue, user: User, data: NotesS
     return NoteSynthOut(note=note_out(note), job_id=job.id)
 ```
 
-- [ ] **Bước 3:** `uv run pytest tests/test_notes.py tests/test_studio.py -q` → **26 pass**. Commit:
+- [x] **Bước 3:** `uv run pytest tests/test_notes.py tests/test_studio.py -q` → **26 pass**. Commit:
 
 ```bash
 git add backend && git commit -m "feat(studio): notes, save from tutor answer, AI synthesis"
