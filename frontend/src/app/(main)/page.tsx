@@ -4,10 +4,13 @@ import { ArrowRight, Clock, Compass, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/app/states";
 import { MyCourseList } from "@/components/course/my-course-list";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
+import { api, unwrap } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/errors";
 import { type User, useAuth } from "@/lib/auth/auth-context";
 
 /** Tên gọi: chữ cuối của họ tên Việt ("Nguyễn Văn An" → "An"). */
@@ -15,7 +18,23 @@ const givenName = (fullName: string) => fullName.trim().split(/\s+/).slice(-1)[0
 
 /** Giảng viên chưa được duyệt: nói rõ đang chờ hay đã bị từ chối (kèm lý do quản trị viên ghi). */
 function TeacherReviewNotice({ user }: { user: User }) {
+  const { reloadUser } = useAuth();
+  const [sending, setSending] = React.useState(false);
   if (user.role !== "teacher" || user.teacher_status === "approved") return null;
+
+  async function askAgain() {
+    setSending(true);
+    try {
+      await unwrap(api.POST("/api/v1/me/teacher-request"));
+      await reloadUser();
+      toast.success("Đã gửi lại yêu cầu duyệt");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  }
+
   const rejected = user.teacher_status === "rejected";
   const Icon = rejected ? XCircle : Clock;
   return (
@@ -25,9 +44,14 @@ function TeacherReviewNotice({ user }: { user: User }) {
         <p className="font-medium">{rejected ? "Yêu cầu giảng dạy chưa được chấp nhận" : "Tài khoản giảng viên đang chờ duyệt"}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {rejected
-            ? `Lý do: ${user.review_note ?? "không ghi"}. Liên hệ quản trị viên nếu bạn cần xem xét lại.`
-            : "Quản trị viên sẽ duyệt sớm. Trong lúc chờ, bạn vẫn xem được các khóa học đã xuất bản."}
+            ? `Lý do: ${user.review_note ?? "không ghi"}. Bổ sung thông tin rồi gửi lại yêu cầu để được xem xét lại.`
+            : "Quản trị viên sẽ duyệt sớm và báo kết quả qua email. Trong lúc chờ, bạn vẫn xem được các khóa học đã xuất bản."}
         </p>
+        {rejected ? (
+          <Button variant="outline" size="sm" className="mt-3" onClick={askAgain} loading={sending} loadingText="Đang gửi…">
+            Gửi lại yêu cầu duyệt
+          </Button>
+        ) : null}
       </div>
     </div>
   );

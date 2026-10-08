@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, BookOpen, ClipboardCheck, GraduationCap, type LucideIcon, MessageCircleQuestion, UserCheck, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, ClipboardCheck, GraduationCap, type LucideIcon, MessageCircleQuestion, ThumbsDown, UserCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { type AdminStats } from "@/lib/admin-queries";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ export function StatTiles({ s }: { s: AdminStats }) {
       <Tile icon={BookOpen} label="Khóa đã xuất bản" value={s.courses_published} sub={`${s.courses_draft} nháp · ${s.courses_hidden} đã ẩn`} href="/admin/courses" />
       <Tile icon={MessageCircleQuestion} label="Câu hỏi AI Tutor (7 ngày)" value={s.tutor_questions_7d} />
       <Tile icon={ClipboardCheck} label="Bài quiz đã nộp (7 ngày)" value={s.quiz_submissions_7d} />
+      <Tile icon={ThumbsDown} label="Trả lời AI bị chê (7 ngày)" value={s.tutor_downvotes_7d} href="/admin/feedback" sub="Xem câu hỏi và câu trả lời" />
       <Tile icon={AlertTriangle} label="Tác vụ AI lỗi (7 ngày)" value={s.failed_jobs_7d} highlight={s.failed_jobs_7d > 0} sub="Xử lý tài liệu, sinh câu hỏi" />
     </div>
   );

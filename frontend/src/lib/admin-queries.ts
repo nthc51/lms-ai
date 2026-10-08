@@ -8,8 +8,14 @@ export type AdminStats = components["schemas"]["AdminStats"];
 export type AdminUser = components["schemas"]["AdminUserOut"];
 export type AdminCourse = components["schemas"]["AdminCourseOut"];
 export type AdminAction = components["schemas"]["AdminActionOut"];
+export type TutorFeedback = components["schemas"]["TutorFeedbackItem"];
 
-export type UserFilter = { role?: "student" | "teacher" | "admin"; status?: "pending" | "approved" | "rejected" | "locked"; q?: string; page: number };
+export type UserFilter = {
+  role?: "student" | "teacher" | "admin";
+  status?: "pending" | "approved" | "rejected" | "locked" | "unverified";
+  q?: string;
+  page: number;
+};
 export type CourseFilter = { status?: "published" | "draft" | "hidden"; q?: string; page: number };
 
 /** Mọi khóa của khu quản trị bắt đầu bằng "admin": một thao tác xong thì làm mới cả khu (số liệu, danh sách, nhật ký). */
@@ -20,6 +26,7 @@ export const adminKeys = {
   users: (f: UserFilter) => [...ADMIN, "users", f] as const,
   courses: (f: CourseFilter) => [...ADMIN, "courses", f] as const,
   actions: (page: number) => [...ADMIN, "actions", page] as const,
+  feedback: (page: number) => [...ADMIN, "feedback", page] as const,
 };
 
 export const PAGE_SIZE = 20;
@@ -56,6 +63,29 @@ export function useAdminActions(page: number, size = PAGE_SIZE) {
     queryFn: () => unwrap(api.GET("/api/v1/admin/actions", { params: { query: { page, size } } })),
     placeholderData: keepPreviousData,
   });
+}
+
+export function useAdminTutorFeedback(page: number, size = PAGE_SIZE) {
+  return useQuery({
+    queryKey: [...adminKeys.feedback(page), size],
+    queryFn: () => unwrap(api.GET("/api/v1/admin/tutor-feedback", { params: { query: { page, size } } })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Tải CSV theo đúng bộ lọc đang xem (qua API client để có token và tự refresh). */
+export async function downloadUsersCsv(f: Omit<UserFilter, "page">) {
+  const blob = await unwrap(
+    api.GET("/api/v1/admin/users/export", { params: { query: { role: f.role, status: f.status, q: f.q || undefined } }, parseAs: "blob" }),
+  );
+  const url = URL.createObjectURL(blob as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `nguoi-dung-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function useAdminMutation<A>(fn: (a: A) => Promise<unknown>) {

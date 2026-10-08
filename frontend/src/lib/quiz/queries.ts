@@ -132,6 +132,16 @@ export function useAttemptResult(attemptId: string) {
   });
 }
 
+/** Câu trả lời AI Tutor bị chê trong khóa (giảng viên; không có tên học viên). */
+export function useCourseTutorFeedback(courseId: string | undefined) {
+  return useQuery({
+    queryKey: [...quizKeys.analytics(courseId ?? "none"), "tutor-feedback"],
+    enabled: !!courseId,
+    queryFn: () =>
+      unwrap(api.GET("/api/v1/courses/{course_id}/tutor-feedback", { params: { path: { course_id: courseId! }, query: { size: 20 } } })),
+  });
+}
+
 export function useCourseAnalytics(courseId: string | undefined) {
   return useQuery({
     queryKey: quizKeys.analytics(courseId ?? "none"),

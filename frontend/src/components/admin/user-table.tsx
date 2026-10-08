@@ -12,6 +12,7 @@ const ROLE = { student: "Học viên", teacher: "Giảng viên", admin: "Quản 
 
 export function UserStatus({ user }: { user: AdminUser }) {
   if (user.locked_at) return <Badge tone="destructive">Đã khóa</Badge>;
+  if (!user.email_verified) return <Badge>Chưa xác nhận email</Badge>;
   if (user.role !== "teacher") return <Badge>Hoạt động</Badge>;
   if (user.teacher_status === "pending") return <Badge tone="accent">Chờ duyệt</Badge>;
   if (user.teacher_status === "rejected") return <Badge tone="destructive">Bị từ chối</Badge>;

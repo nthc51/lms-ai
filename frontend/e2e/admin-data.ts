@@ -36,6 +36,7 @@ export const stats = (over: Record<string, unknown> = {}) => ({
   tutor_questions_7d: 85,
   quiz_submissions_7d: 41,
   failed_jobs_7d: 2,
+  tutor_downvotes_7d: 3,
   signups_14d: Array.from({ length: 14 }, (_, i) => ({ day: new Date(Date.UTC(2026, 8, 23 + i)).toISOString().slice(0, 10), count: i % 4 })),
   ...over,
 });

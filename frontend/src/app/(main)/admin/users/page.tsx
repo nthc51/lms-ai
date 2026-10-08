@@ -1,15 +1,18 @@
 "use client";
 
-import { Search, Users } from "lucide-react";
+import { Download, Search, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
 import { EmptyState, ErrorState, PageHeader } from "@/components/app/states";
 import { FilterTabs } from "@/components/admin/filter-tabs";
 import { UserTable } from "@/components/admin/user-table";
 import { Pagination } from "@/components/course/course-card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/misc";
-import { type UserFilter, useAdminUsers } from "@/lib/admin-queries";
+import { downloadUsersCsv, type UserFilter, useAdminUsers } from "@/lib/admin-queries";
+import { errorMessage } from "@/lib/api/errors";
 import { useDebounced } from "@/lib/use-debounced";
 
 const TABS = [
@@ -17,6 +20,7 @@ const TABS = [
   { value: "teacher", label: "Giảng viên", filter: { role: "teacher" } },
   { value: "student", label: "Học viên", filter: { role: "student" } },
   { value: "locked", label: "Đã khóa", filter: { status: "locked" } },
+  { value: "unverified", label: "Chưa xác nhận email", filter: { status: "unverified" } },
   { value: "all", label: "Tất cả", filter: {} },
 ] as const satisfies readonly { value: string; label: string; filter: Omit<UserFilter, "page"> }[];
 type Tab = (typeof TABS)[number]["value"];
@@ -43,10 +47,31 @@ function UsersView() {
   const page = paging.key === key ? paging.page : 1;
   const filter = TABS.find((t) => t.value === tab)!.filter;
   const users = useAdminUsers({ ...filter, q: query, page });
+  const [exporting, setExporting] = React.useState(false);
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      await downloadUsersCsv({ ...filter, q: query });
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <>
-      <PageHeader title="Người dùng">Duyệt giảng viên mới, tìm kiếm và khóa tài khoản vi phạm.</PageHeader>
+      <PageHeader
+        title="Người dùng"
+        actions={
+          <Button variant="outline" onClick={exportCsv} loading={exporting} loadingText="Đang xuất…">
+            <Download /> Xuất CSV
+          </Button>
+        }
+      >
+        Duyệt giảng viên mới, tìm kiếm và khóa tài khoản vi phạm.
+      </PageHeader>
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <FilterTabs label="Lọc người dùng" value={tab} options={TABS.map(({ value, label }) => ({ value, label }))} onChange={(v) => router.replace(`/admin/users?tab=${v}`)} />
         <div className="relative w-full max-w-sm">

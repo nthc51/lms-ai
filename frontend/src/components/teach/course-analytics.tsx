@@ -3,9 +3,10 @@
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { EmptyState, ErrorState, PageHeader } from "@/components/app/states";
+import { FeedbackList } from "@/components/admin/feedback-list";
 import { Badge, Skeleton } from "@/components/ui/misc";
 import { useCourse } from "@/lib/queries";
-import { useCourseAnalytics } from "@/lib/quiz/queries";
+import { useCourseAnalytics, useCourseTutorFeedback } from "@/lib/quiz/queries";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
@@ -121,7 +122,23 @@ export function CourseAnalyticsView({ slug }: { slug: string }) {
           </section>
         </div>
       )}
+      {course.data ? <TutorFeedbackSection courseId={course.data.id} /> : null}
     </>
+  );
+}
+
+/** Câu trả lời AI bị học viên chê: gợi ý chỗ tài liệu còn thiếu hoặc khó hiểu. */
+function TutorFeedbackSection({ courseId }: { courseId: string }) {
+  const feedback = useCourseTutorFeedback(courseId);
+  if (!feedback.data) return null;
+  return (
+    <section className="mt-10" aria-labelledby="feedback-title">
+      <h2 id="feedback-title" className="mb-1 text-lg font-semibold">
+        Câu trả lời AI bị học viên chê ({feedback.data.total})
+      </h2>
+      <p className="mb-3 text-sm text-muted-foreground">Gợi ý chỗ tài liệu còn thiếu hoặc khó hiểu. Tên học viên được ẩn.</p>
+      <FeedbackList items={feedback.data.items} showCourse={false} />
+    </section>
   );
 }
 
