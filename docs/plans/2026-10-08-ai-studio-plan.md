@@ -3423,7 +3423,7 @@ git add backend && git commit -m "feat(studio): notes, save from tutor answer, A
 - Kết quả từng câu cache ở `eval/results/cache.jsonl` theo (cấu hình, model, prompt_version, câu hỏi).
 - `--rpm` giới hạn số lượt gọi / phút cho gói miễn phí.
 
-- [ ] **Bước 1: Viết test** (`tests/test_eval.py`)
+- [x] **Bước 1: Viết test** (`tests/test_eval.py`)
 
 ```python
 """Benchmark AI Tutor (eval/): chỉ số, bộ câu hỏi, lưới cấu hình, cache, báo cáo, và chạy trọn với AI giả."""
@@ -3634,7 +3634,7 @@ async def test_draft_writes_reviewable_jsonl(tmp_path):
     assert load_dataset(out)[0].gold_pages == [1]
 ```
 
-- [ ] **Bước 2: Bộ dữ liệu**
+- [x] **Bước 2: Bộ dữ liệu**
 
 `eval/dataset.py`:
 
@@ -3727,7 +3727,7 @@ rồi **duyệt bằng tay**.
 {"id": "s4", "type": "refuse", "question": "Thủ đô của nước Pháp là gì?", "gold_pages": [], "gold_answer": "", "must_refuse": true}
 ```
 
-- [ ] **Bước 3: Chỉ số** (`eval/metrics.py`)
+- [x] **Bước 3: Chỉ số** (`eval/metrics.py`)
 
 ```python
 """Chỉ số benchmark: hàm thuần, không gọi DB hay AI (để test kỹ và tính lại từ cache)."""
@@ -3854,7 +3854,7 @@ def threshold_sweep(results: Sequence[QuestionResult], thresholds: Sequence[floa
     return rows
 ```
 
-- [ ] **Bước 4: Dựng khóa từ PDF** (`eval/corpus.py`)
+- [x] **Bước 4: Dựng khóa từ PDF** (`eval/corpus.py`)
 
 ```python
 """Nạp tài liệu benchmark vào DB như một khóa học thật (đúng pipeline xử lý PDF), dùng lại nếu đã nạp.
@@ -3988,7 +3988,7 @@ async def prepare_corpus(
     return Corpus(SearchScope(ids[0], ids[1]), ids[3], sha, n)
 ```
 
-- [ ] **Bước 5: Bộ chạy** (`eval/runner.py`)
+- [x] **Bước 5: Bộ chạy** (`eval/runner.py`)
 
 ```python
 """Chạy benchmark: mỗi cấu hình × mỗi câu hỏi → tìm tài liệu, AI trả lời, giám khảo chấm. Có cache trên đĩa.
@@ -4204,7 +4204,7 @@ async def run_grid(
     return out
 ```
 
-- [ ] **Bước 6: Báo cáo** (`eval/report.py`): bảng so sánh, biểu đồ chất lượng / token (SVG một chuỗi, nhãn trực tiếp, rê chuột xem số, có chế độ tối), bảng quét ngưỡng.
+- [x] **Bước 6: Báo cáo** (`eval/report.py`): bảng so sánh, biểu đồ chất lượng / token (SVG một chuỗi, nhãn trực tiếp, rê chuột xem số, có chế độ tối), bảng quét ngưỡng.
 
 ```python
 """Xuất kết quả benchmark: report.md (dán vào báo cáo) và report.html (bảng + biểu đồ chất lượng – token)."""
@@ -4350,7 +4350,7 @@ def now_label() -> str:
     return datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%Y%m%d-%H%M")
 ```
 
-- [ ] **Bước 7: Lệnh chạy** (`eval/run.py`, `eval/draft.py`)
+- [x] **Bước 7: Lệnh chạy** (`eval/run.py`, `eval/draft.py`)
 
 ```python
 """Chạy benchmark AI Tutor.
@@ -4538,14 +4538,14 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Bước 8: Không commit kết quả chạy và PDF** (`.gitignore` ở gốc repo, thêm cuối file). PDF giáo trình thường có bản quyền nên để ngoài git.
+- [x] **Bước 8: Không commit kết quả chạy và PDF** (`.gitignore` ở gốc repo, thêm cuối file). PDF giáo trình thường có bản quyền nên để ngoài git.
 
 ```
 backend/eval/results/
 backend/eval/datasets/*.pdf
 ```
 
-- [ ] **Bước 9:** `uv run pytest tests/test_eval.py -q` → **8 pass**. Rồi chạy **toàn bộ** backend:
+- [x] **Bước 9:** `uv run pytest tests/test_eval.py -q` → **8 pass**. Rồi chạy **toàn bộ** backend:
 
 ```bash
 uv run pytest -q            # Expected: 681 passed
