@@ -5437,7 +5437,7 @@ git add frontend && git commit -m "feat(web): sign-up email verification flow (c
 - Modify: `frontend/src/lib/admin-queries.ts`, `frontend/src/components/admin/{user-table,overview}.tsx`, `frontend/src/app/(main)/admin/users/page.tsx`, `frontend/src/app/(main)/page.tsx`, `frontend/src/lib/quiz/queries.ts`, `frontend/src/components/teach/course-analytics.tsx`
 - Create: `frontend/src/components/admin/feedback-list.tsx`, `frontend/src/app/(main)/admin/feedback/page.tsx`
 
-- [ ] **Bước 1: `src/lib/admin-queries.ts`** (thay toàn bộ)
+- [x] **Bước 1: `src/lib/admin-queries.ts`** (thay toàn bộ)
 
 ```ts
 "use client";
@@ -5573,13 +5573,13 @@ export const fmtDateTime = (iso: string) => timeFmt.format(new Date(iso));
 
 > `downloadUsersCsv` đi qua API client (`parseAs: "blob"`), nên vẫn có token và tự refresh khi gặp 401. Nếu dùng `<a href>` thẳng tới API thì không gửi được header `Authorization`.
 
-- [ ] **Bước 2: Huy hiệu "Chưa xác nhận email"** (`src/components/admin/user-table.tsx`, trong `UserStatus`, ngay sau dòng `locked_at`)
+- [x] **Bước 2: Huy hiệu "Chưa xác nhận email"** (`src/components/admin/user-table.tsx`, trong `UserStatus`, ngay sau dòng `locked_at`)
 
 ```tsx
   if (!user.email_verified) return <Badge>Chưa xác nhận email</Badge>;
 ```
 
-- [ ] **Bước 3: Trang Người dùng** (`src/app/(main)/admin/users/page.tsx`, thay toàn bộ)
+- [x] **Bước 3: Trang Người dùng** (`src/app/(main)/admin/users/page.tsx`, thay toàn bộ)
 
 Thêm tab "Chưa xác nhận email" và nút **Xuất CSV** (xuất đúng tab và từ khóa đang xem).
 
@@ -5685,7 +5685,7 @@ function UsersView() {
 }
 ```
 
-- [ ] **Bước 4: Ô số liệu 👎** (`src/components/admin/overview.tsx`)
+- [x] **Bước 4: Ô số liệu 👎** (`src/components/admin/overview.tsx`)
 
 Import thêm `ThumbsDown`. Chèn ngay trước ô "Tác vụ AI lỗi":
 
@@ -5693,7 +5693,7 @@ Import thêm `ThumbsDown`. Chèn ngay trước ô "Tác vụ AI lỗi":
       <Tile icon={ThumbsDown} label="Trả lời AI bị chê (7 ngày)" value={s.tutor_downvotes_7d} href="/admin/feedback" sub="Xem câu hỏi và câu trả lời" />
 ```
 
-- [ ] **Bước 5: Danh sách 👎** (`src/components/admin/feedback-list.tsx`)
+- [x] **Bước 5: Danh sách 👎** (`src/components/admin/feedback-list.tsx`)
 
 ```tsx
 "use client";
@@ -5774,7 +5774,7 @@ export default function AdminFeedbackPage() {
 }
 ```
 
-- [ ] **Bước 6: 👎 trong Thống kê của giảng viên**
+- [x] **Bước 6: 👎 trong Thống kê của giảng viên**
 
 `src/lib/quiz/queries.ts`, thêm ngay trước `useCourseAnalytics`:
 
@@ -5813,7 +5813,7 @@ function TutorFeedbackSection({ courseId }: { courseId: string }) {
 }
 ```
 
-- [ ] **Bước 7: Gửi lại yêu cầu duyệt** (`src/app/(main)/page.tsx`, thay toàn bộ)
+- [x] **Bước 7: Gửi lại yêu cầu duyệt** (`src/app/(main)/page.tsx`, thay toàn bộ)
 
 ```tsx
 "use client";
@@ -5933,7 +5933,7 @@ export default function HomePage() {
 }
 ```
 
-- [ ] **Bước 8: Kiểm tra và commit**
+- [x] **Bước 8: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test && npm run build
