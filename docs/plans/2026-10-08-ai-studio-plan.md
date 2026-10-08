@@ -103,7 +103,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 - Modify: `backend/app/ai/models.py`, `backend/app/ai/llm_client.py`, `backend/app/core/config.py`, `backend/.env.example`, `backend/tests/conftest.py`
 - Modify: `backend/app/modules/admin/schemas.py`, `backend/app/modules/admin/service.py`
 
-- [ ] **Bước 1: Model `AiCall`** (`app/ai/models.py`)
+- [x] **Bước 1: Model `AiCall`** (`app/ai/models.py`)
 
 ```diff
 --- a/app/ai/models.py
@@ -142,7 +142,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 +    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
 ```
 
-- [ ] **Bước 2: Cấu hình** (`app/core/config.py`, `.env.example`). Thêm luôn các biến Studio và kích thước đoạn (Task 4 và benchmark dùng).
+- [x] **Bước 2: Cấu hình** (`app/core/config.py`, `.env.example`). Thêm luôn các biến Studio và kích thước đoạn (Task 4 và benchmark dùng).
 
 ```diff
 --- a/app/core/config.py
@@ -201,7 +201,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 +CHUNK_OVERLAP_TOKENS=100
 ```
 
-- [ ] **Bước 3: `LLMClient._note`**: ghi log như cũ **và** thêm một dòng `ai_calls` (lỗi ghi DB chỉ log cảnh báo, không làm hỏng câu trả lời). Mọi chỗ trước gọi `self._log(` nay gọi `await self._note(`. Với stream, ghi trong khối `shield` để học viên đóng tab giữa chừng vẫn ghi được.
+- [x] **Bước 3: `LLMClient._note`**: ghi log như cũ **và** thêm một dòng `ai_calls` (lỗi ghi DB chỉ log cảnh báo, không làm hỏng câu trả lời). Mọi chỗ trước gọi `self._log(` nay gọi `await self._note(`. Với stream, ghi trong khối `shield` để học viên đóng tab giữa chừng vẫn ghi được.
 
 ```diff
 --- a/app/ai/llm_client.py
@@ -354,7 +354,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
  
 ```
 
-- [ ] **Bước 4: Test không ghi `ai_calls`** (`tests/conftest.py`): tránh mỗi test phải dọn bảng. Test riêng của tính năng này bật lại (Task 6).
+- [x] **Bước 4: Test không ghi `ai_calls`** (`tests/conftest.py`): tránh mỗi test phải dọn bảng. Test riêng của tính năng này bật lại (Task 6).
 
 ```diff
 --- a/tests/conftest.py
@@ -369,7 +369,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
  # Test không đọc backend/.env của máy dev (CI cũng không có file này): cấu hình riêng của từng máy,
 ```
 
-- [ ] **Bước 5: `ai_usage_7d` cho trang tổng quan admin**
+- [x] **Bước 5: `ai_usage_7d` cho trang tổng quan admin**
 
 ```diff
 --- a/app/modules/admin/schemas.py
@@ -446,7 +446,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
  
 ```
 
-- [ ] **Bước 6:** Chưa chạy test ở task này (bảng `ai_calls` có ở migration Task 2). Commit:
+- [x] **Bước 6:** Chưa chạy test ở task này (bảng `ai_calls` có ở migration Task 2). Commit:
 
 ```bash
 git add backend && git commit -m "feat(ai): record every LLM call in ai_calls, admin ai_usage_7d"
