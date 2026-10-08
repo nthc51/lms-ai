@@ -7428,7 +7428,7 @@ Task này **người dùng tự làm**, kiểm tra cả phần 1 và phần 2.
 git add docs && git commit -m "docs: admin area and email done"
 ```
 
-- [ ] **Plan tầng S:** thêm vào `.env.prod.example` các dòng `APP_BASE_URL=https://<domain>` và `SMTP_*` của Brevo. Thêm mục "Xác thực domain gửi mail (SPF/DKIM) trong Brevo" vào phần cấu hình DNS.
+- [x] **Plan tầng S:** thêm vào `.env.prod.example` các dòng `APP_BASE_URL=https://<domain>` và `SMTP_*` của Brevo. Thêm mục "Xác thực domain gửi mail (SPF/DKIM) trong Brevo" vào phần cấu hình DNS.
 
 ---
 
