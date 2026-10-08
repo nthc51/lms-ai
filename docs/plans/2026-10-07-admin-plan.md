@@ -6909,9 +6909,9 @@ git add backend && git commit -m "fix(api): per-email outbox claims with lease a
 - Modify: `frontend/src/lib/api/schema.d.ts` (sinh lại), `src/lib/auth/auth-context.tsx`, `src/components/admin/{user-table,overview}.tsx`, `src/app/(main)/admin/{users,courses}/page.tsx`, `src/lib/admin-queries.ts`, `src/components/auth/check-email.tsx`, `src/app/(auth)/verify-email/verify-email.tsx`, `src/app/(main)/page.tsx`, `src/components/teach/course-editor.tsx`, `e2e/{admin-data,admin.spec}.ts`
 - Create: `frontend/e2e/review-fixes.spec.ts`
 
-- [ ] **Bước 1: Sinh lại kiểu API** (`npm run gen:api`). Thêm `lock_reason` vào `AdminUserOut`.
+- [x] **Bước 1: Sinh lại kiểu API** (`npm run gen:api`). Thêm `lock_reason` vào `AdminUserOut`.
 
-- [ ] **Bước 2: E2E (sẽ fail)** (`e2e/review-fixes.spec.ts`)
+- [x] **Bước 2: E2E (sẽ fail)** (`e2e/review-fixes.spec.ts`)
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -6987,7 +6987,7 @@ test("admin vào trang chủ thì được chuyển sang khu quản trị", asyn
 });
 ```
 
-- [ ] **Bước 3: Sửa code**
+- [x] **Bước 3: Sửa code**
 
 ```diff
 --- a/frontend/src/lib/auth/auth-context.tsx
@@ -7323,7 +7323,7 @@ test("admin vào trang chủ thì được chuyển sang khu quản trị", asyn
        <p className="mb-6 rounded-md border border-dashed p-3 text-sm text-muted-foreground md:hidden">
 ```
 
-- [ ] **Bước 4: Sửa E2E cũ cho khớp**
+- [x] **Bước 4: Sửa E2E cũ cho khớp**
 
 ```diff
 --- a/frontend/e2e/admin-data.ts
@@ -7353,7 +7353,7 @@ test("admin vào trang chủ thì được chuyển sang khu quản trị", asyn
      await expectAccessible(page);
 ```
 
-- [ ] **Bước 5: Kiểm tra và commit**
+- [x] **Bước 5: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test && npx playwright test
