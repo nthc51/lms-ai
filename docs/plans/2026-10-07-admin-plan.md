@@ -4168,7 +4168,7 @@ git add backend && git commit -m "feat(api): email verification on sign-up with 
 **Files:**
 - Modify: `backend/app/modules/admin/{schemas,service,router}.py`, `backend/app/modules/analytics/{schemas,service,router}.py`
 
-- [ ] **Bước 1: `app/modules/admin/schemas.py`**
+- [x] **Bước 1: `app/modules/admin/schemas.py`**
 
 `AdminUserOut` thêm ngay dưới `review_note`:
 
@@ -4182,7 +4182,7 @@ git add backend && git commit -m "feat(api): email verification on sign-up with 
     tutor_downvotes_7d: int  # câu trả lời AI bị học viên bấm 👎 trong 7 ngày
 ```
 
-- [ ] **Bước 2: `app/modules/admin/service.py`** (thay toàn bộ)
+- [x] **Bước 2: `app/modules/admin/service.py`** (thay toàn bộ)
 
 ```python
 import csv
@@ -4652,7 +4652,7 @@ async def list_actions(db: AsyncSession, params: PageParams) -> AdminActionPage:
     return AdminActionPage(items=items, total=total, page=params.page, size=params.size)
 ```
 
-- [ ] **Bước 3: `app/modules/admin/router.py`** (thay toàn bộ)
+- [x] **Bước 3: `app/modules/admin/router.py`** (thay toàn bộ)
 
 `/users/export` phải khai báo **trước** mọi route `/users/{user_id}/…`. Thực ra hiện chưa có `GET /users/{user_id}`, nhưng đặt trước cho an toàn.
 
@@ -4826,7 +4826,7 @@ async def tutor_feedback(
     return await downvoted_answers(db, params, with_student=True)
 ```
 
-- [ ] **Bước 4: Phản hồi 👎** (`app/modules/analytics`)
+- [x] **Bước 4: Phản hồi 👎** (`app/modules/analytics`)
 
 `schemas.py`:
 
@@ -4935,7 +4935,7 @@ async def course_tutor_feedback(
     return await service.downvoted_answers(db, params, course.id)
 ```
 
-- [ ] **Bước 5: Chạy test**
+- [x] **Bước 5: Chạy test**
 
 ```bash
 uv run pytest tests/test_email.py tests/test_admin.py -q
@@ -4945,7 +4945,7 @@ uv run ruff check . && uv run ruff format --check .
 
 Expected: 27 passed (10 + 17); toàn bộ **638 passed**; ruff sạch.
 
-- [ ] **Bước 6: Thử với Mailpit**
+- [x] **Bước 6: Thử với Mailpit**
 
 ```bash
 docker compose up -d --build api worker mailpit
@@ -4953,7 +4953,7 @@ docker compose up -d --build api worker mailpit
 
 Đăng ký một tài khoản ở `http://localhost:3000/register` (frontend cũ vẫn gọi được API; nó sẽ báo lỗi ở bước tự đăng nhập, đúng như mong đợi). Mở `http://localhost:8025`: thấy email "Xác nhận email đăng ký LMS-AI" trong vòng vài giây.
 
-- [ ] **Bước 7: Commit**
+- [x] **Bước 7: Commit**
 
 ```bash
 git add backend && git commit -m "feat(api): admin notification emails, teacher re-request, users CSV export, tutor downvote inbox"
