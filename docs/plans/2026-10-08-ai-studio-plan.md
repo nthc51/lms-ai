@@ -4566,9 +4566,9 @@ git add .gitignore backend && git commit -m "feat(eval): AI tutor benchmark with
 - Modify: `frontend/src/lib/api/schema.d.ts`, `frontend/openapi.json` (sinh lại)
 - Create: `frontend/src/lib/studio/queries.ts`, `frontend/src/lib/studio/queries.test.ts`
 
-- [ ] **Bước 1: Sinh lại kiểu API** (backend đang chạy): `cd frontend && npm run gen:api`. Kiểm tra `schema.d.ts` có `StudioOverview`, `ArtifactOut`, `NoteOut`, `ChunkOut`, `DocumentOut`.
+- [x] **Bước 1: Sinh lại kiểu API** (backend đang chạy): `cd frontend && npm run gen:api`. Kiểm tra `schema.d.ts` có `StudioOverview`, `ArtifactOut`, `NoteOut`, `ChunkOut`, `DocumentOut`.
 
-- [ ] **Bước 2: Viết test** (`src/lib/studio/queries.test.ts`)
+- [x] **Bước 2: Viết test** (`src/lib/studio/queries.test.ts`)
 
 ```ts
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -4633,7 +4633,7 @@ describe("studio queries", () => {
 });
 ```
 
-- [ ] **Bước 3: Truy vấn** (`src/lib/studio/queries.ts`). Tổng quan Studio hỏi lại mỗi 3 giây khi có loại đang sinh. Đánh dấu thẻ cập nhật ngay (optimistic), lỗi thì trả lại. `openSourcePdf` mở cửa sổ **trước** khi gọi API, để trình duyệt không chặn popup.
+- [x] **Bước 3: Truy vấn** (`src/lib/studio/queries.ts`). Tổng quan Studio hỏi lại mỗi 3 giây khi có loại đang sinh. Đánh dấu thẻ cập nhật ngay (optimistic), lỗi thì trả lại. `openSourcePdf` mở cửa sổ **trước** khi gọi API, để trình duyệt không chặn popup.
 
 ```ts
 "use client";
@@ -4845,7 +4845,7 @@ export function downloadMarkdown(filename: string, text: string) {
 }
 ```
 
-- [ ] **Bước 4:** `npx vitest run src/lib/studio` → 2 pass. Commit:
+- [x] **Bước 4:** `npx vitest run src/lib/studio` → 2 pass. Commit:
 
 ```bash
 git add frontend && git commit -m "feat(web): studio API types and queries"
