@@ -52,8 +52,8 @@ def _too_many(wait: int) -> AppError:
     )
 
 
-async def _limit(limiter: RateLimiter, key: str, limit: int) -> None:
-    wait = await limiter.hit(key, limit, 3600)
+async def _limit(limiter: RateLimiter, key: str, limit: int, window_s: int = 3600) -> None:
+    wait = await limiter.hit(key, limit, window_s)
     if wait is not None:
         raise _too_many(wait)
 
@@ -119,7 +119,15 @@ async def request_teacher_review(
 
 
 @router.post("/auth/login", response_model=TokenOut)
-async def login(data: LoginIn, response: Response, db: AsyncSession = Depends(get_db)):
+async def login(
+    data: LoginIn,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+):
+    """429 RATE_LIMITED khi một IP gọi quá LOGIN_RATE_LIMIT_PER_MIN lần / phút (tính cả lần sai mật khẩu)."""
+    await _limit(limiter, f"login-ip:{_ip(request)}", get_settings().login_rate_limit_per_min, 60)
     access, raw = await service.login(db, data)
     set_refresh_cookie(response, raw)
     return TokenOut(access_token=access)

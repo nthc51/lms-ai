@@ -112,7 +112,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /**
+         * Login
+         * @description 429 RATE_LIMITED khi một IP gọi quá LOGIN_RATE_LIMIT_PER_MIN lần / phút (tính cả lần sai mật khẩu).
+         */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
         options?: never;
