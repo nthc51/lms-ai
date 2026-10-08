@@ -158,3 +158,45 @@ test.describe("phân quyền và thông báo cho giảng viên", () => {
     await expectAccessible(page);
   });
 });
+
+test.describe("quản trị viên: phản hồi AI và xuất CSV", () => {
+  test("trang câu trả lời AI bị chê", async ({ page }) => {
+    await mockApi(page, {
+      user: admin,
+      extra: {
+        "GET /admin/tutor-feedback": (r) =>
+          r.fulfill({
+            json: pageOf([
+              { message_id: "m1", question: "Đạo hàm của x² là gì?", answer: "Là x [1].", refused: false, created_at: "2026-10-06T03:00:00Z", course_id: "c", course_title: "Giải tích 1", course_slug: "giai-tich-1", lesson_id: "l", lesson_title: "Định nghĩa đạo hàm", student_name: "Nguyễn Văn An" },
+            ]),
+          }),
+      },
+    });
+    await page.goto("/admin/feedback");
+    await expect(page.getByText("Đạo hàm của x² là gì?")).toBeVisible();
+    await expect(page.getByText("· Nguyễn Văn An")).toBeVisible();
+    await page.getByText("Câu trả lời của AI").click();
+    await expect(page.getByText("Là x [1].")).toBeVisible();
+    await expectAccessible(page);
+    await expectNoHorizontalScroll(page);
+  });
+
+  test("xuất CSV theo tab đang xem", async ({ page }) => {
+    let query = "";
+    await mockApi(page, {
+      user: admin,
+      extra: {
+        "GET /admin/users": (r) => r.fulfill({ json: pageOf([studentRow]) }),
+        "GET /admin/users/export": (r, url) => {
+          query = url.search;
+          return r.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "﻿Họ tên,Email\nNguyễn Văn An,an@sv.vn\n" });
+        },
+      },
+    });
+    await page.goto("/admin/users?tab=student");
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Xuất CSV" }).click();
+    expect((await download).suggestedFilename()).toMatch(/^nguoi-dung-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(query).toContain("role=student");
+  });
+});
