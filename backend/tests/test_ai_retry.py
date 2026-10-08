@@ -182,3 +182,33 @@ async def test_real_sdk_client_over_mock_transport():
         assert await e.embed_query("q") == [0.6, 0.8]
     assert sleep.delays == [7.0, 2.0]
     assert len(seen) == 3 and all(t["read"] == 12.5 for t in seen)
+
+
+def quota_error(retry_delay: str) -> errors.APIError:
+    """429 hết quota theo phút: Gemini đặt thời gian chờ trong thân lỗi (RetryInfo), không có header."""
+    body = {
+        "error": {
+            "code": 429,
+            "message": "You exceeded your current quota",
+            "status": "RESOURCE_EXHAUSTED",
+            "details": [
+                {"@type": "type.googleapis.com/google.rpc.QuotaFailure", "violations": []},
+                {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry_delay},
+            ],
+        }
+    }
+    return errors.ClientError(429, body, httpx.Response(429))
+
+
+async def test_retry_info_delay_in_body_is_used_when_no_header():
+    sleep = Sleeps()
+    e, _ = embedder([quota_error("10.286857173s"), None], sleep)
+    await e.embed_query("q")
+    assert sleep.delays == [10.286857173]
+
+
+async def test_retry_info_delay_is_capped_and_bad_values_fall_back():
+    sleep = Sleeps()
+    e, _ = embedder([quota_error("900s"), quota_error("abc"), None], sleep)
+    await e.embed_query("q")
+    assert sleep.delays == [60.0, 2.0]  # lần 2 không đọc được → backoff 2**1

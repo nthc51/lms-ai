@@ -31,18 +31,33 @@ def is_retryable(exc: BaseException) -> bool:
     return code is not None and (code == 429 or 500 <= code <= 599)
 
 
+def _retry_info_delay(exc: BaseException) -> float | None:
+    """retryDelay trong thân lỗi Gemini (google.rpc.RetryInfo, vd. "10.28s"). Gemini báo thời gian chờ ở đây
+    khi hết quota theo phút, thường không kèm header Retry-After."""
+    body = getattr(exc, "details", None)
+    error = body.get("error") if isinstance(body, dict) else None
+    items = error.get("details") if isinstance(error, dict) else None
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, dict) and str(item.get("@type", "")).endswith("RetryInfo"):
+            value = str(item.get("retryDelay", "")).removesuffix("s")
+            try:
+                return float(value)
+            except ValueError:
+                return None
+    return None
+
+
 def retry_after_s(exc: BaseException) -> float | None:
-    """Giây chờ từ header Retry-After của response lỗi (APIError.response là httpx.Response), tối đa
-    MAX_RETRY_AFTER_S. Không có, không phải số, âm hoặc không hữu hạn (inf/nan) → None (dùng backoff)."""
+    """Giây chờ server yêu cầu: header Retry-After của response lỗi (APIError.response là httpx.Response),
+    không có thì retryDelay trong thân lỗi (RetryInfo). Tối đa MAX_RETRY_AFTER_S. Không có, không phải số,
+    âm hoặc không hữu hạn (inf/nan) → None (dùng backoff)."""
     headers = getattr(getattr(exc, "response", None), "headers", None)
     value = headers.get("retry-after") if headers is not None else None
-    if value is None:
-        return None
     try:
-        delay = float(value)
+        delay = float(value) if value is not None else _retry_info_delay(exc)
     except ValueError:
         return None
-    if not math.isfinite(delay) or delay < 0:
+    if delay is None or not math.isfinite(delay) or delay < 0:
         return None
     return min(delay, MAX_RETRY_AFTER_S)
 
