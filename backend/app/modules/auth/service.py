@@ -197,8 +197,10 @@ async def verify_email(db: AsyncSession, raw: str) -> User:
         raise AppError("TOKEN_EXPIRED", "Link xác nhận đã hết hạn, hãy gửi lại email xác nhận", 400)
     token.used_at = utcnow()
     user.email_verified_at = utcnow()
-    if user.role == Role.teacher and user.teacher_status == TeacherStatus.pending:
-        await notify_admins_pending_teacher(db, user)  # chỉ báo admin khi email đã thật
+    # chỉ báo admin khi email đã thật; tắt bắt buộc xác nhận thì đã báo lúc đăng ký rồi
+    required = get_settings().email_verification_required
+    if required and user.role == Role.teacher and user.teacher_status == TeacherStatus.pending:
+        await notify_admins_pending_teacher(db, user)
     await db.commit()
     return user
 

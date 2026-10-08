@@ -95,6 +95,20 @@ async def test_without_required_verification_teachers_queue_immediately(client, 
     ).status_code == 200
 
 
+async def test_without_required_verification_clicking_the_link_does_not_notify_admins_again(
+    client, monkeypatch
+):
+    import re
+
+    monkeypatch.setattr(get_settings(), "email_verification_required", False)
+    await make_admin(client)
+    await register_user(client, "gv@x.com", role="teacher", verify=False)
+    (mail,) = await _outbox("verify_email")
+    token = re.search(r"verify-email\?token=([\w-]+)", mail.body_text).group(1)
+    assert (await client.post(f"{API}/auth/verify-email", json={"token": token})).status_code == 200
+    assert len(await _outbox("new_pending_teacher")) == 1  # chỉ lần báo lúc đăng ký
+
+
 async def test_register_and_resend_are_rate_limited_per_ip(client, limiter):
     limiter.counts["register-ip:127.0.0.1"] = 20
     r = await client.post(
