@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { ErrorState, PageHeader } from "@/components/app/states";
 import { ActionLog } from "@/components/admin/action-log";
-import { SignupChart, StatTiles } from "@/components/admin/overview";
+import { AiUsageTable, SignupChart, StatTiles } from "@/components/admin/overview";
 import { UserTable } from "@/components/admin/user-table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
@@ -26,6 +26,12 @@ export default function AdminHome() {
         <div className="space-y-6">
           <StatTiles s={stats.data} />
           <SignupChart days={stats.data.signups_14d} />
+          <section aria-labelledby="ai-usage-title">
+            <h2 id="ai-usage-title" className="mb-3 text-lg font-semibold">
+              Token AI 7 ngày
+            </h2>
+            <AiUsageTable rows={stats.data.ai_usage_7d} />
+          </section>
         </div>
       )}
 

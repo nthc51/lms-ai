@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, NotebookPen } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/states";
 import { ThemeSwitcher } from "@/components/app/theme-switcher";
@@ -25,6 +26,13 @@ export default function AccountPage() {
               {user.email} · {ROLE_LABEL[user.role]}
             </p>
           </div>
+          {user.role !== "admin" ? (
+            <Button asChild variant="outline">
+              <Link href="/notes">
+                <NotebookPen /> Ghi chú của tôi
+              </Link>
+            </Button>
+          ) : null}
           <div>
             <h2 className="mb-2 text-sm font-medium">Chế độ màu</h2>
             <ThemeSwitcher />

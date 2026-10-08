@@ -82,3 +82,60 @@ export function SignupChart({ days }: { days: AdminStats["signups_14d"] }) {
     </figure>
   );
 }
+
+const OP_LABELS: Record<string, string> = {
+  tutor_answer: "AI Tutor trả lời",
+  tutor_rewrite: "AI Tutor viết lại câu hỏi",
+  tutor_followups: "Gợi ý hỏi tiếp",
+  quiz_generate: "Sinh câu hỏi quiz",
+  quiz_self_check: "Tự kiểm tra quiz",
+  source_guide: "Hướng dẫn tài liệu",
+  studio_study_guide: "Đề cương ôn tập",
+  studio_briefing: "Bản tóm tắt",
+  studio_faq: "Câu hỏi thường gặp",
+  studio_timeline: "Dòng thời gian",
+  studio_map: "Tóm tắt từng phần (tài liệu dài)",
+  studio_flashcards: "Flashcard",
+  notes_synthesize: "Gộp ghi chú",
+  eval_answer: "Benchmark: trả lời",
+  eval_judge: "Benchmark: chấm điểm",
+};
+
+export function opLabel(op: string) {
+  return OP_LABELS[op] ?? op;
+}
+
+/** Bảng token AI 7 ngày theo loại tác vụ (nhiều token nhất trước) — để biết tính năng nào tốn tiền. */
+export function AiUsageTable({ rows }: { rows: AdminStats["ai_usage_7d"] }) {
+  if (rows.length === 0) {
+    return <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">Chưa có lượt gọi AI nào trong 7 ngày qua.</p>;
+  }
+  const n = (v: number) => v.toLocaleString("vi-VN");
+  return (
+    <div className="overflow-x-auto rounded-lg border bg-surface" tabIndex={0} role="region" aria-label="Token AI 7 ngày theo tác vụ">
+      <table className="w-full min-w-[560px] text-sm">
+        <caption className="sr-only">Token AI 7 ngày theo tác vụ</caption>
+        <thead className="border-b text-left text-muted-foreground">
+          <tr>
+            <th className="px-4 py-2 font-medium">Tác vụ</th>
+            <th className="px-4 py-2 text-right font-medium">Lượt gọi</th>
+            <th className="px-4 py-2 text-right font-medium">Từ cache</th>
+            <th className="px-4 py-2 text-right font-medium">Token vào</th>
+            <th className="px-4 py-2 text-right font-medium">Token ra</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.op} className="border-b last:border-0">
+              <td className="px-4 py-2">{opLabel(r.op)}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{n(r.calls)}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{n(r.cached_calls)}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{n(r.tokens_in)}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{n(r.tokens_out)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

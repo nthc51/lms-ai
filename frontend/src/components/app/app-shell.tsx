@@ -1,6 +1,6 @@
 "use client";
 
-import { LogIn, LogOut, User as UserIcon } from "lucide-react";
+import { LogIn, LogOut, NotebookPen, User as UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
@@ -129,6 +129,11 @@ function AccountMenu() {
             <ThemeSwitcher compact />
           </div>
           <MenuSeparator />
+          {user.role !== "admin" ? (
+            <MenuItem onSelect={() => router.push("/notes")}>
+              <NotebookPen /> Ghi chú của tôi
+            </MenuItem>
+          ) : null}
           <MenuItem
             onSelect={async () => {
               await logout();
