@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { expectAccessible, expectNoHorizontalScroll } from "./a11y";
-import { COURSE_ID, L1, mockApi, note, studioOverview } from "./mock-api";
+import { COURSE_ID, L1, lesson, mockApi, note, studioOverview } from "./mock-api";
 
 const ART = "a-1";
 const FC = "a-2";
@@ -116,6 +116,8 @@ test.describe("AI Studio", () => {
               {
                 source_id: "src-1",
                 title: "Giáo trình đạo hàm",
+                file_name: "Giáo trình đạo hàm.pdf",
+                status: "ready",
                 page_count: 12,
                 guide: { status: "ready", title: "Giáo trình đạo hàm", summary: "Tài liệu trình bày định nghĩa và quy tắc tính đạo hàm.", topics: ["Định nghĩa", "Quy tắc"], questions: ["Đạo hàm một phía là gì?"] },
               },
@@ -129,6 +131,67 @@ test.describe("AI Studio", () => {
     await expectAccessible(page);
     await page.getByRole("button", { name: "Đạo hàm một phía là gì?" }).click();
     await expect(page.getByRole("tab", { name: "AI Tutor" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("bài chỉ có PDF: vẫn hiện tài liệu (kể cả đang xử lý), xem ngay trong trang và tải xuống", async ({ page, isMobile }) => {
+    const fileRequests: string[] = [];
+    await page.route("**/fake-files/**", (r) =>
+      r.fulfill({
+        contentType: "application/pdf",
+        headers: r.request().url().includes("dl=1") ? { "Content-Disposition": 'attachment; filename="slide.pdf"' } : {},
+        body: "%PDF-1.4\n%%EOF\n",
+      }),
+    );
+    await mockApi(page, {
+      extra: {
+        [`GET /lessons/${L1}`]: (r) => r.fulfill({ json: { ...lesson(L1), content_md: "" } }),
+        "GET /lessons/*/documents": (r) =>
+          r.fulfill({
+            json: [
+              { source_id: "src-1", title: "Giáo trình đạo hàm", file_name: "Giáo trình đạo hàm.pdf", status: "ready", page_count: 12, guide: null },
+              { source_id: "src-2", title: "Slide chương 2", file_name: "Slide chương 2.pdf", status: "processing", page_count: 0, guide: null },
+            ],
+          }),
+        "GET /sources/*/file": (r, url) => {
+          fileRequests.push(url.search);
+          const dl = url.searchParams.get("download") === "true";
+          return r.fulfill({ json: { url: `${new URL(r.request().url()).origin}/fake-files/doc.pdf${dl ? "?dl=1" : ""}` } });
+        },
+      },
+    });
+    await page.goto(`/learn/giai-tich-1/${L1}`);
+    const section = page.getByRole("region", { name: "Tài liệu của bài" });
+    await expect(section.getByText("Giáo trình đạo hàm")).toBeVisible();
+    await expect(section.getByText("12 trang")).toBeVisible();
+    await expect(section.getByText(/AI đang đọc tài liệu, bạn vẫn xem được ngay/)).toBeVisible();
+    await expect(page.getByText("Bài này chưa có nội dung đọc.")).toHaveCount(0);
+    await expectAccessible(page);
+    await expectNoHorizontalScroll(page);
+
+    if (isMobile) {
+      // điện thoại: mở thẻ mới thay vì nhúng
+      const popup = page.waitForEvent("popup");
+      await section.getByRole("button", { name: "Xem Slide chương 2" }).click();
+      await popup;
+    } else {
+      await section.getByRole("button", { name: "Xem Slide chương 2" }).click();
+      await expect(section.locator('iframe[title="Tài liệu: Slide chương 2"]')).toBeVisible();
+      await expect(section.getByRole("link", { name: /Mở trong thẻ mới/ })).toBeVisible();
+      await section.getByRole("button", { name: "Ẩn Slide chương 2" }).click();
+      await expect(section.locator("iframe")).toHaveCount(0);
+    }
+
+    const download = page.waitForEvent("download");
+    await section.getByRole("button", { name: "Tải xuống Giáo trình đạo hàm" }).click();
+    await download;
+    expect(fileRequests).toContain("?download=true");
+  });
+
+  test("bài không có chữ, video hay tài liệu: báo bài trống", async ({ page }) => {
+    await mockApi(page, { extra: { [`GET /lessons/${L1}`]: (r) => r.fulfill({ json: { ...lesson(L1), content_md: "" } }) } });
+    await page.goto(`/learn/giai-tich-1/${L1}`);
+    await expect(page.getByText("Bài này chưa có nội dung đọc.")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Tài liệu của bài" })).toHaveCount(0);
   });
 
   test("AI Tutor: gợi ý hỏi tiếp + lưu câu trả lời vào ghi chú", async ({ page }) => {
