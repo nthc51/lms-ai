@@ -15,6 +15,7 @@ from app.modules.enrollment.router import router as enrollment_router
 from app.modules.jobs.router import router as jobs_router
 from app.modules.materials.router import router as materials_router
 from app.modules.quiz.router import router as quiz_router
+from app.modules.studio.router import router as studio_router
 from app.modules.tutor.router import router as tutor_router
 
 
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(quiz_router)
     app.include_router(analytics_router)
     app.include_router(admin_router)
+    app.include_router(studio_router)
     return app
 
 

@@ -10,7 +10,16 @@ from app.ai.vision import get_vision
 from app.core.config import get_settings
 from app.core.storage import MinioStorage
 from app.modules.notify.mailer import SmtpMailer
-from app.worker.tasks import JOB_TIMEOUTS, ingest_pdf, quiz_gen, send_pending_emails, sweep_stale_jobs
+from app.worker.tasks import (
+    JOB_TIMEOUTS,
+    ingest_pdf,
+    notes_synth,
+    quiz_gen,
+    send_pending_emails,
+    source_guide,
+    studio_gen,
+    sweep_stale_jobs,
+)
 
 
 async def startup(ctx: dict) -> None:
@@ -30,6 +39,9 @@ class WorkerSettings:
         func(ingest_pdf, name="ingest_pdf", timeout=JOB_TIMEOUTS["ingest_pdf"]),
         func(quiz_gen, name="quiz_gen", timeout=JOB_TIMEOUTS["quiz_gen"]),
         func(send_pending_emails, name="send_pending_emails", timeout=120),
+        func(source_guide, name="source_guide", timeout=JOB_TIMEOUTS["source_guide"]),
+        func(studio_gen, name="studio_gen", timeout=JOB_TIMEOUTS["studio_gen"]),
+        func(notes_synth, name="notes_synth", timeout=JOB_TIMEOUTS["notes_synth"]),
     ]
     # 5 phút một lần: job processing quá timeout + 5 phút → failed "Worker bị gián đoạn";
     # job pending bị kẹt → enqueue lại một lần, vẫn kẹt → failed "Không đưa được job vào hàng đợi"

@@ -1037,6 +1037,241 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lessons/{lesson_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lesson Documents
+         * @description Tài liệu PDF đã xử lý xong của bài + hướng dẫn (tóm tắt, chủ đề, câu hỏi gợi ý). Quyền như xem bài học.
+         */
+        get: operations["lesson_documents_api_v1_lessons__lesson_id__documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sources/{source_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Source File
+         * @description URL ký sẵn (1 giờ) để mở file PDF; thêm #page=N để nhảy tới trang.
+         */
+        get: operations["source_file_api_v1_sources__source_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chunks/{chunk_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chunk Detail
+         * @description Toàn văn một đoạn tài liệu (xem trước nguồn [n]).
+         */
+        get: operations["chunk_detail_api_v1_chunks__chunk_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Studio Overview
+         * @description Trạng thái 5 loại tài liệu học của phạm vi (một bài, hoặc cả khóa khi không có lesson_id).
+         */
+        get: operations["studio_overview_api_v1_studio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studio/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Artifact
+         * @description Có bản còn mới thì 200 kèm artifact_id; không thì tạo bản mới, 202 kèm job_id.
+         *     409 NO_CONTENT (chưa có tài liệu), 403 khi học viên dùng force, 429 RATE_LIMITED (học viên quá 10 lần/giờ).
+         */
+        post: operations["request_artifact_api_v1_studio__kind__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studio/artifacts/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Artifact */
+        get: operations["get_artifact_api_v1_studio_artifacts__artifact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Artifact
+         * @description Chủ khóa / admin sửa nội dung; bản đã sửa được đánh dấu đã duyệt, không bị sinh lại tự động.
+         */
+        patch: operations["update_artifact_api_v1_studio_artifacts__artifact_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/studio/artifacts/{artifact_id}/cards/{card_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Review Card */
+        put: operations["review_card_api_v1_studio_artifacts__artifact_id__cards__card_no__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tutor/messages/{message_id}/followups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Followups
+         * @description 3 câu hỏi gợi ý sau một câu trả lời (sinh lần đầu rồi lưu). Lỗi AI thì trả danh sách rỗng.
+         */
+        post: operations["followups_api_v1_tutor_messages__message_id__followups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notes */
+        get: operations["list_notes_api_v1_notes_get"];
+        put?: never;
+        /** Create Note */
+        post: operations["create_note_api_v1_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes/from-message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Note From Message
+         * @description Lưu câu trả lời AI Tutor (của chính mình) thành ghi chú, giữ trích nguồn.
+         */
+        post: operations["note_from_message_api_v1_notes_from_message_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes/synthesize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Synthesize
+         * @description Gộp các ghi chú (cùng khóa) thành một đề cương: tạo ghi chú mới đang tổng hợp, job nền điền nội dung.
+         */
+        post: operations["synthesize_api_v1_notes_synthesize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Note */
+        delete: operations["delete_note_api_v1_notes__note_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Note */
+        patch: operations["update_note_api_v1_notes__note_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1238,6 +1473,59 @@ export interface components {
              */
             answered_at: string;
         };
+        /**
+         * ArtifactKind
+         * @enum {string}
+         */
+        ArtifactKind: "study_guide" | "briefing" | "faq" | "timeline" | "flashcards";
+        /** ArtifactOut */
+        ArtifactOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /** Lesson Id */
+            lesson_id: string | null;
+            kind: components["schemas"]["ArtifactKind"];
+            status: components["schemas"]["StudioStatus"];
+            /** Content Md */
+            content_md: string;
+            /** Cards */
+            cards: components["schemas"]["Card"][] | null;
+            /** Citations */
+            citations: {
+                [key: string]: unknown;
+            }[];
+            /** Error Msg */
+            error_msg: string | null;
+            /** Stale */
+            stale: boolean;
+            /** Reviewed */
+            reviewed: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Known Cards */
+            known_cards: number[];
+        };
+        /**
+         * ArtifactUpdate
+         * @description Giảng viên sửa nội dung: báo cáo sửa content_md, flashcard sửa cards. Sửa xong là bản đã duyệt.
+         */
+        ArtifactUpdate: {
+            /** Content Md */
+            content_md?: string | null;
+            /** Cards */
+            cards?: components["schemas"]["Card"][] | null;
+        };
         /** AskIn */
         AskIn: {
             /** Content */
@@ -1349,11 +1637,56 @@ export interface components {
             /** Message */
             message: string | null;
         };
+        /** Card */
+        Card: {
+            /** Front */
+            front: string;
+            /** Back */
+            back: string;
+            /** Sources */
+            sources?: number[];
+        };
+        /** CardReviewIn */
+        CardReviewIn: {
+            /** Known */
+            known: boolean;
+        };
         /**
          * ChatRole
          * @enum {string}
          */
         ChatRole: "user" | "assistant";
+        /**
+         * ChunkOut
+         * @description Toàn văn một đoạn tài liệu, để xem trước nguồn [n] (S5).
+         */
+        ChunkOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /**
+             * Lesson Id
+             * Format: uuid
+             */
+            lesson_id: string;
+            /** Lesson Title */
+            lesson_title: string;
+            /** Heading Path */
+            heading_path: string;
+            /** Page No */
+            page_no: number | null;
+            /** Start Sec */
+            start_sec: number | null;
+            /** Content */
+            content: string;
+        };
         /** Citation */
         Citation: {
             /** N */
@@ -1537,6 +1870,22 @@ export interface components {
              */
             hard: number;
         };
+        /**
+         * DocumentOut
+         * @description Một tài liệu PDF đã xử lý xong của bài, kèm hướng dẫn (S1). guide=None: chưa có (đang chờ sinh).
+         */
+        DocumentOut: {
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Title */
+            title: string;
+            /** Page Count */
+            page_count: number;
+            guide: components["schemas"]["GuideOut"] | null;
+        };
         /** EnrollmentOut */
         EnrollmentOut: {
             /**
@@ -1560,6 +1909,11 @@ export interface components {
             /** Value */
             value: (1 | -1) | null;
         };
+        /** FileUrlOut */
+        FileUrlOut: {
+            /** Url */
+            url: string;
+        };
         /** FinalAnswer */
         FinalAnswer: {
             /**
@@ -1569,6 +1923,23 @@ export interface components {
             question_id: string;
             /** Selected Option Id */
             selected_option_id: string;
+        };
+        /** FollowupsOut */
+        FollowupsOut: {
+            /** Questions */
+            questions: string[];
+        };
+        /** GuideOut */
+        GuideOut: {
+            status: components["schemas"]["StudioStatus"];
+            /** Title */
+            title: string;
+            /** Summary */
+            summary: string;
+            /** Topics */
+            topics: string[];
+            /** Questions */
+            questions: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1784,6 +2155,105 @@ export interface components {
             page: number;
             /** Size */
             size: number;
+        };
+        /** NoteFromMessageIn */
+        NoteFromMessageIn: {
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+        };
+        /** NoteIn */
+        NoteIn: {
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /** Lesson Id */
+            lesson_id?: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Content Md
+             * @default
+             */
+            content_md: string;
+            /** Citations */
+            citations?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** NoteOut */
+        NoteOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /** Lesson Id */
+            lesson_id: string | null;
+            /** Title */
+            title: string;
+            /** Content Md */
+            content_md: string;
+            /** Citations */
+            citations: {
+                [key: string]: unknown;
+            }[];
+            status: components["schemas"]["StudioStatus"];
+            /** From Message Id */
+            from_message_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** NotePage */
+        NotePage: {
+            /** Items */
+            items: components["schemas"]["NoteOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /** NoteSynthOut */
+        NoteSynthOut: {
+            note: components["schemas"]["NoteOut"];
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+        };
+        /** NoteUpdate */
+        NoteUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Content Md */
+            content_md?: string | null;
+        };
+        /** NotesSynthesizeIn */
+        NotesSynthesizeIn: {
+            /** Note Ids */
+            note_ids: string[];
+            /** Title */
+            title?: string | null;
         };
         /** OptionIn */
         OptionIn: {
@@ -2285,6 +2755,67 @@ export interface components {
          * @enum {string}
          */
         SourceType: "pdf" | "video";
+        /** StudioItem */
+        StudioItem: {
+            kind: components["schemas"]["ArtifactKind"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "none" | "generating" | "ready" | "failed";
+            /** Artifact Id */
+            artifact_id: string | null;
+            /** Job Id */
+            job_id: string | null;
+            /** Error */
+            error: string | null;
+            /** Stale */
+            stale: boolean;
+            /** Reviewed */
+            reviewed: boolean;
+            /** Created At */
+            created_at: string | null;
+        };
+        /** StudioOverview */
+        StudioOverview: {
+            /** Has Content */
+            has_content: boolean;
+            /** Can Regenerate */
+            can_regenerate: boolean;
+            /** Items */
+            items: components["schemas"]["StudioItem"][];
+        };
+        /** StudioRequestIn */
+        StudioRequestIn: {
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /** Lesson Id */
+            lesson_id?: string | null;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+        };
+        /** StudioRequestOut */
+        StudioRequestOut: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            status: components["schemas"]["StudioStatus"];
+            /** Job Id */
+            job_id: string | null;
+        };
+        /**
+         * StudioStatus
+         * @enum {string}
+         */
+        StudioStatus: "generating" | "ready" | "failed";
         /** SubmitIn */
         SubmitIn: {
             /** Final Answers */
@@ -4629,6 +5160,494 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TutorFeedbackPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lesson_documents_api_v1_lessons__lesson_id__documents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_file_api_v1_sources__source_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileUrlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chunk_detail_api_v1_chunks__chunk_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chunk_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChunkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    studio_overview_api_v1_studio_get: {
+        parameters: {
+            query: {
+                course_id: string;
+                lesson_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioOverview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_artifact_api_v1_studio__kind__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["ArtifactKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudioRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifact_api_v1_studio_artifacts__artifact_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_artifact_api_v1_studio_artifacts__artifact_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtifactUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_card_api_v1_studio_artifacts__artifact_id__cards__card_no__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+                card_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followups_api_v1_tutor_messages__message_id__followups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_notes_get: {
+        parameters: {
+            query?: {
+                course_id?: string | null;
+                lesson_id?: string | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_note_api_v1_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    note_from_message_api_v1_notes_from_message_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteFromMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    synthesize_api_v1_notes_synthesize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotesSynthesizeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteSynthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_note_api_v1_notes__note_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_note_api_v1_notes__note_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
                 };
             };
             /** @description Validation Error */

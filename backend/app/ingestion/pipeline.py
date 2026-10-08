@@ -72,6 +72,8 @@ async def ingest_pdf_source(
     max_vision_pages: int | None = None,
     session_factory: async_sessionmaker = SessionLocal,
     job_id: uuid.UUID | None = None,
+    chunk_max_tokens: int | None = None,
+    chunk_overlap_tokens: int | None = None,
 ) -> int:
     """Xử lý một source PDF. Trả về số chunk đã ghi.
 
@@ -80,7 +82,8 @@ async def ingest_pdf_source(
     processing (sweeper đã đánh dấu failed) thì bỏ kết quả, trả về 0.
 
     Dùng các DB session ngắn: không giữ connection trong lúc tải file, gọi vision và embedding (có thể mất vài phút).
-    max_vision_pages mặc định lấy từ VISION_MAX_PAGES_PER_DOC.
+    max_vision_pages mặc định lấy từ VISION_MAX_PAGES_PER_DOC; kích thước đoạn mặc định lấy từ CHUNK_MAX_TOKENS /
+    CHUNK_OVERLAP_TOKENS (benchmark truyền giá trị riêng để so cấu hình).
     """
     if max_vision_pages is None:
         max_vision_pages = get_settings().vision_max_pages_per_doc
@@ -105,7 +108,12 @@ async def ingest_pdf_source(
     try:
         pdf_bytes = await storage.read_all(storage_key)
         pages = await extract_pages(pdf_bytes, vision, max_vision_pages=max_vision_pages)
-        drafts = chunk_pages(pages)
+        cfg = get_settings()
+        drafts = chunk_pages(
+            pages,
+            max_tokens=chunk_max_tokens or cfg.chunk_max_tokens,
+            overlap_tokens=cfg.chunk_overlap_tokens if chunk_overlap_tokens is None else chunk_overlap_tokens,
+        )
         if not drafts:
             raise ValueError("Tài liệu không có nội dung đọc được")
         vectors = await embedder.embed_documents([d.content for d in drafts])

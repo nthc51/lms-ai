@@ -14,15 +14,22 @@ from app.core.time import utcnow
 from app.ingestion.pipeline import error_text, ingest_pdf_source
 from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.queue import ArqQueue, JobQueue
-from app.modules.jobs.service import finish_job
+from app.modules.jobs.service import create_and_enqueue, finish_job
 from app.modules.materials.models import Source, SourceStatus
 from app.modules.quiz.generation import QuizGenerationError, generate_questions_for_lesson
 from app.modules.quiz.schemas import QuizGenerateIn
+from app.modules.studio.jobs import run_notes_synth, run_source_guide, run_studio
 
 logger = logging.getLogger(__name__)
 
 # job_timeout riêng cho từng loại job (spec K4), đơn vị giây. arq hủy job chạy quá thời gian này.
-JOB_TIMEOUTS: dict[str, int] = {"ingest_pdf": 600, "quiz_gen": 900}
+JOB_TIMEOUTS: dict[str, int] = {
+    "ingest_pdf": 600,
+    "quiz_gen": 900,
+    "source_guide": 300,
+    "studio_gen": 900,
+    "notes_synth": 300,
+}
 # Handler bị hủy sớm hơn job_timeout của arq một khoảng này, để run_job kịp ghi job + source failed
 # ngay (arq hủy ở đúng job_timeout thì không còn cơ hội ghi, phải đợi sweeper).
 JOB_TIMEOUT_MARGIN_S = 30
@@ -123,6 +130,59 @@ async def ingest_pdf(ctx: dict, job_id: str) -> None:
         )
 
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("ingest_pdf"))
+    await _queue_source_guide(ctx, uuid.UUID(job_id), session_factory)
+
+
+async def _queue_source_guide(
+    ctx: dict, ingest_job_id: uuid.UUID, session_factory: async_sessionmaker
+) -> None:
+    """Xử lý PDF xong (job done) thì xếp hàng job hướng dẫn tài liệu (AI Studio S1). Lỗi chỉ ghi log: hướng dẫn
+    là phần phụ, không làm hỏng việc xử lý tài liệu."""
+    queue = ctx.get("queue") or (ArqQueue(pool=ctx["redis"]) if "redis" in ctx else None)
+    if queue is None:  # test chạy job ingest đơn lẻ, không có hàng đợi
+        return
+    try:
+        async with session_factory() as db:
+            job = await db.get(Job, ingest_job_id)
+            if job is None or job.status != JobStatus.done:
+                return
+            await create_and_enqueue(db, queue, "source_guide", job.ref_id, created_by=job.created_by)
+    except Exception:
+        logger.exception("Không xếp hàng được job hướng dẫn tài liệu cho job %s", ingest_job_id)
+
+
+async def source_guide(ctx: dict, job_id: str) -> None:
+    """Hướng dẫn tài liệu: ref_id = sources.id."""
+    session_factory = ctx.get("session_factory", SessionLocal)
+
+    async def handler(source_id: uuid.UUID) -> None:
+        await run_source_guide(source_id, ctx["llm"], get_settings(), session_factory)
+
+    await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("source_guide"))
+
+
+async def studio_gen(ctx: dict, job_id: str) -> None:
+    """Báo cáo / flashcard: ref_id = study_artifacts.id."""
+    session_factory = ctx.get("session_factory", SessionLocal)
+
+    async def handler(artifact_id: uuid.UUID) -> None:
+        await run_studio(artifact_id, ctx["llm"], get_settings(), session_factory)
+
+    await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("studio_gen"))
+
+
+async def notes_synth(ctx: dict, job_id: str) -> None:
+    """Tổng hợp ghi chú: ref_id = notes.id (ghi chú đích), payload.note_ids = ghi chú nguồn theo thứ tự."""
+    session_factory = ctx.get("session_factory", SessionLocal)
+    jid = uuid.UUID(job_id)
+
+    async def handler(note_id: uuid.UUID) -> None:
+        async with session_factory() as db:
+            payload = await db.scalar(select(Job.payload).where(Job.id == jid)) or {}
+        ids = [uuid.UUID(i) for i in payload.get("note_ids", [])]
+        await run_notes_synth(note_id, ids, ctx["llm"], get_settings(), session_factory)
+
+    await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("notes_synth"))
 
 
 async def quiz_gen(ctx: dict, job_id: str) -> None:
