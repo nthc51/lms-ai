@@ -2878,7 +2878,7 @@ E2E: e2e/auth-email.spec.ts (mới), e2e/admin.spec.ts (thêm 2 kịch bản), e
 - Modify: `backend/app/core/config.py`, `backend/app/modules/auth/models.py`, `backend/app/models_registry.py`, `backend/app/worker/tasks.py`, `backend/app/worker/settings.py`, `backend/.env.example`, `docker-compose.yml`
 - Create: `backend/app/modules/notify/__init__.py` (rỗng), `models.py`, `templates.py`, `mailer.py`, `outbox.py`, `backend/alembic/versions/c5d2e8f1a734_email.py`
 
-- [ ] **Bước 1: Cấu hình** (`app/core/config.py`, thêm ngay sau `tutor_prestream_deadline_s`)
+- [x] **Bước 1: Cấu hình** (`app/core/config.py`, thêm ngay sau `tutor_prestream_deadline_s`)
 
 ```python
     # Địa chỉ frontend, dùng để tạo link trong email (xác nhận email...). Không có dấu / ở cuối.
@@ -2917,7 +2917,7 @@ MAIL_FROM="LMS-AI <no-reply@example.com>"
 MAIL_MAX_ATTEMPTS=5
 ```
 
-- [ ] **Bước 2: Model** (`app/modules/notify/models.py`)
+- [x] **Bước 2: Model** (`app/modules/notify/models.py`)
 
 ```python
 import enum
@@ -2990,7 +2990,7 @@ class EmailToken(IdMixin, TimestampMixin, Base):
 from app.modules.notify import models as notify_models  # noqa: F401
 ```
 
-- [ ] **Bước 3: Nội dung email** (`app/modules/notify/templates.py`)
+- [x] **Bước 3: Nội dung email** (`app/modules/notify/templates.py`)
 
 ```python
 """Nội dung email. Mỗi hàm trả (subject, text, html). HTML tối giản, inline style để hiện ổn trong Gmail."""
@@ -3122,7 +3122,7 @@ def new_pending_teacher(teacher_name: str, teacher_email: str, url: str) -> Mail
     return subject, text, html
 ```
 
-- [ ] **Bước 4: Gửi SMTP** (`app/modules/notify/mailer.py`)
+- [x] **Bước 4: Gửi SMTP** (`app/modules/notify/mailer.py`)
 
 ```python
 import asyncio
@@ -3164,7 +3164,7 @@ class SmtpMailer:
         await asyncio.to_thread(self._send_sync, msg)
 ```
 
-- [ ] **Bước 5: Outbox** (`app/modules/notify/outbox.py`)
+- [x] **Bước 5: Outbox** (`app/modules/notify/outbox.py`)
 
 ```python
 import logging
@@ -3252,7 +3252,7 @@ async def send_pending(session_factory: async_sessionmaker, mailer: Mailer, limi
     return sent
 ```
 
-- [ ] **Bước 6: Worker**
+- [x] **Bước 6: Worker**
 
 Cuối `app/worker/tasks.py`:
 
@@ -3287,7 +3287,7 @@ async def send_pending_emails(ctx: dict) -> int:
           ),
   ```
 
-- [ ] **Bước 7: Migration** (`alembic/versions/c5d2e8f1a734_email.py`)
+- [x] **Bước 7: Migration** (`alembic/versions/c5d2e8f1a734_email.py`)
 
 ```python
 """email: users.email_verified_at, email_tokens, email_outbox
@@ -3372,7 +3372,7 @@ def downgrade() -> None:
     op.drop_column("users", "email_verified_at")
 ```
 
-- [ ] **Bước 8: Mailpit** (`docker-compose.yml`)
+- [x] **Bước 8: Mailpit** (`docker-compose.yml`)
 
 Thêm service (đặt sau `minio`). Tag ghim theo bản mới nhất ở <https://github.com/axllent/mailpit/releases> lúc làm, **không dùng `latest`**:
 
@@ -3393,7 +3393,7 @@ SMTP_PORT=1025
 APP_BASE_URL=http://localhost:3000
 ```
 
-- [ ] **Bước 9: Kiểm tra và commit**
+- [x] **Bước 9: Kiểm tra và commit**
 
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run pytest -q
