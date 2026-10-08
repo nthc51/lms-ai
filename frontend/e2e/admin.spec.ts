@@ -183,12 +183,14 @@ test.describe("quản trị viên: phản hồi AI và xuất CSV", () => {
 
   test("xuất CSV theo tab đang xem", async ({ page }) => {
     let query = "";
+    let auth: string | undefined;
     await mockApi(page, {
       user: admin,
       extra: {
         "GET /admin/users": (r) => r.fulfill({ json: pageOf([studentRow]) }),
         "GET /admin/users/export": (r, url) => {
           query = url.search;
+          auth = r.request().headers()["authorization"];
           return r.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "﻿Họ tên,Email\nNguyễn Văn An,an@sv.vn\n" });
         },
       },
@@ -198,5 +200,6 @@ test.describe("quản trị viên: phản hồi AI và xuất CSV", () => {
     await page.getByRole("button", { name: "Xuất CSV" }).click();
     expect((await download).suggestedFilename()).toMatch(/^nguoi-dung-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(query).toContain("role=student");
+    expect(auth).toMatch(/^Bearer S+/); // tải CSV qua API client (có token), không phải link trần
   });
 });
