@@ -6047,7 +6047,7 @@ git add frontend && git commit -m "feat(web): study assistant tabs: studio, docu
 
 Thanh menu học viên **giữ nguyên 3 mục** (test `nav-items` kiểm). Lối vào Sổ ghi chú nằm ở menu tài khoản, trang Tài khoản và tab "Ghi chú" trong bài học.
 
-- [ ] **Bước 1: Trang Sổ ghi chú** (`src/app/(main)/notes/page.tsx`)
+- [x] **Bước 1: Trang Sổ ghi chú** (`src/app/(main)/notes/page.tsx`)
 
 ```tsx
 "use client";
@@ -6219,7 +6219,7 @@ function NoteEditor({ note, onClose }: { note: Note; onClose: () => void }) {
 }
 ```
 
-- [ ] **Bước 2: Lối vào**
+- [x] **Bước 2: Lối vào**
 
 ```diff
 --- a/src/app/(main)/account/page.tsx
@@ -6274,7 +6274,7 @@ function NoteEditor({ note, onClose }: { note: Note; onClose: () => void }) {
                await logout();
 ```
 
-- [ ] **Bước 3: Bảng "Token AI 7 ngày"** (`overview.tsx`, `admin/page.tsx`). Bảng cuộn ngang được (`tabIndex=0`, `role="region"`) để đạt axe trên điện thoại.
+- [x] **Bước 3: Bảng "Token AI 7 ngày"** (`overview.tsx`, `admin/page.tsx`). Bảng cuộn ngang được (`tabIndex=0`, `role="region"`) để đạt axe trên điện thoại.
 
 ```diff
 --- a/src/components/admin/overview.tsx
@@ -6369,7 +6369,7 @@ function NoteEditor({ note, onClose }: { note: Note; onClose: () => void }) {
  
 ```
 
-- [ ] **Bước 4:** `npx tsc --noEmit && npx eslint src` → sạch. Commit:
+- [x] **Bước 4:** `npx tsc --noEmit && npx eslint src` → sạch. Commit:
 
 ```bash
 git add frontend && git commit -m "feat(web): notes page, account links, admin AI token table"
