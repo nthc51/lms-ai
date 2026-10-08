@@ -38,13 +38,13 @@ function TeacherReviewNotice({ user }: { user: User }) {
   const rejected = user.teacher_status === "rejected";
   const Icon = rejected ? XCircle : Clock;
   return (
-    <div role="status" className="mb-6 flex gap-3 rounded-lg border p-4">
+    <section aria-label="Trạng thái tài khoản giảng viên" className="mb-6 flex gap-3 rounded-lg border p-4">
       <Icon className={rejected ? "mt-0.5 size-5 shrink-0 text-destructive" : "mt-0.5 size-5 shrink-0 text-accent"} aria-hidden />
       <div>
         <p className="font-medium">{rejected ? "Yêu cầu giảng dạy chưa được chấp nhận" : "Tài khoản giảng viên đang chờ duyệt"}</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {rejected
-            ? `Lý do: ${user.review_note ?? "không ghi"}. Bổ sung thông tin rồi gửi lại yêu cầu để được xem xét lại.`
+            ? `Lý do: ${user.review_note ?? "không ghi"}. Bạn có thể gửi lại yêu cầu để được xem xét lại.`
             : "Quản trị viên sẽ duyệt sớm và báo kết quả qua email. Trong lúc chờ, bạn vẫn xem được các khóa học đã xuất bản."}
         </p>
         {rejected ? (
@@ -53,7 +53,7 @@ function TeacherReviewNotice({ user }: { user: User }) {
           </Button>
         ) : null}
       </div>
-    </div>
+    </section>
   );
 }
 

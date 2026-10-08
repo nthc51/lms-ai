@@ -81,16 +81,26 @@ export async function downloadUsersCsv(f: Omit<UserFilter, "page">) {
   const url = URL.createObjectURL(blob as Blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `nguoi-dung-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `nguoi-dung-${isoDateVN(new Date())}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  // Thu hồi ngay sau click làm hỏng tải xuống trên Safari / Firefox cũ: đợi một nhịp.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function useAdminMutation<A>(fn: (a: A) => Promise<unknown>) {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries({ queryKey: ADMIN }) });
+  return useMutation({
+    mutationFn: fn,
+    // Ẩn / hiện khóa cũng đổi danh mục công khai và trang chi tiết khóa đang cache.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ADMIN }),
+        qc.invalidateQueries({ queryKey: ["catalog"] }),
+        qc.invalidateQueries({ queryKey: ["course"] }),
+      ]),
+  });
 }
 
 const uid = (id: string) => ({ params: { path: { user_id: id } } });
@@ -126,4 +136,6 @@ export const actionLabel = (a: string) => ACTION_LABEL[a] ?? a;
 const dateFmt = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" });
 const timeFmt = new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh" });
 export const fmtDate = (iso: string) => dateFmt.format(new Date(iso));
+/** yyyy-mm-dd theo giờ Việt Nam (toISOString là giờ UTC: 0h–7h sáng sẽ ra ngày hôm trước). */
+export const isoDateVN = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(d);
 export const fmtDateTime = (iso: string) => timeFmt.format(new Date(iso));

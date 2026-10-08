@@ -6,6 +6,7 @@ import { EmptyState, ErrorState, PageHeader } from "@/components/app/states";
 import { CourseTable } from "@/components/admin/course-table";
 import { FilterTabs } from "@/components/admin/filter-tabs";
 import { Pagination } from "@/components/course/course-card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/misc";
 import { type CourseFilter, useAdminCourses } from "@/lib/admin-queries";
@@ -46,7 +47,19 @@ export default function AdminCoursesPage() {
       ) : courses.isError ? (
         <ErrorState error={courses.error} onRetry={() => courses.refetch()} />
       ) : courses.data.items.length === 0 ? (
-        <EmptyState icon={Library} title={query ? `Không tìm thấy khóa nào cho “${query}”.` : "Không có khóa học nào."} />
+        page > 1 ? (
+          <EmptyState
+            icon={Library}
+            title="Trang này không còn khóa nào."
+            action={
+              <Button variant="outline" onClick={() => setPaging({ key, page: 1 })}>
+                Về trang đầu
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState icon={Library} title={query ? `Không tìm thấy khóa nào cho “${query}”.` : "Không có khóa học nào."} />
+        )
       ) : (
         <div aria-busy={courses.isFetching}>
           <CourseTable courses={courses.data.items} />

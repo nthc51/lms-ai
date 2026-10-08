@@ -41,6 +41,17 @@ export function UserTable({ users, caption }: { users: AdminUser[]; caption: str
     }
   }
 
+  // Chặn bấm đúp: trạng thái "đang xử lý" của mutation chỉ có sau lần render kế tiếp, cú bấm thứ hai
+  // (cùng nhịp) vẫn lọt qua. Ref đổi ngay lập tức.
+  const busy = React.useRef(new Set<string>());
+  function once(key: string, start: () => Promise<unknown>, ok: string) {
+    if (busy.current.has(key)) return;
+    busy.current.add(key);
+    run(start(), ok)
+      .catch(() => {})
+      .finally(() => busy.current.delete(key));
+  }
+
   return (
     <>
       <div className="overflow-x-auto rounded-lg border bg-surface" tabIndex={0} role="region" aria-label={caption}>
@@ -62,7 +73,8 @@ export function UserTable({ users, caption }: { users: AdminUser[]; caption: str
                 <td className="px-4 py-3">
                   <p className="font-medium">{u.full_name}</p>
                   <p className="text-muted-foreground">{u.email}</p>
-                  {u.review_note ? <p className="mt-1 text-xs text-muted-foreground">Lý do: {u.review_note}</p> : null}
+                  {u.review_note ? <p className="mt-1 text-xs text-muted-foreground">Lý do từ chối: {u.review_note}</p> : null}
+                  {u.lock_reason ? <p className="mt-1 text-xs text-muted-foreground">Lý do khóa: {u.lock_reason}</p> : null}
                 </td>
                 <td className="px-4 py-3">{ROLE[u.role]}</td>
                 <td className="px-4 py-3">
@@ -75,7 +87,13 @@ export function UserTable({ users, caption }: { users: AdminUser[]; caption: str
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
                     {u.role === "teacher" && u.teacher_status !== "approved" && !u.locked_at ? (
-                      <Button size="sm" aria-label={`Duyệt ${u.full_name}`} onClick={() => run(mut.approve.mutateAsync(u.id), `Đã duyệt ${u.full_name}`).catch(() => {})}>
+                      <Button
+                        size="sm"
+                        aria-label={`Duyệt ${u.full_name}`}
+                        loading={mut.approve.isPending && mut.approve.variables === u.id}
+                        loadingText="Đang duyệt…"
+                        onClick={() => once(`approve:${u.id}`, () => mut.approve.mutateAsync(u.id), `Đã duyệt ${u.full_name}`)}
+                      >
                         Duyệt
                       </Button>
                     ) : null}
@@ -85,7 +103,14 @@ export function UserTable({ users, caption }: { users: AdminUser[]; caption: str
                       </Button>
                     ) : null}
                     {u.role === "admin" ? null : u.locked_at ? (
-                      <Button size="sm" variant="outline" aria-label={`Mở khóa ${u.full_name}`} onClick={() => run(mut.unlock.mutateAsync(u.id), `Đã mở khóa ${u.full_name}`).catch(() => {})}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Mở khóa ${u.full_name}`}
+                        loading={mut.unlock.isPending && mut.unlock.variables === u.id}
+                        loadingText="Đang mở…"
+                        onClick={() => once(`unlock:${u.id}`, () => mut.unlock.mutateAsync(u.id), `Đã mở khóa ${u.full_name}`)}
+                      >
                         Mở khóa
                       </Button>
                     ) : (

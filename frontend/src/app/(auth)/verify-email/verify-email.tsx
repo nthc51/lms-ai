@@ -13,6 +13,9 @@ import { resendErrorMessage, useResendVerification, useVerifyEmail } from "@/lib
 export function VerifyEmail() {
   const token = useSearchParams().get("token");
   const verify = useVerifyEmail(token);
+  // Khung chờ đổi sang kết quả: đưa focus tới tiêu đề kết quả.
+  const heading = React.useRef<HTMLHeadingElement>(null);
+  React.useEffect(() => heading.current?.focus(), [verify.status]);
 
   if (token && verify.isPending)
     return (
@@ -27,10 +30,12 @@ export function VerifyEmail() {
     return (
       <div className="text-center">
         <CheckCircle2 className="mx-auto size-10 text-success" aria-hidden />
-        <h1 className="mt-3 text-2xl font-semibold">Email đã được xác nhận</h1>
+        <h1 ref={heading} tabIndex={-1} className="mt-3 text-2xl font-semibold outline-none">
+          Email đã được xác nhận
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {teacherWaiting
-            ? "Bạn đã đăng nhập được. Tài khoản giảng viên đang chờ quản trị viên duyệt, bạn sẽ nhận email khi có kết quả."
+            ? "Bạn có thể đăng nhập. Tài khoản giảng viên đang chờ quản trị viên duyệt, bạn sẽ nhận email khi có kết quả."
             : "Tài khoản đã được kích hoạt. Bạn có thể đăng nhập ngay."}
         </p>
         <Button asChild size="lg" className="mt-6 w-full">
@@ -44,7 +49,9 @@ export function VerifyEmail() {
   return (
     <div>
       <XCircle className="mx-auto size-10 text-destructive" aria-hidden />
-      <h1 className="mt-3 text-center text-2xl font-semibold">{expired ? "Link đã hết hạn" : "Link không dùng được"}</h1>
+      <h1 ref={heading} tabIndex={-1} className="mt-3 text-center text-2xl font-semibold outline-none">
+        {expired ? "Link đã hết hạn" : "Link không dùng được"}
+      </h1>
       <p className="mt-2 text-center text-sm text-muted-foreground">
         {token ? errorMessage(verify.error) : "Thiếu mã xác nhận trong link."} Nhập email để nhận link mới.
       </p>

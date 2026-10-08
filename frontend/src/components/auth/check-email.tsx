@@ -2,14 +2,20 @@
 
 import { MailCheck } from "lucide-react";
 import Link from "next/link";
+import * as React from "react";
 import { ResendVerification } from "./resend-verification";
 
 /** Màn sau khi đăng ký: chưa đăng nhập được cho tới khi bấm link trong email. */
 export function CheckEmail({ email, teacher }: { email: string; teacher: boolean }) {
+  // Form đăng ký vừa biến mất (nút đang focus bị gỡ): đưa focus tới tiêu đề mới để trình đọc màn hình đọc.
+  const heading = React.useRef<HTMLHeadingElement>(null);
+  React.useEffect(() => heading.current?.focus(), []);
   return (
     <div className="text-center">
       <MailCheck className="mx-auto size-10 text-primary" aria-hidden />
-      <h1 className="mt-3 text-2xl font-semibold">Kiểm tra hộp thư của bạn</h1>
+      <h1 ref={heading} tabIndex={-1} className="mt-3 text-2xl font-semibold outline-none">
+        Kiểm tra hộp thư của bạn
+      </h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Chúng tôi đã gửi link xác nhận tới <span className="font-medium text-foreground">{email}</span>. Bấm link trong
         email để kích hoạt tài khoản (link có hiệu lực 24 giờ).

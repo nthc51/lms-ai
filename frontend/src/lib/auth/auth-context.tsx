@@ -65,7 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (status === "loading" || lastUserId.current === userId) return;
     lastUserId.current = userId;
-    void qc.resetQueries();
+    // Trừ truy vấn xác nhận email: token chỉ dùng một lần, gọi lại sẽ báo lỗi dù vừa xác nhận thành công.
+    void qc.resetQueries({ predicate: (q) => q.queryKey[0] !== "verify-email" });
   }, [status, userId, qc]);
 
   const login = React.useCallback(

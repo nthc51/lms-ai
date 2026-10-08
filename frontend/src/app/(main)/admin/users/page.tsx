@@ -87,7 +87,20 @@ function UsersView() {
       ) : users.isError ? (
         <ErrorState error={users.error} onRetry={() => users.refetch()} />
       ) : users.data.items.length === 0 ? (
-        <EmptyState icon={Users} title={query ? `Không tìm thấy ai cho “${query}”.` : tab === "pending" ? "Không có giảng viên nào đang chờ duyệt." : "Chưa có người dùng nào."} />
+        page > 1 ? (
+          // Vừa xử lý hết dòng của trang cuối (vd. duyệt người cuối ở trang 2): đưa về trang đầu.
+          <EmptyState
+            icon={Users}
+            title="Trang này không còn ai."
+            action={
+              <Button variant="outline" onClick={() => setPaging({ key, page: 1 })}>
+                Về trang đầu
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState icon={Users} title={query ? `Không tìm thấy ai cho “${query}”.` : tab === "pending" ? "Không có giảng viên nào đang chờ duyệt." : "Chưa có người dùng nào."} />
+        )
       ) : (
         <div aria-busy={users.isFetching}>
           <UserTable users={users.data.items} caption={`Danh sách người dùng: ${TABS.find((t) => t.value === tab)!.label}`} />

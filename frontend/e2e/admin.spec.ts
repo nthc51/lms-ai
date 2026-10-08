@@ -152,7 +152,7 @@ test.describe("phân quyền và thông báo cho giảng viên", () => {
     const hiddenCourse = courseDetail({ status: "archived", is_owner: true, hidden_reason: "Sao chép giáo trình" });
     await mockApi(page, { user: teacher, extra: { "GET /courses/giai-tich-1": (r) => r.fulfill({ json: hiddenCourse }) } });
     await page.goto("/teach/giai-tich-1");
-    await expect(page.getByRole("alert").filter({ hasText: "Quản trị viên đã ẩn khóa học này" })).toContainText("Sao chép giáo trình");
+    await expect(page.getByRole("region", { name: "Khóa học đã bị ẩn" })).toContainText("Sao chép giáo trình");
     await expect(page.getByText("Đã bị ẩn")).toBeVisible();
     await expect(page.getByRole("button", { name: "Xuất bản" })).toHaveCount(0);
     await expectAccessible(page);
@@ -200,6 +200,6 @@ test.describe("quản trị viên: phản hồi AI và xuất CSV", () => {
     await page.getByRole("button", { name: "Xuất CSV" }).click();
     expect((await download).suggestedFilename()).toMatch(/^nguoi-dung-\d{4}-\d{2}-\d{2}\.csv$/);
     expect(query).toContain("role=student");
-    expect(auth).toMatch(/^Bearer S+/); // tải CSV qua API client (có token), không phải link trần
+    expect(auth).toMatch(/^Bearer \S+/); // tải CSV qua API client (có token), không phải link trần
   });
 });

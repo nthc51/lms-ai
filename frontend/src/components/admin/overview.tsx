@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, BookOpen, ClipboardCheck, GraduationCap, type LucideIcon, MessageCircleQuestion, ThumbsDown, UserCheck, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, Lock, ClipboardCheck, GraduationCap, type LucideIcon, MessageCircleQuestion, ThumbsDown, UserCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { type AdminStats } from "@/lib/admin-queries";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,8 @@ export function StatTiles({ s }: { s: AdminStats }) {
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Tile icon={UserCheck} label="Giảng viên chờ duyệt" value={s.pending_teachers} href="/admin/users?tab=pending" highlight={s.pending_teachers > 0} sub={s.pending_teachers > 0 ? "Bấm để xử lý" : "Không có ai đang chờ"} />
       <Tile icon={Users} label="Học viên" value={s.students} sub={`${s.enrollments.toLocaleString("vi-VN")} lượt đăng ký khóa`} href="/admin/users?tab=student" />
-      <Tile icon={GraduationCap} label="Giảng viên" value={s.teachers} sub={s.locked_users ? `${s.locked_users} tài khoản đang bị khóa` : undefined} href="/admin/users?tab=teacher" />
+      <Tile icon={GraduationCap} label="Giảng viên" value={s.teachers} href="/admin/users?tab=teacher" />
+      <Tile icon={Lock} label="Tài khoản bị khóa" value={s.locked_users} href="/admin/users?tab=locked" />
       <Tile icon={BookOpen} label="Khóa đã xuất bản" value={s.courses_published} sub={`${s.courses_draft} nháp · ${s.courses_hidden} đã ẩn`} href="/admin/courses" />
       <Tile icon={MessageCircleQuestion} label="Câu hỏi AI Tutor (7 ngày)" value={s.tutor_questions_7d} />
       <Tile icon={ClipboardCheck} label="Bài quiz đã nộp (7 ngày)" value={s.quiz_submissions_7d} />
@@ -46,6 +47,7 @@ const dayFmt = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digi
 
 /** Cột đăng ký mới 14 ngày. Một chuỗi số liệu nên không cần chú thích; có bảng ẩn cho trình đọc màn hình. */
 export function SignupChart({ days }: { days: AdminStats["signups_14d"] }) {
+  if (days.length === 0) return null;
   const max = Math.max(1, ...days.map((d) => d.count));
   const total = days.reduce((a, d) => a + d.count, 0);
   const label = (d: { day: string }) => dayFmt.format(new Date(`${d.day}T00:00:00Z`));

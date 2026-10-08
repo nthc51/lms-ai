@@ -9,6 +9,8 @@ export const pendingTeacher = {
   teacher_status: "pending",
   locked_at: null,
   review_note: null,
+  lock_reason: null,
+  email_verified: true,
   created_at: "2026-10-05T02:00:00Z",
   course_count: 0,
   enrollment_count: 0,

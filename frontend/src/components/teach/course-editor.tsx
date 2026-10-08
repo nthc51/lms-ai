@@ -85,7 +85,7 @@ function Editor({ course }: { course: CourseDetail }) {
       </div>
 
       {course.hidden_reason ? (
-        <div role="alert" className="mb-6 flex gap-3 rounded-lg border border-destructive/50 p-4">
+        <section aria-label="Khóa học đã bị ẩn" className="mb-6 flex gap-3 rounded-lg border border-destructive/50 p-4">
           <EyeOff className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
           <div>
             <p className="font-medium">Quản trị viên đã ẩn khóa học này</p>
@@ -93,7 +93,7 @@ function Editor({ course }: { course: CourseDetail }) {
               Lý do: {course.hidden_reason}. Học viên tạm thời không vào học được. Hãy chỉnh sửa nội dung rồi liên hệ quản trị viên để được hiện lại.
             </p>
           </div>
-        </div>
+        </section>
       ) : null}
 
       <p className="mb-6 rounded-md border border-dashed p-3 text-sm text-muted-foreground md:hidden">
