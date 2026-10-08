@@ -1,5 +1,6 @@
 import asyncio
 import smtplib
+import ssl
 from email.message import EmailMessage
 from email.utils import make_msgid
 from typing import Protocol
@@ -21,7 +22,8 @@ class SmtpMailer:
         s = self.s
         with smtplib.SMTP(s.smtp_host, s.smtp_port, timeout=s.smtp_timeout_s) as smtp:
             if s.smtp_starttls:
-                smtp.starttls()
+                # kiểm chứng chỉ server trước khi gửi mật khẩu
+                smtp.starttls(context=ssl.create_default_context())
             if s.smtp_user:
                 smtp.login(s.smtp_user, s.smtp_password)
             smtp.send_message(msg)
