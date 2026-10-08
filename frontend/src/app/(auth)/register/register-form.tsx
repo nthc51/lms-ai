@@ -2,15 +2,14 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import * as React from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
+import { CheckEmail } from "@/components/auth/check-email";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import { useAuth } from "@/lib/auth/auth-context";
-import { safeNext } from "@/lib/auth/safe-next";
 import { cn } from "@/lib/utils";
 
 const schema = z.object({
@@ -22,9 +21,9 @@ const schema = z.object({
 type Values = z.infer<typeof schema>;
 
 export function RegisterForm() {
-  const { register: signup, login } = useAuth();
-  const router = useRouter();
-  const params = useSearchParams();
+  const { register: signup } = useAuth();
+  // Đăng ký xong chưa đăng nhập được: phải bấm link xác nhận trong email trước.
+  const [sent, setSent] = React.useState<{ email: string; teacher: boolean } | null>(null);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { full_name: "", email: "", password: "", role: "student" },
@@ -35,9 +34,7 @@ export function RegisterForm() {
   async function onSubmit(values: Values) {
     try {
       await signup(values);
-      const user = await login(values.email, values.password);
-      if (user.role === "teacher") toast("Tài khoản giảng viên cần quản trị viên duyệt trước khi tạo khóa học.");
-      router.replace(safeNext(params.get("next"), user.role === "student" ? "/explore" : "/teach"));
+      setSent({ email: values.email.trim().toLowerCase(), teacher: values.role === "teacher" });
     } catch (err) {
       if (err instanceof ApiError && err.code === "EMAIL_TAKEN") {
         form.setError("email", { message: err.message }, { shouldFocus: true });
@@ -46,6 +43,8 @@ export function RegisterForm() {
       }
     }
   }
+
+  if (sent) return <CheckEmail email={sent.email} teacher={sent.teacher} />;
 
   return (
     <>

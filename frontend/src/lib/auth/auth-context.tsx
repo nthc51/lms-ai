@@ -17,6 +17,8 @@ type AuthValue = {
   login: (email: string, password: string) => Promise<User>;
   register: (data: components["schemas"]["RegisterIn"]) => Promise<void>;
   logout: () => Promise<void>;
+  /** Tải lại /me sau khi trạng thái tài khoản đổi (vd. gửi lại yêu cầu duyệt giảng viên). */
+  reloadUser: () => Promise<User>;
 };
 
 const AuthContext = React.createContext<AuthValue | null>(null);
@@ -91,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [qc]);
 
   const value = React.useMemo(
-    () => ({ user, userId, status, login, register, logout }),
-    [user, userId, status, login, register, logout],
+    () => ({ user, userId, status, login, register, logout, reloadUser: loadMe }),
+    [user, userId, status, login, register, logout, loadMe],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
