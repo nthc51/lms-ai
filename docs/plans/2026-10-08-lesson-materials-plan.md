@@ -561,9 +561,9 @@ git add backend && git commit -m "feat(api): lesson PDFs visible right after upl
 - Modify: `frontend/src/lib/api/upload.ts`, `frontend/src/lib/studio/queries.ts`, `frontend/src/components/lesson/lesson-view.tsx`, `frontend/src/components/studio/documents-panel.tsx`, `frontend/src/components/teach/source-list.tsx`
 - Modify: `frontend/src/lib/api/schema.d.ts`, `frontend/openapi.json` (sinh lại)
 
-- [ ] **Bước 1: Sinh lại kiểu API** (backend đã chạy bản Task 1): `cd frontend`, rồi `npm run gen:api`. Kiểm tra `schema.d.ts` có `file_name` và `filename`.
+- [x] **Bước 1: Sinh lại kiểu API** (backend đã chạy bản Task 1): `cd frontend`, rồi `npm run gen:api`. Kiểm tra `schema.d.ts` có `file_name` và `filename`.
 
-- [ ] **Bước 2: Gửi tên file khi tải lên** (`src/lib/api/upload.ts`)
+- [x] **Bước 2: Gửi tên file khi tải lên** (`src/lib/api/upload.ts`)
 
 ```diff
 --- a/src/lib/api/upload.ts
@@ -579,7 +579,7 @@ git add backend && git commit -m "feat(api): lesson PDFs visible right after upl
    await unwrap(api.POST("/api/v1/uploads/{asset_id}/complete", { params: { path: { asset_id } } }));
 ```
 
-- [ ] **Bước 3: Truy vấn** (`src/lib/studio/queries.ts`): hỏi lại khi còn tài liệu đang xử lý; thêm `sourceFileUrl` và `downloadSourcePdf`.
+- [x] **Bước 3: Truy vấn** (`src/lib/studio/queries.ts`): hỏi lại khi còn tài liệu đang xử lý; thêm `sourceFileUrl` và `downloadSourcePdf`.
 
 ```diff
 --- a/src/lib/studio/queries.ts
@@ -622,7 +622,7 @@ git add backend && git commit -m "feat(api): lesson PDFs visible right after upl
      else window.location.href = target;
 ```
 
-- [ ] **Bước 4: Mục "Tài liệu của bài"** (`src/components/lesson/lesson-materials.tsx`)
+- [x] **Bước 4: Mục "Tài liệu của bài"** (`src/components/lesson/lesson-materials.tsx`)
   - **Xem**: màn hình rộng nhúng PDF ngay trong trang (cao 75% màn hình, kèm link "Mở trong thẻ mới" phòng khi trình duyệt không hiện); điện thoại mở thẻ mới (trình duyệt di động hiện PDF trong khung rất kém).
   - **Tải xuống**: server ký URL kèm `Content-Disposition: attachment`, trình duyệt tải mà không rời trang.
 
@@ -737,7 +737,7 @@ export function LessonMaterials({ lessonId }: { lessonId: string }) {
 }
 ```
 
-- [ ] **Bước 5: Gắn vào trang bài học** (`lesson-view.tsx`): đặt dưới nội dung chữ; dòng "Bài này chưa có nội dung đọc" chỉ hiện khi không có chữ, video lẫn tài liệu (đợi danh sách tài liệu tải xong để không nháy).
+- [x] **Bước 5: Gắn vào trang bài học** (`lesson-view.tsx`): đặt dưới nội dung chữ; dòng "Bài này chưa có nội dung đọc" chỉ hiện khi không có chữ, video lẫn tài liệu (đợi danh sách tài liệu tải xong để không nháy).
 
 ```diff
 --- a/src/components/lesson/lesson-view.tsx
@@ -782,7 +782,7 @@ export function LessonMaterials({ lessonId }: { lessonId: string }) {
  
 ```
 
-- [ ] **Bước 6: Tab Tài liệu** (`documents-panel.tsx`) **và trang soạn bài** (`source-list.tsx`)
+- [x] **Bước 6: Tab Tài liệu** (`documents-panel.tsx`) **và trang soạn bài** (`source-list.tsx`)
 
 ```diff
 --- a/src/components/studio/documents-panel.tsx
@@ -839,7 +839,7 @@ export function LessonMaterials({ lessonId }: { lessonId: string }) {
                    {s.status === "ready" ? <CheckCircle2 className="size-3" aria-hidden /> : null}
 ```
 
-- [ ] **Bước 7:** `npx tsc --noEmit && npx eslint src && npx vitest run` → sạch, 106 pass. Commit:
+- [x] **Bước 7:** `npx tsc --noEmit && npx eslint src && npx vitest run` → sạch, 106 pass. Commit:
 
 ```bash
 git add frontend && git commit -m "feat(web): show lesson PDFs to students with inline view and download"
