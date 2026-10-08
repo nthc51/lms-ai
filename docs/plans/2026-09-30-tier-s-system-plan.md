@@ -103,7 +103,7 @@ lms-ai/
 - Modify: `backend/app/core/middleware.py`, `backend/app/main.py`
 - Test: `backend/tests/test_security_headers.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_security_headers.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_security_headers.py`**
 
 ```python
 async def test_api_responses_have_security_headers(client):
@@ -127,12 +127,12 @@ async def test_swagger_docs_are_not_blocked_by_api_csp(client):
     assert "content-security-policy" not in r.headers
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_security_headers.py -v`
 Expected: FAIL với `KeyError: 'x-content-type-options'`
 
-- [ ] **Step 3: Thêm vào cuối `app/core/middleware.py`**
+- [x] **Step 3: Thêm vào cuối `app/core/middleware.py`**
 
 ```python
 _SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
@@ -174,7 +174,7 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)
 ```
 
-- [ ] **Step 4: Gắn middleware vào `app/main.py`**
+- [x] **Step 4: Gắn middleware vào `app/main.py`**
   - Sửa dòng import thành: `from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, StrictCORSMiddleware`
   - Thêm ngay **sau** khối `app.add_middleware(StrictCORSMiddleware, ...)`, trước `register_error_handlers(app)`:
 
@@ -183,12 +183,12 @@ class SecurityHeadersMiddleware:
     app.add_middleware(SecurityHeadersMiddleware)
 ```
 
-- [ ] **Step 5: Chạy toàn bộ test**
+- [x] **Step 5: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
 Expected: PASS hết
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend && git commit -m "feat(security): security headers middleware for all API responses"
