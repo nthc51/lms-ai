@@ -356,7 +356,7 @@ Expected: trên tab Actions của GitHub, job `audit` xanh.
 - `bump(ns)` tăng phiên bản. Mọi key cũ lập tức bị bỏ qua và tự hết hạn theo TTL, nên không cần quét để xóa từng key.
 - `get_or_load` đọc phiên bản **trước khi** chạy hàm load, và ghi kết quả vào đúng phiên bản đó. Nhờ vậy, nếu có người sửa dữ liệu (tức là bump) trong lúc đang load, dữ liệu cũ vừa load sẽ rơi vào phiên bản cũ và không làm bẩn phiên bản mới.
 
-- [ ] **Step 1: Setting**: thêm vào `Settings`:
+- [x] **Step 1: Setting**: thêm vào `Settings`:
 
 ```python
     cache_enabled: bool = True
@@ -376,7 +376,7 @@ Thêm vào khối `os.environ[...]` ở đầu `tests/conftest.py`, cạnh `DB_N
 os.environ["CACHE_ENABLED"] = "false"  # test mặc định không dùng cache; test cache tự bật (Task 4, 5)
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_cache.py`** (cần Redis của docker compose; CI đã có service redis)
+- [x] **Step 2: Viết test hỏng trước — `tests/test_cache.py`** (cần Redis của docker compose; CI đã có service redis)
 
 ```python
 import uuid
@@ -463,12 +463,12 @@ async def test_null_cache_always_loads():
     assert len(calls) == 2
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_cache.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.core.cache'`
 
-- [ ] **Step 4: `app/core/cache.py`**
+- [x] **Step 4: `app/core/cache.py`**
 
 ```python
 """Cache JSON trên Redis theo namespace có phiên bản (spec tầng S5).
@@ -559,12 +559,12 @@ def get_cache() -> Cache:
     return RedisCache.from_url(s.redis_url)
 ```
 
-- [ ] **Step 5: Chạy test**
+- [x] **Step 5: Chạy test**
 
 Run: `uv run pytest tests/test_cache.py -v`
 Expected: PASS cả 6 test
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend && git commit -m "feat(cache): versioned Redis JSON cache with fail-open and race-safe invalidation"
