@@ -2989,8 +2989,8 @@ git add backend && git commit -m "feat(studio): source guides, reports, flashcar
 
 ## Task 5: Khởi động lại worker và thử tay nhanh
 
-- [ ] **Bước 1:** `docker compose up -d --build api worker`. Xem log: `docker compose logs worker --tail 30`. Phải thấy các hàm `source_guide`, `studio_gen`, `notes_synth` trong danh sách.
-- [ ] **Bước 2:** Upload lại một PDF cho một bài (provider giả). Sau khi `ingest_pdf` xong, `GET /api/v1/lessons/{id}/documents` (qua `/docs`) phải có `guide.status = "ready"`.
+- [x] **Bước 1:** `docker compose up -d --build api worker`. Xem log: `docker compose logs worker --tail 30`. Phải thấy các hàm `source_guide`, `studio_gen`, `notes_synth` trong danh sách.
+- [x] **Bước 2:** Upload lại một PDF cho một bài (provider giả). Sau khi `ingest_pdf` xong, `GET /api/v1/lessons/{id}/documents` (qua `/docs`) phải có `guide.status = "ready"`.
 
 ---
 
