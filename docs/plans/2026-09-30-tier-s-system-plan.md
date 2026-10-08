@@ -296,7 +296,7 @@ git add backend && git commit -m "feat(security): per-IP rate limit on login"
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Chạy thử trên máy**
+- [x] **Step 1: Chạy thử trên máy**
 
 Run (từ `backend/`):
 ```bash
@@ -311,7 +311,7 @@ Nếu có lỗ hổng:
 
 Xóa file tạm: `rm ../.audit-req.txt`.
 
-- [ ] **Step 2: Thêm job `audit` vào `.github/workflows/ci.yml`** (ngang hàng với `lint`, `test`, `docker`)
+- [x] **Step 2: Thêm job `audit` vào `.github/workflows/ci.yml`** (ngang hàng với `lint`, `test`, `docker`)
 
 ```yaml
   audit:
@@ -332,7 +332,7 @@ Xóa file tạm: `rm ../.audit-req.txt`.
 
 Nếu `npm audit` báo lỗi: xem thư viện nào, nâng đúng thư viện đó (`npm install <tên>@<bản vá>`) rồi chạy lại `npm test` và E2E. **Không dùng `npm audit fix --force`** (nó tự nâng bản chính, dễ làm hỏng Next.js).
 
-- [ ] **Step 3: Commit, push và kiểm tra**
+- [x] **Step 3: Commit, push và kiểm tra**
 
 ```bash
 git add .github/workflows/ci.yml && git commit -m "ci: dependency vulnerability audit with pip-audit"
