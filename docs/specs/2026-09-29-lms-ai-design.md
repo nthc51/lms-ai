@@ -12,7 +12,7 @@
 
 > Cập nhật mục này mỗi khi xong việc. Ký hiệu: `[ ]` chưa làm · `[~]` đang làm · `[x]` xong · `[-]` đã cắt.
 
-**Tuần hiện tại:** 2 / 5  **Tổng tiến độ:** 8 / 40 hạng mục
+**Tuần hiện tại:** 2 / 5  **Tổng tiến độ:** 9 / 40 hạng mục
 
 **Thứ tự ưu tiên:** A (lõi) → B (mức Khá) → S (chất lượng hệ thống) → C (điểm nhấn). Hết thời gian mà vẫn còn việc thì phần bị trễ là tầng C, không phải S. Tuần 5 vẫn giữ cho báo cáo và bộ đánh giá.
 
@@ -36,7 +36,7 @@
 - [ ] B5. Assignment + AI gợi ý chấm theo rubric, giáo viên xác nhận
 - [ ] B6. Thông báo realtime (SSE)
 - [ ] B7. Phân tích lớp học (câu hay sai, chủ đề yếu)
-- [ ] B8. Trang admin (duyệt giáo viên, quản lý user và khóa học)
+- [x] B8. Trang admin (duyệt giáo viên, quản lý user và khóa học)
 
 ### Tầng S: chất lượng hệ thống (rải từ tuần 1 đến tuần 4, trước tầng C)
 
@@ -756,3 +756,5 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-04 | Tutor: stream xong mà rỗng → `error AI_UNAVAILABLE` (lưu tin rỗng `truncated`); availability phạm vi cả khóa trên khóa nháp có thông báo riêng; body request Tutor/Quiz không nhận trường lạ (`422`) |
 | 2026-10-04 | Hợp đồng frontend: thay text đã stream bằng `done.content`; `sources` gửi cả khi từ chối; đạt/không đạt theo điểm đã làm tròn; autosave cùng câu gửi tuần tự (lần sau thắng); lịch sử/phản hồi Tutor đọc được sau khi hủy đăng ký; giới hạn CRUD quiz và chỉ câu `approved`/`edited` |
 | 2026-10-06 | FE-2: tự lưu đáp án bằng hàng đợi tuần tự, nộp bài luôn kèm final_answers; loại câu hỏi có Hoàn tác 5 giây (gửi trễ thay vì gọi API khôi phục); bài làm gần nhất lưu ở localStorage vì chưa có API danh sách bài làm (để B1 bổ sung `GET /quizzes/{id}/attempts/me`). |
+| 2026-10-07 | Khu quản trị: ẩn khóa dùng lại status=archived + hidden_at/hidden_reason; từ chối chỉ áp cho giảng viên đang chờ, vi phạm sau khi duyệt thì khóa; mọi thao tác ghi admin_actions; seed_admin từ chối email `.local`. |
+| 2026-10-07 | Email: xác nhận khi đăng ký (chặn đăng nhập tới khi xác nhận, gửi lại tối đa 3 lần/giờ, luôn 202); outbox ghi cùng transaction, worker gửi (kick + cron mỗi phút, SKIP LOCKED, thử lại 5 lần); dev dùng Mailpit, chạy thật dùng Brevo SMTP. Giảng viên chỉ vào hàng chờ khi đã xác nhận email. 👎 của AI Tutor: admin thấy tên học viên, giảng viên thì không. |

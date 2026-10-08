@@ -7379,29 +7379,29 @@ Expected: **102** unit test, **62** E2E pass; CI xanh.
 
 Task này **người dùng tự làm**, kiểm tra cả phần 1 và phần 2.
 
-- [ ] `docker compose up -d --build`. Sau đó mở `http://localhost:8025` (Mailpit) ở một tab riêng.
-- [ ] Tạo admin: `docker compose exec api python -m app.scripts.seed_admin --email admin@example.com --password Admin12345`.
-- [ ] **Đăng ký học viên ở cửa sổ ẩn danh:**
+- [x] `docker compose up -d --build`. Sau đó mở `http://localhost:8025` (Mailpit) ở một tab riêng.
+- [x] Tạo admin: `docker compose exec api python -m app.scripts.seed_admin --email admin@example.com --password Admin12345`.
+- [x] **Đăng ký học viên ở cửa sổ ẩn danh:**
   - Thấy màn "Kiểm tra hộp thư".
   - Thử đăng nhập ngay: thấy báo "cần xác nhận email", kèm nút gửi lại.
   - Mailpit có 2 mail; bấm link trong mail **cũ**: thấy "Link không dùng được".
   - Bấm link trong mail **mới**: thấy "Email đã được xác nhận". Đăng nhập được.
-- [ ] **Đăng ký 2 giảng viên.** Trước khi họ xác nhận email: admin thấy họ ở tab "Chưa xác nhận email", Tổng quan ghi 0 chờ duyệt. Sau khi xác nhận: Mailpit có mail "Giảng viên mới chờ duyệt" gửi admin.
-- [ ] **Admin:**
+- [x] **Đăng ký 2 giảng viên.** Trước khi họ xác nhận email: admin thấy họ ở tab "Chưa xác nhận email", Tổng quan ghi 0 chờ duyệt. Sau khi xác nhận: Mailpit có mail "Giảng viên mới chờ duyệt" gửi admin.
+- [x] **Admin:**
   - Duyệt người thứ nhất; từ chối người thứ hai, có lý do. Mailpit có mail duyệt và mail từ chối kèm lý do.
   - Giảng viên thứ hai bấm **Gửi lại yêu cầu duyệt** ở trang chủ: quay về hàng chờ, admin nhận mail.
-- [ ] **Ẩn / hiện khóa học:** chủ khóa nhận 2 mail, link trong mail mở đúng trình soạn.
-- [ ] **Khóa một học viên:** học viên nhận mail kèm lý do.
-- [ ] **Người dùng › Học viên › Xuất CSV:** mở bằng Excel, tiếng Việt hiển thị đúng.
-- [ ] **👎:** học viên bấm 👎 một câu trả lời của AI Tutor.
+- [x] **Ẩn / hiện khóa học:** chủ khóa nhận 2 mail, link trong mail mở đúng trình soạn.
+- [x] **Khóa một học viên:** học viên nhận mail kèm lý do.
+- [x] **Người dùng › Học viên › Xuất CSV:** mở bằng Excel, tiếng Việt hiển thị đúng.
+- [x] **👎:** học viên bấm 👎 một câu trả lời của AI Tutor.
   - Admin thấy ô "Trả lời AI bị chê" = 1, mở trang danh sách thấy câu hỏi, câu trả lời và tên học viên.
   - Giảng viên mở Thống kê khóa: thấy mục đó nhưng **không có tên** học viên.
-- [ ] Ẩn khóa: giảng viên mở trình soạn thấy khung "Quản trị viên đã ẩn khóa học này", không còn nút Xuất bản; khóa biến mất khỏi Khám phá. Admin bấm **Hiện lại**.
-- [ ] Khóa một học viên đang đăng nhập ở cửa sổ khác: thao tác tiếp theo ở cửa sổ đó báo tài khoản bị khóa và đưa về trang đăng nhập. Mở khóa lại.
-- [ ] **Nhật ký đầy đủ:** thấy đủ các thao tác vừa làm, có tên admin và lý do.
-- [ ] Tổng quan: ô "Giảng viên chờ duyệt" có viền màu nhấn khi có người chờ; biểu đồ có cột ở ngày hôm nay.
-- [ ] Ở khung 375px: menu dưới có Tổng quan / Người dùng / Khóa học / Tài khoản; bảng cuộn ngang được; trang không bị cuộn ngang.
-- [ ] **(Tùy chọn) Brevo thật:**
+- [x] Ẩn khóa: giảng viên mở trình soạn thấy khung "Quản trị viên đã ẩn khóa học này", không còn nút Xuất bản; khóa biến mất khỏi Khám phá. Admin bấm **Hiện lại**.
+- [x] Khóa một học viên đang đăng nhập ở cửa sổ khác: thao tác tiếp theo ở cửa sổ đó báo tài khoản bị khóa và đưa về trang đăng nhập. Mở khóa lại.
+- [x] **Nhật ký đầy đủ:** thấy đủ các thao tác vừa làm, có tên admin và lý do.
+- [x] Tổng quan: ô "Giảng viên chờ duyệt" có viền màu nhấn khi có người chờ; biểu đồ có cột ở ngày hôm nay.
+- [x] Ở khung 375px: menu dưới có Tổng quan / Người dùng / Khóa học / Tài khoản; bảng cuộn ngang được; trang không bị cuộn ngang.
+- [x] **(Tùy chọn) Brevo thật:**
   - Tạo tài khoản ở brevo.com.
   - **Senders, Domains & Dedicated IPs** → thêm và xác minh email gửi (ví dụ Gmail của bạn).
   - **SMTP & API** → tạo SMTP key.
@@ -7415,7 +7415,7 @@ Task này **người dùng tự làm**, kiểm tra cả phần 1 và phần 2.
     MAIL_FROM="LMS-AI <email-đã-xác-minh@gmail.com>"
     ```
   - Chạy `docker compose up -d --force-recreate api worker`, rồi đăng ký bằng email thật của bạn. Nếu mail vào Spam thì bình thường với domain chưa có SPF/DKIM; khi có tên miền riêng (tầng S) thì xác thực domain trong Brevo.
-- [ ] Cập nhật spec `docs/specs/2026-09-29-lms-ai-design.md`:
+- [x] Cập nhật spec `docs/specs/2026-09-29-lms-ai-design.md`:
   - Đánh dấu xong **B8**.
   - Thêm nhật ký quyết định:
 
