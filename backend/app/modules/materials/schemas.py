@@ -12,6 +12,7 @@ class PresignIn(BaseModel):
     kind: Literal["pdf", "video", "submission", "image"]
     mime: str = Field(max_length=100)
     size: int = Field(gt=0)
+    filename: str | None = Field(default=None, max_length=255)  # tên file gốc, chỉ để hiển thị / tải xuống
 
 
 class PresignOut(BaseModel):
@@ -48,6 +49,7 @@ class SourceOut(BaseModel):
     page_count: int
     vision_pages: int  # số trang trích bằng vision (source_pages.extraction_method = 'vision')
     chunk_count: int
+    file_name: str | None  # tên file gốc (file tải lên trước khi có cột này thì None)
 
 
 class SourceCreated(BaseModel):

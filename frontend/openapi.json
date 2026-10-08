@@ -3779,7 +3779,7 @@
           "studio"
         ],
         "summary": "Lesson Documents",
-        "description": "Tài liệu PDF đã xử lý xong của bài + hướng dẫn (tóm tắt, chủ đề, câu hỏi gợi ý). Quyền như xem bài học.",
+        "description": "Tài liệu PDF của bài (kể cả đang xử lý) + hướng dẫn (tóm tắt, chủ đề, câu hỏi gợi ý). Quyền như xem bài học.",
         "operationId": "lesson_documents_api_v1_lessons__lesson_id__documents_get",
         "security": [
           {
@@ -3832,7 +3832,7 @@
           "studio"
         ],
         "summary": "Source File",
-        "description": "URL ký sẵn (1 giờ) để mở file PDF; thêm #page=N để nhảy tới trang.",
+        "description": "URL ký sẵn (1 giờ) để mở file PDF (thêm #page=N để nhảy tới trang). download=true: tải về với tên file gốc.",
         "operationId": "source_file_api_v1_sources__source_id__file_get",
         "security": [
           {
@@ -3848,6 +3848,16 @@
               "type": "string",
               "format": "uuid",
               "title": "Source Id"
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Download"
             }
           }
         ],
@@ -6056,6 +6066,20 @@
             "type": "string",
             "title": "Title"
           },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SourceStatus"
+          },
           "page_count": {
             "type": "integer",
             "title": "Page Count"
@@ -6075,11 +6099,13 @@
         "required": [
           "source_id",
           "title",
+          "file_name",
+          "status",
           "page_count",
           "guide"
         ],
         "title": "DocumentOut",
-        "description": "Một tài liệu PDF đã xử lý xong của bài, kèm hướng dẫn (S1). guide=None: chưa có (đang chờ sinh)."
+        "description": "Một tài liệu PDF của bài, kèm hướng dẫn (S1). Hiện ngay khi tải lên, không chờ AI xử lý xong:\nhọc viên mở / tải được file trong lúc AI còn đọc. guide=None: chưa có hướng dẫn."
       },
       "EnrollmentOut": {
         "properties": {
@@ -7146,6 +7172,18 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Size"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
           }
         },
         "type": "object",
@@ -8246,6 +8284,17 @@
           "chunk_count": {
             "type": "integer",
             "title": "Chunk Count"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
           }
         },
         "type": "object",
@@ -8259,7 +8308,8 @@
           "processed_at",
           "page_count",
           "vision_pages",
-          "chunk_count"
+          "chunk_count",
+          "file_name"
         ],
         "title": "SourceOut"
       },

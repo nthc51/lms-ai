@@ -15,6 +15,7 @@ from app.modules.jobs.queue import JobQueue
 from app.modules.jobs.service import create_and_enqueue, create_job
 from app.modules.materials.assets import require_verified_asset
 from app.modules.materials.models import (
+    Asset,
     AssetKind,
     Chunk,
     ExtractionMethod,
@@ -44,10 +45,10 @@ async def get_owned_source(db: AsyncSession, source_id: uuid.UUID, user: User) -
     return row[0]
 
 
-async def _counts(db: AsyncSession, source_ids: list[uuid.UUID]) -> tuple[dict, dict]:
-    """Đếm trang, trang vision và chunk cho nhiều source bằng các truy vấn GROUP BY (không N+1)."""
+async def _counts(db: AsyncSession, source_ids: list[uuid.UUID]) -> tuple[dict, dict, dict]:
+    """Đếm trang, trang vision và chunk cho nhiều source bằng các truy vấn GROUP BY (không N+1), kèm tên file gốc."""
     if not source_ids:
-        return {}, {}
+        return {}, {}, {}
     page_rows = await db.execute(
         select(
             SourcePage.source_id,
@@ -62,13 +63,19 @@ async def _counts(db: AsyncSession, source_ids: list[uuid.UUID]) -> tuple[dict, 
         .where(Chunk.source_id.in_(source_ids))
         .group_by(Chunk.source_id)
     )
+    name_rows = await db.execute(
+        select(Source.id, Asset.original_name)
+        .join(Asset, Asset.id == Source.asset_id)
+        .where(Source.id.in_(source_ids))
+    )
     pages = {sid: (total, vision) for sid, total, vision in page_rows}
     chunks = {sid: n for sid, n in chunk_rows}
-    return pages, chunks
+    names = {sid: name for sid, name in name_rows}
+    return pages, chunks, names
 
 
 async def to_out_many(db: AsyncSession, sources: Sequence[Source]) -> list[SourceOut]:
-    pages, chunks = await _counts(db, [s.id for s in sources])
+    pages, chunks, names = await _counts(db, [s.id for s in sources])
     result = []
     for s in sources:
         page_count, vision_pages = pages.get(s.id, (0, 0))
@@ -85,6 +92,7 @@ async def to_out_many(db: AsyncSession, sources: Sequence[Source]) -> list[Sourc
                 page_count=page_count,
                 vision_pages=vision_pages,
                 chunk_count=chunks.get(s.id, 0),
+                file_name=names.get(s.id),
             )
         )
     return result

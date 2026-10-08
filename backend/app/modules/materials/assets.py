@@ -43,6 +43,16 @@ def _invalid_type() -> AppError:
     return AppError("INVALID_FILE_TYPE", "Định dạng file không hợp lệ", 400)
 
 
+def clean_filename(name: str | None) -> str | None:
+    """Chỉ giữ tên file (bỏ đường dẫn C:\\... hay /...), bỏ ký tự điều khiển, gộp khoảng trắng. Rỗng → None."""
+    if not name:
+        return None
+    base = name.replace("\\", "/").rsplit("/", 1)[-1]
+    base = "".join(ch for ch in base if ch.isprintable())
+    base = " ".join(base.split())[:255]
+    return base or None
+
+
 def mime_matches(declared: str, head: bytes) -> bool:
     """So magic bytes của 2KB đầu với mime đã khai báo. Text thuần thì không có magic bytes."""
     guessed = filetype.guess(head)
@@ -62,7 +72,14 @@ async def create_presigned_upload(
     if data.size > SIZE_LIMITS[kind]:
         raise _too_large()
     key = f"{kind.value}/{user.id}/{uuid.uuid4().hex}.{EXTENSIONS[data.mime]}"
-    asset = Asset(owner_id=user.id, kind=kind, storage_key=key, mime=data.mime, size_bytes=0)
+    asset = Asset(
+        owner_id=user.id,
+        kind=kind,
+        storage_key=key,
+        mime=data.mime,
+        size_bytes=0,
+        original_name=clean_filename(data.filename),
+    )
     db.add(asset)
     await db.commit()
     # Trình duyệt chỉ nhận URL ghi vào key tạm; key chính thức chỉ có server ghi sau khi kiểm tra xong.

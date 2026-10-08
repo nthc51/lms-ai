@@ -43,6 +43,8 @@ class Asset(IdMixin, TimestampMixin, Base):
     mime: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Tên file gốc trên máy người tải (đã bỏ đường dẫn): hiện cho học viên và dùng làm tên khi tải xuống
+    original_name: Mapped[str | None] = mapped_column(String(255))
 
 
 class SourceType(str, enum.Enum):

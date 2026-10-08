@@ -43,19 +43,20 @@ router = APIRouter(prefix="/api/v1", tags=["studio"])
 async def lesson_documents(
     lesson_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
-    """Tài liệu PDF đã xử lý xong của bài + hướng dẫn (tóm tắt, chủ đề, câu hỏi gợi ý). Quyền như xem bài học."""
+    """Tài liệu PDF của bài (kể cả đang xử lý) + hướng dẫn (tóm tắt, chủ đề, câu hỏi gợi ý). Quyền như xem bài học."""
     return await service.lesson_documents(db, user, lesson_id)
 
 
 @router.get("/sources/{source_id}/file", response_model=FileUrlOut)
 async def source_file(
     source_id: uuid.UUID,
+    download: bool = False,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     storage: Storage = Depends(get_storage),
 ):
-    """URL ký sẵn (1 giờ) để mở file PDF; thêm #page=N để nhảy tới trang."""
-    return FileUrlOut(url=await service.source_file_url(db, storage, user, source_id))
+    """URL ký sẵn (1 giờ) để mở file PDF (thêm #page=N để nhảy tới trang). download=true: tải về với tên file gốc."""
+    return FileUrlOut(url=await service.source_file_url(db, storage, user, source_id, download=download))
 
 
 @router.get("/chunks/{chunk_id}", response_model=ChunkOut)

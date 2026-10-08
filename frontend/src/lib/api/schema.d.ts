@@ -1046,7 +1046,7 @@ export interface paths {
         };
         /**
          * Lesson Documents
-         * @description Tài liệu PDF đã xử lý xong của bài + hướng dẫn (tóm tắt, chủ đề, câu hỏi gợi ý). Quyền như xem bài học.
+         * @description Tài liệu PDF của bài (kể cả đang xử lý) + hướng dẫn (tóm tắt, chủ đề, câu hỏi gợi ý). Quyền như xem bài học.
          */
         get: operations["lesson_documents_api_v1_lessons__lesson_id__documents_get"];
         put?: never;
@@ -1066,7 +1066,7 @@ export interface paths {
         };
         /**
          * Source File
-         * @description URL ký sẵn (1 giờ) để mở file PDF; thêm #page=N để nhảy tới trang.
+         * @description URL ký sẵn (1 giờ) để mở file PDF (thêm #page=N để nhảy tới trang). download=true: tải về với tên file gốc.
          */
         get: operations["source_file_api_v1_sources__source_id__file_get"];
         put?: never;
@@ -1873,7 +1873,8 @@ export interface components {
         };
         /**
          * DocumentOut
-         * @description Một tài liệu PDF đã xử lý xong của bài, kèm hướng dẫn (S1). guide=None: chưa có (đang chờ sinh).
+         * @description Một tài liệu PDF của bài, kèm hướng dẫn (S1). Hiện ngay khi tải lên, không chờ AI xử lý xong:
+         *     học viên mở / tải được file trong lúc AI còn đọc. guide=None: chưa có hướng dẫn.
          */
         DocumentOut: {
             /**
@@ -1883,6 +1884,9 @@ export interface components {
             source_id: string;
             /** Title */
             title: string;
+            /** File Name */
+            file_name: string | null;
+            status: components["schemas"]["SourceStatus"];
             /** Page Count */
             page_count: number;
             guide: components["schemas"]["GuideOut"] | null;
@@ -2303,6 +2307,8 @@ export interface components {
             mime: string;
             /** Size */
             size: number;
+            /** Filename */
+            filename?: string | null;
         };
         /** PresignOut */
         PresignOut: {
@@ -2743,6 +2749,8 @@ export interface components {
             vision_pages: number;
             /** Chunk Count */
             chunk_count: number;
+            /** File Name */
+            file_name: string | null;
         };
         /** SourcePagesPage */
         SourcePagesPage: {
@@ -5216,7 +5224,9 @@ export interface operations {
     };
     source_file_api_v1_sources__source_id__file_get: {
         parameters: {
-            query?: never;
+            query?: {
+                download?: boolean;
+            };
             header?: never;
             path: {
                 source_id: string;

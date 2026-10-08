@@ -1,8 +1,10 @@
 import asyncio
 import io
+import unicodedata
 from datetime import timedelta
 from functools import lru_cache
 from typing import Protocol
+from urllib.parse import quote
 
 from minio import Minio
 from minio.commonconfig import CopySource
@@ -18,11 +20,24 @@ def staging_key(key: str) -> str:
     return STAGING_PREFIX + key
 
 
+def content_disposition(download_name: str) -> str:
+    """attachment; filename=... an toàn với tên tiếng Việt (RFC 6266): tên ASCII dự phòng + filename* UTF-8."""
+    if download_name.isascii() and '"' not in download_name and "\\" not in download_name:
+        return f'attachment; filename="{download_name}"'
+    fallback = (
+        unicodedata.normalize("NFKD", download_name.replace("đ", "d").replace("Đ", "D"))
+        .encode("ascii", "ignore")
+        .decode()
+    )
+    fallback = "".join(ch for ch in fallback if ch.isprintable() and ch not in '"\\') or "download"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(download_name, safe='')}"
+
+
 def download_headers(mime: str, download_name: str | None = None) -> dict[str, str]:
     """Header response ký kèm presigned GET: luôn trả đúng Content-Type, thêm attachment nếu có tên file."""
     headers = {"response-content-type": mime}
     if download_name:
-        headers["response-content-disposition"] = f'attachment; filename="{download_name}"'
+        headers["response-content-disposition"] = content_disposition(download_name)
     return headers
 
 

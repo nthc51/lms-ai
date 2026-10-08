@@ -16,6 +16,10 @@ def test_download_headers():
         "response-content-type": "text/plain",
         "response-content-disposition": 'attachment; filename="bai.txt"',
     }
+    # Tên tiếng Việt: tên ASCII dự phòng (đ → d) + filename* UTF-8 cho trình duyệt hiện đại
+    assert download_headers("application/pdf", "Đề cương.pdf")["response-content-disposition"] == (
+        "attachment; filename=\"De cuong.pdf\"; filename*=UTF-8''%C4%90%E1%BB%81%20c%C6%B0%C6%A1ng.pdf"
+    )
 
 
 async def test_presign_get_signs_public_host_with_content_type():

@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.pagination import Page
+from app.modules.materials.models import SourceStatus
 from app.modules.studio.models import ArtifactKind, StudioStatus
 
 
@@ -17,11 +18,16 @@ class GuideOut(BaseModel):
 
 
 class DocumentOut(BaseModel):
-    """Một tài liệu PDF đã xử lý xong của bài, kèm hướng dẫn (S1). guide=None: chưa có (đang chờ sinh)."""
+    """Một tài liệu PDF của bài, kèm hướng dẫn (S1). Hiện ngay khi tải lên, không chờ AI xử lý xong:
+    học viên mở / tải được file trong lúc AI còn đọc. guide=None: chưa có hướng dẫn."""
 
     source_id: uuid.UUID
-    title: str  # tên AI suy ra; chưa có thì "Tài liệu N"
-    page_count: int
+    title: str  # tên AI suy ra; chưa có thì tên file gốc (bỏ .pdf); không có nữa thì "Tài liệu N"
+    file_name: str | None  # tên file gốc
+    status: (
+        SourceStatus  # pending / processing: AI đang đọc; ready: AI dùng được; failed: chỉ giảng viên thấy
+    )
+    page_count: int  # 0 khi chưa xử lý xong
     guide: GuideOut | None
 
 

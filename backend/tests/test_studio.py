@@ -12,7 +12,7 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.service import create_job
-from app.modules.materials.models import Source
+from app.modules.materials.models import Source, SourceStatus
 from app.modules.studio.generation import (
     batches,
     fingerprint,
@@ -32,7 +32,8 @@ from app.modules.tutor.models import ChatMessage, ChatRole, ChatSession
 from app.worker.tasks import ingest_pdf, source_guide, studio_gen
 from tests.factories import LONG_LESSON_TEXT, seed_chunks
 from tests.fakes import RecordingQueue
-from tests.helpers import API, make_published_course, make_student, make_teacher
+from tests.helpers import API, make_published_course, make_student, make_teacher, upload_file
+from tests.pdfs import make_pdf
 from tests.test_ai_retry import Sleeps
 
 
@@ -315,6 +316,45 @@ async def test_documents_file_and_chunk_for_enrolled_students_only(client, db, s
     _, outsider = await make_student(client, "khac@x.com")
     for path in (f"/lessons/{lesson['id']}/documents", f"/sources/{source_id}/file", f"/chunks/{chunk_id}"):
         assert (await client.get(f"{API}{path}", headers=outsider)).status_code == 403, path
+
+
+async def test_documents_show_while_processing_with_original_file_name(client, db, storage):
+    gv, sv, _course, lesson = await _course_with_chunks(client, db)
+    asset_id = await upload_file(
+        client, storage, gv, make_pdf(["Noi dung"]), filename="C:\\Bai giang\\Kỹ thuật  truyền thông.pdf"
+    )
+    r = await client.post(f"{API}/lessons/{lesson['id']}/sources", json={"asset_id": asset_id}, headers=gv)
+    assert r.status_code == 202 and r.json()["source"]["file_name"] == "Kỹ thuật truyền thông.pdf"
+    new_id = r.json()["source"]["id"]
+
+    # Học viên thấy ngay tài liệu đang chờ xử lý, kèm tên file gốc (bỏ đường dẫn, gộp khoảng trắng)
+    docs = (await client.get(f"{API}/lessons/{lesson['id']}/documents", headers=sv)).json()
+    # (seed_chunks không tạo source_pages nên tài liệu 1 cũng có page_count = 0)
+    assert [(d["title"], d["status"], d["page_count"]) for d in docs] == [
+        ("Tài liệu 1", "ready", 0),
+        ("Kỹ thuật truyền thông", "pending", 0),
+    ]
+    assert docs[1]["file_name"] == "Kỹ thuật truyền thông.pdf"
+
+    # Mở / tải được ngay, không chờ AI. Tải về giữ tên tiếng Việt (filename* theo RFC 6266)
+    assert (await client.get(f"{API}/sources/{new_id}/file", headers=sv)).status_code == 200
+    r = await client.get(f"{API}/sources/{new_id}/file", params={"download": "true"}, headers=sv)
+    assert r.status_code == 200
+    disposition = [h for h in storage.signed_gets.values() if "response-content-disposition" in h][-1]
+    assert disposition["response-content-disposition"] == (
+        'attachment; filename="Ky thuat truyen thong.pdf"; '
+        "filename*=UTF-8''K%E1%BB%B9%20thu%E1%BA%ADt%20truy%E1%BB%81n%20th%C3%B4ng.pdf"
+    )
+
+    # Xử lý lỗi: chỉ giảng viên còn thấy (để tải lại), học viên không thấy và không mở được
+    source = await db.get(Source, uuid.UUID(new_id))
+    source.status = SourceStatus.failed
+    await db.commit()
+    assert len((await client.get(f"{API}/lessons/{lesson['id']}/documents", headers=sv)).json()) == 1
+    assert (await client.get(f"{API}/sources/{new_id}/file", headers=sv)).status_code == 404
+    teacher_docs = (await client.get(f"{API}/lessons/{lesson['id']}/documents", headers=gv)).json()
+    assert [d["status"] for d in teacher_docs] == ["ready", "failed"]
+    assert (await client.get(f"{API}/sources/{new_id}/file", headers=gv)).status_code == 200
 
 
 async def test_source_guide_job_fills_guide(client, db):

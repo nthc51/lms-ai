@@ -76,35 +76,43 @@ async def dead_generating(db: AsyncSession, job_type: str, ref_ids: list[uuid.UU
     return {r for r in ref_ids if latest.get(r) in (None, JobStatus.failed, JobStatus.done)}
 
 
+def _doc_title(guide_title: str | None, file_name: str | None, index: int) -> str:
+    if guide_title:
+        return guide_title
+    if file_name:
+        return file_name[:-4] if file_name.lower().endswith(".pdf") else file_name
+    return f"Tài liệu {index}"
+
+
 async def lesson_documents(db: AsyncSession, user: User, lesson_id: uuid.UUID) -> list[DocumentOut]:
-    await ensure_lesson_access(db, lesson_id, user)
+    """Mọi PDF của bài, kể cả đang xử lý. Tài liệu xử lý lỗi chỉ giảng viên / admin thấy (để biết mà tải lại)."""
+    _, course = await ensure_lesson_access(db, lesson_id, user)
     pages = select(SourcePage.source_id, func.count().label("n")).group_by(SourcePage.source_id).subquery()
-    rows = (
-        await db.execute(
-            select(Source.id, func.coalesce(pages.c.n, 0), SourceGuide)
-            .outerjoin(pages, pages.c.source_id == Source.id)
-            .outerjoin(SourceGuide, SourceGuide.source_id == Source.id)
-            .where(
-                Source.lesson_id == lesson_id,
-                Source.status == SourceStatus.ready,
-                Source.type == SourceType.pdf,
-            )
-            .order_by(Source.created_at, Source.id)
-        )
-    ).all()
+    stmt = (
+        select(Source.id, Source.status, Asset.original_name, func.coalesce(pages.c.n, 0), SourceGuide)
+        .join(Asset, Asset.id == Source.asset_id)
+        .outerjoin(pages, pages.c.source_id == Source.id)
+        .outerjoin(SourceGuide, SourceGuide.source_id == Source.id)
+        .where(Source.lesson_id == lesson_id, Source.type == SourceType.pdf)
+        .order_by(Source.created_at, Source.id)
+    )
+    if not is_course_staff(course, user):
+        stmt = stmt.where(Source.status != SourceStatus.failed)
+    rows = (await db.execute(stmt)).all()
     dead = await dead_generating(
         db,
         "source_guide",
-        [r[0] for r in rows if r[2] is not None and r[2].status == StudioStatus.generating],
+        [r[0] for r in rows if r[4] is not None and r[4].status == StudioStatus.generating],
     )
     out = []
-    for i, (source_id, page_count, guide) in enumerate(rows, 1):
-        title = guide.title if guide is not None and guide.title else f"Tài liệu {i}"
+    for i, (source_id, status, file_name, page_count, guide) in enumerate(rows, 1):
         out.append(
             DocumentOut(
                 source_id=source_id,
-                title=title,
-                page_count=page_count,
+                title=_doc_title(guide.title if guide is not None else None, file_name, i),
+                file_name=file_name,
+                status=status,
+                page_count=page_count if status == SourceStatus.ready else 0,
                 guide=None
                 if guide is None
                 else GuideOut(
@@ -119,19 +127,30 @@ async def lesson_documents(db: AsyncSession, user: User, lesson_id: uuid.UUID) -
     return out
 
 
-async def source_file_url(db: AsyncSession, storage: Storage, user: User, source_id: uuid.UUID) -> str:
-    """URL ký sẵn (1 giờ) để mở PDF trong trình duyệt; frontend thêm #page=N để nhảy tới trang."""
+async def source_file_url(
+    db: AsyncSession, storage: Storage, user: User, source_id: uuid.UUID, *, download: bool = False
+) -> str:
+    """URL ký sẵn (1 giờ) để xem PDF trong trình duyệt (frontend thêm #page=N để nhảy tới trang), hoặc tải về
+    với tên file gốc. Không cần chờ AI xử lý xong: file đã được kiểm tra lúc tải lên."""
     row = (
         await db.execute(
-            select(Source, Asset.storage_key, Asset.mime)
+            select(Source, Asset.storage_key, Asset.mime, Asset.original_name)
             .join(Asset, Asset.id == Source.asset_id)
             .where(Source.id == source_id)
         )
     ).one_or_none()
-    if row is None or row[0].status != SourceStatus.ready:
+    if row is None:
         raise not_found("Tài liệu")
-    await ensure_lesson_access(db, row[0].lesson_id, user)
-    return await storage.presign_get(row[1], row[2])
+    source, key, mime, file_name = row
+    _, course = await ensure_lesson_access(db, source.lesson_id, user)
+    if source.status == SourceStatus.failed and not is_course_staff(course, user):
+        raise not_found("Tài liệu")
+    name = None
+    if download:
+        name = file_name or "tai-lieu.pdf"
+        if not name.lower().endswith(".pdf"):
+            name += ".pdf"
+    return await storage.presign_get(key, mime, download_name=name)
 
 
 async def chunk_detail(db: AsyncSession, user: User, chunk_id: uuid.UUID) -> ChunkOut:
