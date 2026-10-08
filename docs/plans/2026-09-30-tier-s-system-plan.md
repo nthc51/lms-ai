@@ -20,25 +20,40 @@
 
 **Spec:** `docs/specs/2026-09-29-lms-ai-design.md` (mục 0 tầng S, 3, 6, 7, 9.7, 11, 13).
 
+> **Bản vá 08/10/2026.** Plan gốc viết ngày 30/09, trước khi có frontend, khu admin, email xác minh và AI Studio. Bản này sửa cho khớp code hiện tại. Phần backend (Task 1–8, 13, 15) đã được **chạy thử** trên bản đã xong plan admin và plan AI Studio: **706 test pass** (682 cũ + 24 mới), `ruff` sạch. Caddyfile đã được `caddy validate` và diễn tập định tuyến thật (Caddy + API + Next.js trên máy). `docker-compose.prod.yml` đã qua `docker compose config`.
+>
+> | # | Chỗ sửa | Vì sao |
+> |---|---|---|
+> | 1 | Task 2 chỉ thêm giới hạn **đăng nhập**; bỏ file `auth/ratelimit.py` | Đăng ký đã có giới hạn theo IP từ plan admin (`register-ip`, 20/giờ). Làm lại sẽ đếm hai lần. Fixture `limiter` cũng đã có sẵn |
+> | 2 | Task 5 thêm xóa cache khi admin **ẩn / hiện lại** khóa | Không thì khóa bị ẩn vẫn nằm trên catalog tới 60 giây |
+> | 3 | Task 7 thêm `METRICS_REFRESH_S` vào `.env.example`, sửa `noqa` thừa | `test_config` bắt mọi setting phải có trong `.env.example`; ruff báo `RUF100` |
+> | 4 | Task 7 đo thêm hộp thư đi (email) và token AI | Hai thứ mới dễ hỏng / tốn tiền nhất |
+> | 5 | Task 9: thêm service `web` (Next.js), Caddy chuyển `/` tới web, thêm SMTP Brevo, `APP_BASE_URL`, CORS của MinIO | Plan gốc chỉ có trang giữ chỗ, chưa gửi được email thật |
+> | 6 | Mật khẩu Postgres / Redis sinh bằng `openssl rand -hex 32` | Base64 có ký tự `/`: arq đọc sai `REDIS_URL` (đã thử: `invalid literal for int()`), worker không chạy |
+> | 7 | Task 13 `perf_seed`: email `@example.com`, đánh dấu đã xác minh, nạp `models_registry` | Bản cũ dùng `@lms.local` (đăng nhập từ chối), chưa xác minh (403), và lỗi `NoReferencedTableError` khi chạy |
+> | 8 | Task 11 `deploy.sh` chờ cả web | Bản cũ chỉ kiểm API |
+> | 9 | Task 12 runbook thêm swap, Brevo, thử email | VPS 4 GB build Next.js dễ hết RAM; email cần cấu hình người gửi |
+> | 10 | Task 3 quét thêm thư viện frontend; Task 14, 15, 16 cập nhật theo tính năng mới | OWASP, sơ đồ kiến trúc và ERD phải khớp code thật |
+
 **Điều kiện trước khi chạy plan (bắt buộc):**
 
-1. Plan tuần 2 (`2026-09-29-week2-backend-plan.md`) đã xong. Plan này dùng lại:
-   - `app/core/ratelimit.py`: `RateLimiter`, `get_rate_limiter`.
-   - `tests/fakes.py`: `InMemoryRateLimiter`.
-   - Bảng `chat_messages`, có cột `ttft_ms` và `role`.
+1. Plan tuần 2, FE-1, FE-2, **plan admin** (`2026-10-07-admin-plan.md`) và **plan AI Studio** (`2026-10-08-ai-studio-plan.md`) đã xong. Plan này dùng lại:
+   - `app/core/ratelimit.py` (`RateLimiter`, `get_rate_limiter`), fixture `limiter` trong `tests/conftest.py`, hàm `_limit` / `_ip` trong `app/modules/auth/router.py`.
+   - Bảng `chat_messages` (cột `ttft_ms`, `role`), `email_outbox`, `ai_calls`, `study_artifacts`, `notes`.
+   - `frontend/Dockerfile` (Next.js standalone, build arg `API_ORIGIN`).
 2. CI (S1) đang xanh.
 
 **Ngoài phạm vi:**
 
-- Frontend. Caddy mới trả một trang giữ chỗ; plan frontend sẽ thay bằng `reverse_proxy web:3000`.
 - Mirror dữ liệu MinIO ra ngoài VPS. Backup hiện nằm trên chính VPS; đồng bộ sang nơi khác ghi vào mục Hướng phát triển.
 - Guard chặn JWT secret mặc định. Bạn đã quyết định bỏ qua; production dùng secret sinh ngẫu nhiên, xem Task 12.
+- Content-Security-Policy cho trang web Next.js (cần liệt kê nguồn script / style của KaTeX, video MinIO…). Trang web chỉ có các header cơ bản (Task 9).
 
 **Bổ sung so với spec** (cập nhật vào spec ở Task 16):
 
 - **Endpoint mới:** `GET /api/v1/ready` (công khai, không cần token) và `GET /metrics` (chỉ gọi được trong mạng nội bộ; Caddy chặn từ bên ngoài).
-- **Setting mới:** `CACHE_ENABLED`, `CACHE_TTL_S`, `LOGIN_RATE_LIMIT_PER_MIN`, `REGISTER_RATE_LIMIT_PER_HOUR`, `MINIO_PUBLIC_SECURE`, `METRICS_REFRESH_S`.
-- **Giới hạn đăng nhập/đăng ký chọn rộng (20/phút và 20/giờ cho mỗi IP)** vì cả lớp dùng WiFi trường thì đi chung một IP (NAT). Giới hạn chặt hơn sẽ chặn nhầm đợt dùng thử của cả lớp.
+- **Setting mới:** `CACHE_ENABLED`, `CACHE_TTL_S`, `LOGIN_RATE_LIMIT_PER_MIN`, `MINIO_PUBLIC_SECURE`, `METRICS_REFRESH_S`.
+- **Giới hạn đăng nhập chọn rộng (20 lần / phút / IP)** vì cả lớp dùng WiFi trường thì đi chung một IP (NAT). Giới hạn chặt hơn sẽ chặn nhầm đợt dùng thử của cả lớp. Đăng ký (20 / giờ / IP) và gửi lại email xác minh đã có giới hạn từ plan admin.
 
 ---
 
@@ -72,9 +87,10 @@ lms-ai/
     ├── app/core/middleware.py         # (sửa) SecurityHeadersMiddleware
     ├── app/core/storage.py            # (sửa) ping(), MINIO_PUBLIC_SECURE
     ├── app/core/config.py             # (sửa) setting mới
-    ├── app/modules/auth/ratelimit.py  # (mới) dependency giới hạn theo IP
+    ├── app/modules/auth/router.py     # (sửa) giới hạn đăng nhập theo IP
     ├── app/modules/courses/service.py # (sửa) cache catalog/chi tiết, xóa cache khi dữ liệu đổi
     ├── app/main.py                    # (sửa) middleware, router health, metrics, lifespan
+    ├── app/modules/admin/service.py   # (sửa) xóa cache khi ẩn / hiện lại khóa
     ├── scripts/{perf_seed.py,gen_erd.py}
     └── tests/test_{security_headers,auth_ratelimit,cache,course_cache,ready,metrics}.py
 ```
@@ -180,162 +196,97 @@ git add backend && git commit -m "feat(security): security headers middleware fo
 
 ---
 
-### Task 2: Rate limit cho đăng nhập và đăng ký theo IP
+### Task 2: Rate limit cho đăng nhập theo IP
 
 **Files:**
-- Create: `backend/app/modules/auth/ratelimit.py`
-- Modify: `backend/app/core/config.py`, `backend/.env.example`, `backend/app/modules/auth/router.py`, `backend/tests/conftest.py` (nếu cần, xem Step 1)
+- Modify: `backend/app/core/config.py`, `backend/.env.example`, `backend/app/modules/auth/router.py`
 - Test: `backend/tests/test_auth_ratelimit.py`
 
-- [ ] **Step 1: Kiểm tra fixture `client` đã thay rate limiter thật chưa**
+Đăng ký và gửi lại email xác minh **đã có** giới hạn theo IP từ plan admin (`register-ip`, `verify-resend-ip` trong `auth/router.py`). Task này chỉ thêm đăng nhập, dùng lại `_limit`, `_ip`, `_too_many` sẵn có. Fixture `limiter` (rate limiter giả, mới cho mỗi test) cũng đã có trong `tests/conftest.py`.
 
-Mở `tests/conftest.py`. Fixture `client` **phải** có dòng `app.dependency_overrides[get_rate_limiter] = ...` trỏ tới một `InMemoryRateLimiter()` mới cho mỗi test (plan tuần 2, Task 8–11). Nếu chưa có, thêm vào fixture `client`:
-
-```python
-from app.core.ratelimit import get_rate_limiter  # noqa: E402
-from tests.fakes import InMemoryRateLimiter  # noqa: E402
-
-
-@pytest.fixture
-def rate_limiter():
-    return InMemoryRateLimiter()
-```
-
-Trong fixture `client`, thêm tham số `rate_limiter` và dòng `app.dependency_overrides[get_rate_limiter] = lambda: rate_limiter`.
-
-**Tại sao bắt buộc:** nếu không thay, toàn bộ test suite sẽ đăng nhập hàng trăm lần từ cùng IP `127.0.0.1` vào Redis thật và bị chặn 429 ngẫu nhiên.
-
-- [ ] **Step 2: Setting**: thêm vào `Settings` trong `app/core/config.py`, cạnh `tutor_rate_limit_per_hour`:
+- [ ] **Step 1: Setting**: thêm vào `Settings` trong `app/core/config.py`, ngay dưới `tutor_rate_limit_per_hour`:
 
 ```python
-    # Rộng tay vì cả lớp dùng chung một IP khi ở WiFi trường (NAT)
+    # Đếm cả lần sai mật khẩu. Rộng tay vì cả lớp dùng chung một IP khi ở WiFi trường (NAT)
     login_rate_limit_per_min: int = 20
-    register_rate_limit_per_hour: int = 20
 ```
 
-Thêm vào cuối `backend/.env.example`:
+Thêm vào cuối `backend/.env.example`: `LOGIN_RATE_LIMIT_PER_MIN=20`
 
-```
-LOGIN_RATE_LIMIT_PER_MIN=20
-REGISTER_RATE_LIMIT_PER_HOUR=20
-```
-
-- [ ] **Step 3: Viết test hỏng trước — `tests/test_auth_ratelimit.py`**
+- [ ] **Step 2: Viết test hỏng trước — `tests/test_auth_ratelimit.py`**
 
 ```python
-import httpx
-
 from app.core.config import get_settings
-from app.core.ratelimit import get_rate_limiter
-from app.main import create_app
-from tests.fakes import InMemoryRateLimiter
 from tests.helpers import API, register_user
 
 
-def _client_with(limiter):
-    app = create_app()
-    app.dependency_overrides[get_rate_limiter] = lambda: limiter
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
-
-
-async def test_login_is_rate_limited_per_ip():
-    limiter = InMemoryRateLimiter()
-    async with _client_with(limiter) as c:
-        await register_user(c, "rl@x.com")
-        body = {"email": "rl@x.com", "password": "password123"}
-        for _ in range(get_settings().login_rate_limit_per_min):
-            assert (await c.post(f"{API}/auth/login", json=body)).status_code == 200
-        r = await c.post(f"{API}/auth/login", json=body)
+async def test_login_is_rate_limited_per_ip(client, limiter):
+    await register_user(client, "rl@x.com")
+    body = {"email": "rl@x.com", "password": "password123"}
+    for _ in range(get_settings().login_rate_limit_per_min):
+        assert (await client.post(f"{API}/auth/login", json=body)).status_code == 200
+    r = await client.post(f"{API}/auth/login", json=body)
     assert r.status_code == 429
     assert r.json()["error"]["code"] == "RATE_LIMITED"
     assert int(r.headers["retry-after"]) > 0
-    assert "auth:login:127.0.0.1" in limiter.counts
+    assert any(k.startswith("login-ip:") for k in limiter.counts)
 
 
-async def test_wrong_password_attempts_also_count():
-    limiter = InMemoryRateLimiter()
-    async with _client_with(limiter) as c:
-        await register_user(c, "rl2@x.com")
-        bad = {"email": "rl2@x.com", "password": "saimatkhau1"}
-        for _ in range(get_settings().login_rate_limit_per_min):
-            assert (await c.post(f"{API}/auth/login", json=bad)).status_code == 401
-        r = await c.post(f"{API}/auth/login", json=bad)
-    assert r.status_code == 429
-
-
-async def test_register_is_rate_limited_per_ip():
-    limiter = InMemoryRateLimiter()
-    async with _client_with(limiter) as c:
-        for i in range(get_settings().register_rate_limit_per_hour):
-            await register_user(c, f"reg{i}@x.com")
-        r = await c.post(f"{API}/auth/register",
-                         json={"email": "reg-x@x.com", "password": "password123", "full_name": "X"})
+async def test_wrong_password_attempts_also_count(client):
+    await register_user(client, "rl2@x.com")
+    bad = {"email": "rl2@x.com", "password": "saimatkhau1"}
+    for _ in range(get_settings().login_rate_limit_per_min):
+        assert (await client.post(f"{API}/auth/login", json=bad)).status_code == 401
+    r = await client.post(f"{API}/auth/login", json=bad)
     assert r.status_code == 429
 ```
 
-- [ ] **Step 4: Chạy test**
+`register_user` mặc định đánh dấu đã xác minh email, nên đăng nhập trả 200 chứ không phải 403.
+
+- [ ] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_auth_ratelimit.py -v`
 Expected: FAIL (lần đăng nhập thứ 21 vẫn trả 200)
 
-- [ ] **Step 5: `app/modules/auth/ratelimit.py`**
+- [ ] **Step 4: Sửa `app/modules/auth/router.py`**
+  - Hàm `_limit` nhận thêm cửa sổ thời gian:
 
 ```python
-"""Giới hạn số lần gọi endpoint xác thực theo IP (chống dò mật khẩu, spam đăng ký)."""
-
-from collections.abc import Awaitable, Callable
-
-from fastapi import Depends, Request
-
-from app.core.config import get_settings
-from app.core.errors import AppError
-from app.core.ratelimit import RateLimiter, get_rate_limiter
-
-
-def client_ip(request: Request) -> str:
-    # Ở production uvicorn chạy với --proxy-headers nên request.client là IP thật lấy từ X-Forwarded-For
-    # do Caddy gắn; API chỉ nhận kết nối từ Caddy trong mạng nội bộ nên tin header này là an toàn.
-    return request.client.host if request.client else "unknown"
-
-
-def auth_rate_limit(action: str, limit_setting: str, window_s: int) -> Callable[..., Awaitable[None]]:
-    async def dependency(request: Request, limiter: RateLimiter = Depends(get_rate_limiter)) -> None:
-        limit = getattr(get_settings(), limit_setting)
-        retry_after = await limiter.hit(f"auth:{action}:{client_ip(request)}", limit, window_s)
-        if retry_after is not None:
-            raise AppError(
-                "RATE_LIMITED",
-                "Bạn thao tác quá nhanh, vui lòng thử lại sau",
-                429,
-                {"retry_after": retry_after},
-                headers={"Retry-After": str(retry_after)},
-            )
-
-    return dependency
-
-
-login_rate_limit = auth_rate_limit("login", "login_rate_limit_per_min", 60)
-register_rate_limit = auth_rate_limit("register", "register_rate_limit_per_hour", 3600)
+async def _limit(limiter: RateLimiter, key: str, limit: int, window_s: int = 3600) -> None:
+    wait = await limiter.hit(key, limit, window_s)
+    if wait is not None:
+        raise _too_many(wait)
 ```
 
-- [ ] **Step 6: Gắn vào router** (`app/modules/auth/router.py`)
-  - Thêm import: `from app.modules.auth.ratelimit import login_rate_limit, register_rate_limit`
-  - Sửa decorator của route đăng ký thành:
-    `@router.post("/auth/register", response_model=UserOut, status_code=201, dependencies=[Depends(register_rate_limit)])`
-  - Sửa decorator của route đăng nhập thành:
-    `@router.post("/auth/login", response_model=TokenOut, dependencies=[Depends(login_rate_limit)])`
+  - Thay route đăng nhập bằng:
 
-Dependency chạy **trước** handler, nên lần đăng nhập sai mật khẩu cũng bị đếm. Đây chính là điều cần để chống dò mật khẩu.
+```python
+@router.post("/auth/login", response_model=TokenOut)
+async def login(
+    data: LoginIn,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+):
+    """429 RATE_LIMITED khi một IP gọi quá LOGIN_RATE_LIMIT_PER_MIN lần / phút (tính cả lần sai mật khẩu)."""
+    await _limit(limiter, f"login-ip:{_ip(request)}", get_settings().login_rate_limit_per_min, 60)
+    access, raw = await service.login(db, data)
+    set_refresh_cookie(response, raw)
+    return TokenOut(access_token=access)
+```
 
-- [ ] **Step 7: Chạy toàn bộ test**
+Giới hạn chạy **trước** khi kiểm mật khẩu, nên lần đăng nhập sai cũng bị đếm. Đây chính là điều cần để chống dò mật khẩu. `_ip()` đọc `request.client.host`: ở production uvicorn chạy `--proxy-headers` sau Caddy nên đây là IP thật (Task 9).
+
+- [ ] **Step 5: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
-Expected: PASS hết (các file test cũ dùng fixture `client` với rate limiter mới cho mỗi test)
+Expected: PASS hết
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add backend && git commit -m "feat(security): per-IP rate limit on login and register"
+git add backend && git commit -m "feat(security): per-IP rate limit on login"
 ```
 
 ---
@@ -374,7 +325,12 @@ Xóa file tạm: `rm ../.audit-req.txt`.
         run: uv export --frozen --no-dev --no-hashes --no-emit-project --format requirements-txt -o /tmp/req.txt
       - name: Quét lỗ hổng đã công bố (OSV/PyPI advisory)
         run: uvx pip-audit -r /tmp/req.txt
+      - name: Quét lỗ hổng thư viện frontend (chỉ thư viện chạy production, mức high trở lên)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 ```
+
+Nếu `npm audit` báo lỗi: xem thư viện nào, nâng đúng thư viện đó (`npm install <tên>@<bản vá>`) rồi chạy lại `npm test` và E2E. **Không dùng `npm audit fix --force`** (nó tự nâng bản chính, dễ làm hỏng Next.js).
 
 - [ ] **Step 3: Commit, push và kiểm tra**
 
@@ -477,6 +433,7 @@ async def test_not_cacheable_results_are_not_stored():
 async def test_load_racing_with_bump_does_not_poison_new_version():
     c = _cache()
     try:
+
         async def stale_loader():
             await c.bump("ns")  # giả lập: giảng viên sửa khóa đúng lúc đang đọc DB
             return {"v": "cu"}, True
@@ -618,14 +575,14 @@ git add backend && git commit -m "feat(cache): versioned Redis JSON cache with f
 ### Task 5: Cache catalog và trang chi tiết khóa học
 
 **Files:**
-- Modify: `backend/app/modules/courses/service.py`, `backend/app/modules/courses/router.py`
+- Modify: `backend/app/modules/courses/service.py`, `backend/app/modules/courses/router.py`, `backend/app/modules/admin/service.py`
 - Test: `backend/tests/test_course_cache.py`
 
 **Quy tắc:**
 
 - Catalog được cache theo `(q, page, size)`.
 - Trang chi tiết cache **phần chung** của khóa (thông tin khóa và mục lục), **chỉ khi khóa đã publish**. Hai cờ `is_enrolled` và `is_owner` luôn được tính lại cho từng người, nên cùng một bản cache dùng được cho mọi người xem.
-- Mọi thao tác thay đổi khóa, chương hoặc bài học đều gọi `bump(COURSES_NS)`.
+- Mọi thao tác thay đổi khóa, chương hoặc bài học đều gọi `bump(COURSES_NS)`, **kể cả khi admin ẩn / hiện lại khóa**.
 
 - [ ] **Step 1: Viết test hỏng trước — `tests/test_course_cache.py`**
 
@@ -639,7 +596,15 @@ from app.core import cache as cache_mod
 from app.core.cache import RedisCache
 from app.core.config import get_settings
 from app.modules.courses.models import Course
-from tests.helpers import API, add_lesson, create_course, make_published_course, make_student, make_teacher
+from tests.helpers import (
+    API,
+    add_lesson,
+    create_course,
+    make_admin,
+    make_published_course,
+    make_student,
+    make_teacher,
+)
 
 
 @pytest.fixture
@@ -650,24 +615,24 @@ async def redis_cache(monkeypatch):
     await c.aclose()
 
 
-async def _first_title(client) -> str:
-    return (await client.get(f"{API}/courses")).json()["items"][0]["title"]
+async def _titles(client) -> list[str]:
+    return [c["title"] for c in (await client.get(f"{API}/courses")).json()["items"]]
 
 
 async def test_catalog_served_from_cache_until_course_changes(client, db, redis_cache):
     _, gv = await make_teacher(client)
     course, _, _ = await make_published_course(client, gv, title="Cấu trúc dữ liệu")
-    assert await _first_title(client) == "Cấu trúc dữ liệu"
+    assert await _titles(client) == ["Cấu trúc dữ liệu"]
 
     # Sửa thẳng DB (không qua service nên không bump) → vẫn thấy bản cache: chứng minh có cache
     await db.execute(update(Course).where(Course.id == uuid.UUID(course["id"])).values(title="Đổi ngầm"))
     await db.commit()
-    assert await _first_title(client) == "Cấu trúc dữ liệu"
+    assert await _titles(client) == ["Cấu trúc dữ liệu"]
 
     # Sửa qua API → service bump → thấy bản mới ngay
     r = await client.patch(f"{API}/courses/{course['id']}", json={"title": "Giải thuật nâng cao"}, headers=gv)
     assert r.status_code == 200
-    assert await _first_title(client) == "Giải thuật nâng cao"
+    assert await _titles(client) == ["Giải thuật nâng cao"]
 
 
 async def test_detail_cache_keeps_per_user_flags(client, redis_cache):
@@ -700,12 +665,31 @@ async def test_adding_lesson_invalidates_detail(client, redis_cache):
     assert len((await client.get(url)).json()["sections"][0]["lessons"]) == 1
     await add_lesson(client, gv, section["id"], "Bài 2")
     assert len((await client.get(url)).json()["sections"][0]["lessons"]) == 2
+
+
+async def test_admin_hide_and_unhide_take_effect_immediately(client, redis_cache):
+    _, gv = await make_teacher(client)
+    _, ad = await make_admin(client)
+    course, _, _ = await make_published_course(client, gv, title="Khóa vi phạm")
+    url = f"{API}/courses/{course['slug']}"
+    assert await _titles(client) == ["Khóa vi phạm"]
+    assert (await client.get(url)).status_code == 200  # đã nằm trong cache
+
+    r = await client.post(f"{API}/admin/courses/{course['id']}/hide", json={"reason": "Vi phạm"}, headers=ad)
+    assert r.status_code == 200
+    assert await _titles(client) == []
+    assert (await client.get(url)).status_code == 404
+    owner = (await client.get(url, headers=gv)).json()
+    assert owner["hidden_reason"] == "Vi phạm"
+
+    assert (await client.post(f"{API}/admin/courses/{course['id']}/unhide", headers=ad)).status_code == 200
+    assert await _titles(client) == ["Khóa vi phạm"]
 ```
 
 - [ ] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_course_cache.py -v`
-Expected: `test_catalog_served_from_cache_until_course_changes` FAIL (thấy "Đổi ngầm" vì chưa có cache). Các test còn lại có thể PASS ngay, vì chúng chỉ canh để không làm hỏng hành vi hiện có.
+Expected: `test_catalog_served_from_cache_until_course_changes` FAIL (thấy "Đổi ngầm" vì chưa có cache). Riêng `test_admin_hide_and_unhide_take_effect_immediately` chỉ fail sau Step 3 nếu quên Step 4b. Các test còn lại có thể PASS ngay, vì chúng chỉ canh để không làm hỏng hành vi hiện có.
 
 - [ ] **Step 3: Sửa `app/modules/courses/service.py`**
 
@@ -717,15 +701,15 @@ from app.core.cache import COURSES_NS
 from app.core.config import get_settings
 ```
 
-Thêm hàm này ngay trên `def make_slug`:
+Thêm hàm này ngay trên `def make_slug` (không có `_` ở đầu vì `admin/service.py` cũng gọi):
 
 ```python
-async def _invalidate_courses() -> None:
+async def invalidate_courses_cache() -> None:
     """Gọi sau mọi commit làm đổi dữ liệu hiển thị trên catalog/chi tiết khóa."""
     await cache_mod.get_cache().bump(COURSES_NS)
 ```
 
-Thêm dòng `await _invalidate_courses()` ngay **sau** `await db.commit()` trong **đúng 10 hàm** sau:
+Thêm dòng `await invalidate_courses_cache()` ngay **sau** `await db.commit()` trong **đúng 10 hàm** sau:
 
 - `update_course`, `delete_course`, `publish_course`
 - `add_section`, `update_section`, `delete_section`
@@ -773,10 +757,12 @@ async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> C
 
     async def load():
         base = await _load_detail_base(db, slug)
-        # Chỉ cache khóa đã publish: bản nháp chỉ chủ khóa xem, không được lọt ra cho người khác
+        # Chỉ cache khóa đã publish: bản nháp / bị ẩn chỉ chủ khóa xem, không được lọt ra cho người khác
         return base, base["status"] == CourseStatus.published.value
 
-    base = await cache_mod.get_cache().get_or_load(COURSES_NS, f"detail:{slug}", get_settings().cache_ttl_s, load)
+    base = await cache_mod.get_cache().get_or_load(
+        COURSES_NS, f"detail:{slug}", get_settings().cache_ttl_s, load
+    )
     teacher_id, course_id = uuid.UUID(base["teacher_id"]), uuid.UUID(base["id"])
     is_owner = user is not None and (user.role == Role.admin or teacher_id == user.id)
     if base["status"] != CourseStatus.published.value and not is_owner:
@@ -786,6 +772,14 @@ async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> C
 ```
 
 - [ ] **Step 4: Router dùng bản có cache** (`app/modules/courses/router.py`): trong hàm `catalog`, đổi lời gọi `service.list_published(...)` thành `service.list_published_cached(...)`, giữ nguyên tham số.
+
+- [ ] **Step 4b: Admin ẩn / hiện lại khóa cũng xóa cache** (`app/modules/admin/service.py`)
+  - Import: `from app.modules.courses.service import invalidate_courses_cache` (đặt ngay dưới dòng import `app.modules.courses.models`).
+  - Trong `hide_course` và `unhide_course`, thêm ngay **sau** `await db.commit()`:
+
+```python
+    await invalidate_courses_cache()  # khóa vào / ra khỏi catalog ngay, không chờ hết TTL
+```
 
 - [ ] **Step 5: Chạy toàn bộ test**
 
@@ -917,8 +911,11 @@ def get_redis_ping() -> RedisPing:
 
 
 @router.get("/ready")
-async def ready(db: AsyncSession = Depends(get_db), storage: Storage = Depends(get_storage),
-                redis_ping: RedisPing = Depends(get_redis_ping)) -> JSONResponse:
+async def ready(
+    db: AsyncSession = Depends(get_db),
+    storage: Storage = Depends(get_storage),
+    redis_ping: RedisPing = Depends(get_redis_ping),
+) -> JSONResponse:
     async def check_db() -> None:
         await db.execute(text("SELECT 1"))
 
@@ -930,8 +927,9 @@ async def ready(db: AsyncSession = Depends(get_db), storage: Storage = Depends(g
         except Exception as e:  # noqa: BLE001 — mọi lỗi đều nghĩa là chưa sẵn sàng
             checks[name] = f"error: {type(e).__name__}"
     ok = all(v == "ok" for v in checks.values())
-    return JSONResponse({"status": "ready" if ok else "not_ready", "checks": checks},
-                        status_code=200 if ok else 503)
+    return JSONResponse(
+        {"status": "ready" if ok else "not_ready", "checks": checks}, status_code=200 if ok else 503
+    )
 ```
 
 (Chỉ trả **tên loại lỗi**, không trả nội dung lỗi, để không lộ host hay mật khẩu trong chuỗi kết nối.)
@@ -965,7 +963,7 @@ git add backend && git commit -m "feat(ops): readiness endpoint checking db, red
 Run: `uv add prometheus-fastapi-instrumentator`
 Expected: `pyproject.toml` và `uv.lock` được cập nhật (kéo theo `prometheus-client`).
 
-Thêm vào `Settings`: `metrics_refresh_s: int = 15`
+Thêm vào `Settings`: `metrics_refresh_s: int = 15`, và thêm dòng `METRICS_REFRESH_S=15` vào cuối `backend/.env.example` (`tests/test_config.py` bắt mọi setting phải có trong file này).
 
 - [ ] **Step 2: Viết test hỏng trước — `tests/test_metrics.py`**
 
@@ -974,9 +972,11 @@ import uuid
 
 from prometheus_client import REGISTRY
 
+from app.ai.models import AiCall
 from app.core.metrics import refresh_business_metrics
 from app.core.time import utcnow
 from app.modules.jobs.models import Job, JobStatus
+from app.modules.notify.models import EmailOutbox, EmailStatus
 
 
 async def test_metrics_endpoint_exposes_http_metrics(client):
@@ -992,25 +992,60 @@ async def test_metrics_endpoint_is_hidden_from_openapi(client):
     assert "/metrics" not in (await client.get("/openapi.json")).json()["paths"]
 
 
-async def test_business_metrics_count_active_and_recent_failed_jobs(db):
-    db.add_all([
-        Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.pending),
-        Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.pending),
-        Job(type="quiz_gen", ref_id=uuid.uuid4(), status=JobStatus.processing),
-        Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.failed, finished_at=utcnow()),
-        Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.done, finished_at=utcnow()),
-    ])
+def _mail(status: EmailStatus) -> EmailOutbox:
+    return EmailOutbox(
+        to_email="a@x.com", subject="s", body_text="t", body_html="h", template="verify_email", status=status
+    )
+
+
+async def test_business_metrics_count_jobs_emails_and_ai_tokens(db):
+    db.add_all(
+        [
+            Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.pending),
+            Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.pending),
+            Job(type="studio_gen", ref_id=uuid.uuid4(), status=JobStatus.processing),
+            Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.failed, finished_at=utcnow()),
+            Job(type="ingest_pdf", ref_id=uuid.uuid4(), status=JobStatus.done, finished_at=utcnow()),
+            _mail(EmailStatus.pending),
+            _mail(EmailStatus.failed),
+            _mail(EmailStatus.sent),
+            AiCall(
+                op="tutor_answer",
+                provider="fake",
+                model="m",
+                prompt_version="v1",
+                status="ok",
+                tokens_in=100,
+                tokens_out=20,
+            ),
+            AiCall(
+                op="tutor_answer",
+                provider="fake",
+                model="m",
+                prompt_version="v1",
+                status="ok",
+                tokens_in=50,
+                tokens_out=5,
+            ),
+        ]
+    )
     await db.commit()
     await refresh_business_metrics(db)
 
-    def val(type_, status):
-        return REGISTRY.get_sample_value("lms_jobs", {"type": type_, "status": status})
+    def val(name, **labels):
+        return REGISTRY.get_sample_value(name, labels)
 
-    assert val("ingest_pdf", "pending") == 2
-    assert val("quiz_gen", "processing") == 1
-    assert val("ingest_pdf", "failed_1h") == 1
-    assert val("ingest_pdf", "done") is None  # job đã xong không phải việc cần theo dõi
-    assert REGISTRY.get_sample_value("lms_tutor_ttft_p95_ms") == 0  # chưa có tin nhắn Tutor nào
+    assert val("lms_jobs", type="ingest_pdf", status="pending") == 2
+    assert val("lms_jobs", type="studio_gen", status="processing") == 1
+    assert val("lms_jobs", type="ingest_pdf", status="failed_1h") == 1
+    assert (
+        val("lms_jobs", type="ingest_pdf", status="done") is None
+    )  # job đã xong không phải việc cần theo dõi
+    assert val("lms_tutor_ttft_p95_ms") == 0  # chưa có tin nhắn Tutor nào
+    assert val("lms_email_outbox", status="pending") == 1
+    assert val("lms_email_outbox", status="failed_24h") == 1
+    assert val("lms_ai_tokens_1h", op="tutor_answer", direction="in") == 150
+    assert val("lms_ai_tokens_1h", op="tutor_answer", direction="out") == 25
 ```
 
 - [ ] **Step 3: Chạy test**
@@ -1024,7 +1059,11 @@ Expected: FAIL với `ModuleNotFoundError: No module named 'app.core.metrics'`
 """Metrics cho Prometheus (spec tầng S4).
 
 - HTTP: prometheus-fastapi-instrumentator (http_requests_total, http_request_duration_*).
-- Nghiệp vụ: số job đang chờ/chạy/lỗi và p95 TTFT của AI Tutor, lấy từ DB mỗi `metrics_refresh_s` giây.
+- Nghiệp vụ, lấy từ DB mỗi `metrics_refresh_s` giây:
+  - số job đang chờ / đang chạy / lỗi trong 1 giờ (gồm cả job AI Studio),
+  - p95 thời gian tới token đầu của AI Tutor,
+  - số email đang chờ gửi và email lỗi hẳn trong 24 giờ (hộp thư đi),
+  - token AI 1 giờ gần nhất (bảng ai_calls).
 """
 
 import asyncio
@@ -1043,8 +1082,20 @@ logger = logging.getLogger(__name__)
 # Tạo MỘT lần cho cả tiến trình: test gọi create_app() nhiều lần, tạo lại sẽ trùng tên metric
 _HTTP_METRICS = metrics.default()
 
-JOBS = Gauge("lms_jobs", "Số job theo loại và trạng thái (failed_1h: lỗi trong 1 giờ gần nhất)", ["type", "status"])
-TUTOR_TTFT_P95 = Gauge("lms_tutor_ttft_p95_ms", "p95 thời gian tới token đầu tiên của AI Tutor, 15 phút gần nhất")
+JOBS = Gauge(
+    "lms_jobs", "Số job theo loại và trạng thái (failed_1h: lỗi trong 1 giờ gần nhất)", ["type", "status"]
+)
+TUTOR_TTFT_P95 = Gauge(
+    "lms_tutor_ttft_p95_ms", "p95 thời gian tới token đầu tiên của AI Tutor, 15 phút gần nhất"
+)
+EMAILS = Gauge(
+    "lms_email_outbox",
+    "Email trong hộp thư đi (pending: chờ gửi, failed_24h: lỗi hẳn, tạo trong 24 giờ)",
+    ["status"],
+)
+AI_TOKENS = Gauge(
+    "lms_ai_tokens_1h", "Token AI 1 giờ gần nhất theo loại tác vụ và chiều (in/out)", ["op", "direction"]
+)
 
 _EXCLUDED = ["/metrics", "/api/v1/health", "/api/v1/ready"]
 
@@ -1056,27 +1107,64 @@ def setup_metrics(app: FastAPI) -> None:
 
 
 async def refresh_business_metrics(db: AsyncSession) -> None:
-    rows = (await db.execute(text(
-        """
-        SELECT type, CASE WHEN status = 'failed' THEN 'failed_1h' ELSE status::text END, count(*)
-        FROM jobs
-        WHERE status IN ('pending', 'processing')
-           OR (status = 'failed' AND finished_at > now() - interval '1 hour')
-        GROUP BY 1, 2
-        """
-    ))).all()
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT type, CASE WHEN status = 'failed' THEN 'failed_1h' ELSE status::text END, count(*)
+                FROM jobs
+                WHERE status IN ('pending', 'processing')
+                   OR (status = 'failed' AND finished_at > now() - interval '1 hour')
+                GROUP BY 1, 2
+                """
+            )
+        )
+    ).all()
     JOBS.clear()  # xóa nhãn cũ: loại job đã hết việc thì không còn treo số liệu cũ
     for type_, status, count in rows:
         JOBS.labels(type=type_, status=status).set(count)
 
-    p95 = await db.scalar(text(
-        """
-        SELECT percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms)
-        FROM chat_messages
-        WHERE role = 'assistant' AND ttft_ms IS NOT NULL AND created_at > now() - interval '15 minutes'
-        """
-    ))
+    p95 = await db.scalar(
+        text(
+            """
+            SELECT percentile_cont(0.95) WITHIN GROUP (ORDER BY ttft_ms)
+            FROM chat_messages
+            WHERE role = 'assistant' AND ttft_ms IS NOT NULL AND created_at > now() - interval '15 minutes'
+            """
+        )
+    )
     TUTOR_TTFT_P95.set(p95 or 0)
+
+    pending, failed = (
+        await db.execute(
+            text(
+                """
+                SELECT count(*) FILTER (WHERE status = 'pending'),
+                       count(*) FILTER (WHERE status = 'failed' AND created_at > now() - interval '1 day')
+                FROM email_outbox
+                """
+            )
+        )
+    ).one()
+    EMAILS.labels(status="pending").set(pending)
+    EMAILS.labels(status="failed_24h").set(failed)
+
+    tokens = (
+        await db.execute(
+            text(
+                """
+                SELECT op, coalesce(sum(tokens_in), 0), coalesce(sum(tokens_out), 0)
+                FROM ai_calls
+                WHERE created_at > now() - interval '1 hour'
+                GROUP BY op
+                """
+            )
+        )
+    ).all()
+    AI_TOKENS.clear()
+    for op, t_in, t_out in tokens:
+        AI_TOKENS.labels(op=op, direction="in").set(t_in)
+        AI_TOKENS.labels(op=op, direction="out").set(t_out)
 
 
 async def metrics_refresher(interval_s: int) -> None:
@@ -1084,14 +1172,14 @@ async def metrics_refresher(interval_s: int) -> None:
         try:
             async with SessionLocal() as db:
                 await refresh_business_metrics(db)
-        except Exception:  # noqa: BLE001 — lỗi đo đạc không được làm sập API
+        except Exception:  # lỗi đo đạc không được làm sập API
             logger.exception("Không cập nhật được metrics nghiệp vụ")
         await asyncio.sleep(interval_s)
 ```
 
 - [ ] **Step 5: Gắn vào `app/main.py`**
   - Import: `import asyncio`, `from contextlib import suppress`, `from app.core.metrics import metrics_refresher, setup_metrics`
-  - Thay hàm `lifespan` bằng:
+  - Thay hàm `lifespan` bằng (giữ `close_rate_limiter()` đã có):
 
 ```python
 @asynccontextmanager
@@ -1101,10 +1189,13 @@ async def lifespan(app: FastAPI):
     if ensure_bucket is not None:
         await ensure_bucket()
     refresher = asyncio.create_task(metrics_refresher(get_settings().metrics_refresh_s))
-    yield
-    refresher.cancel()
-    with suppress(asyncio.CancelledError):
-        await refresher
+    try:
+        yield
+    finally:
+        refresher.cancel()
+        with suppress(asyncio.CancelledError):
+            await refresher
+        await close_rate_limiter()  # tự bắt lỗi, không làm hỏng việc tắt app
 ```
 
   - Trong `create_app`, thêm `setup_metrics(app)` ngay trước dòng `return app`.
@@ -1117,12 +1208,12 @@ Expected: PASS hết
 - [ ] **Step 7: Kiểm tra trên stack dev**
 
 Run: `docker compose up -d --build api` rồi mở http://localhost:8000/metrics
-Expected: thấy `http_requests_total`, `lms_jobs`, `lms_tutor_ttft_p95_ms`.
+Expected: thấy `http_requests_total`, `lms_jobs`, `lms_tutor_ttft_p95_ms`, `lms_email_outbox`, `lms_ai_tokens_1h`.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add backend && git commit -m "feat(ops): Prometheus metrics for HTTP traffic, job queue and tutor TTFT"
+git add backend && git commit -m "feat(ops): Prometheus metrics for HTTP, jobs, tutor TTFT, email outbox and AI tokens"
 ```
 
 ---
@@ -1186,6 +1277,8 @@ git add backend && git commit -m "feat(storage): separate https setting for publ
 - Create: `docker-compose.prod.yml`, `.env.prod.example`, `infra/prod.sh`, `infra/caddy/Caddyfile`, `infra/prometheus/prometheus.yml`, `infra/grafana/provisioning/datasources/prometheus.yml`, `infra/grafana/provisioning/dashboards/lms.yml`, `infra/grafana/dashboards/lms-overview.json`
 - Modify: `.gitignore`
 
+Stack gồm cả giao diện web (`web`, build từ `frontend/Dockerfile`). Caddy chuyển `/api/*` **thẳng tới API** (SSE của AI Tutor không đi qua bộ đệm và `proxyTimeout` của Next), phần còn lại tới web.
+
 Tên project compose là `lms-ai-prod`, khác project dev (`lms-ai`), nên hai stack **không dùng chung volume**. Diễn tập stack production trên máy không làm mất dữ liệu dev.
 
 - [ ] **Step 1: `.gitignore`**: thêm các dòng:
@@ -1211,7 +1304,7 @@ Run: `git update-index --chmod=+x infra/prod.sh` (trên Windows đây là cách 
 - [ ] **Step 3: `.env.prod.example`**
 
 ```
-# Copy thành .env.prod (KHÔNG commit). Sinh mật khẩu: openssl rand -base64 36
+# Copy thành .env.prod (KHÔNG commit). Sinh mật khẩu: openssl rand -hex 32 (KHÔNG dùng -base64: ký tự / làm hỏng URL)
 # Domain: dùng sslip.io nếu không có tên miền, ví dụ VPS IP 203.0.113.10:
 #   APP_DOMAIN=lms.203-0-113-10.sslip.io  FILES_DOMAIN=files.203-0-113-10.sslip.io  GRAFANA_DOMAIN=grafana.203-0-113-10.sslip.io
 # Diễn tập trên máy: APP_DOMAIN=localhost  FILES_DOMAIN=files.localhost  GRAFANA_DOMAIN=grafana.localhost
@@ -1236,6 +1329,15 @@ VISION_PROVIDER=gemini
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=
 CACHE_ENABLED=true
+
+# Email thật qua Brevo (SMTP relay). Lấy SMTP key ở Brevo → SMTP & API → SMTP.
+# MAIL_FROM phải là địa chỉ / tên miền đã xác minh trong Brevo (Senders, Domains).
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_STARTTLS=true
+SMTP_USER=
+SMTP_PASSWORD=
+MAIL_FROM=LMS-AI <no-reply@ten-mien-cua-ban>
 ```
 
 - [ ] **Step 4: `docker-compose.prod.yml`**
@@ -1264,6 +1366,8 @@ x-backend-env: &backend_env
   MINIO_PUBLIC_SECURE: "true"
   CORS_ORIGINS: https://${APP_DOMAIN}
   COOKIE_SECURE: "true"
+  # Link trong email (xác nhận email, thông báo duyệt giảng viên...) trỏ về đúng tên miền thật
+  APP_BASE_URL: https://${APP_DOMAIN}
 
 services:
   db:
@@ -1301,6 +1405,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Đặt MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Đặt MINIO_ROOT_PASSWORD}
+      # Trình duyệt PUT file thẳng vào MinIO (presigned) từ trang web: chỉ cho đúng origin của web
+      MINIO_API_CORS_ALLOW_ORIGIN: https://${APP_DOMAIN}
     volumes: [miniodata:/data]
     networks: [internal]
 
@@ -1308,7 +1414,8 @@ services:
     <<: *backend
     environment: *backend_env
     # --proxy-headers: lấy IP thật từ X-Forwarded-For (rate limit theo IP). Tin mọi nguồn là an toàn
-    # vì API không publish port nào, chỉ Caddy trong mạng nội bộ gọi tới được.
+    # vì API không publish port nào, chỉ Caddy trong mạng nội bộ gọi tới được; Caddy bỏ X-Forwarded-For
+    # do trình duyệt tự gửi và ghi lại bằng IP thật.
     # Bắt buộc giữ cờ này (admin plan Task 15): đăng ký / gửi lại email xác nhận giới hạn theo IP, thiếu nó thì mọi request mang IP của Caddy và giới hạn chặn cả hệ thống.
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
     healthcheck:
@@ -1321,7 +1428,20 @@ services:
   worker:
     <<: *backend
     environment: *backend_env
+    # Xử lý PDF, sinh quiz, AI Studio (studio_gen tới 15 phút), gửi email từ hộp thư đi
     command: arq app.worker.settings.WorkerSettings
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # Rewrites /api/v1 của Next "đóng băng" lúc build. Ở production Caddy chuyển /api/* thẳng tới api,
+        # nên rewrite này chỉ là đường dự phòng.
+        API_ORIGIN: http://api:8000
+    image: lms-ai-web:prod
+    restart: unless-stopped
+    depends_on: [api]
+    networks: [internal]
 
   caddy:
     image: caddy:2-alpine
@@ -1336,7 +1456,7 @@ services:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
       - caddyconfig:/config
-    depends_on: [api, minio, grafana]
+    depends_on: [api, web, minio, grafana]
     networks: [internal]
 
   prometheus:
@@ -1416,8 +1536,9 @@ volumes:
 	@internal path /metrics /metrics/*
 	respond @internal 404
 
+	# API đi thẳng tới FastAPI (không qua Next): SSE của AI Tutor không bị bộ đệm / proxyTimeout của Next,
+	# và uvicorn nhận đúng X-Forwarded-For để rate limit theo IP. Caddy tự flush khi Content-Type là text/event-stream.
 	handle /api/* {
-		# SSE của AI Tutor: Caddy tự flush khi Content-Type là text/event-stream
 		reverse_proxy api:8000
 	}
 	handle /docs* {
@@ -1426,9 +1547,15 @@ volumes:
 	handle /openapi.json {
 		reverse_proxy api:8000
 	}
-	# Plan frontend sẽ thay khối này bằng: reverse_proxy web:3000
+	# Còn lại là giao diện Next.js. API đã tự gắn security headers (kể cả CSP), nên chỉ gắn cho phần web.
 	handle {
-		respond "LMS-AI API đang chạy. Giao diện web sẽ được thêm ở plan frontend." 200
+		header {
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		}
+		reverse_proxy web:3000
 	}
 }
 
@@ -1495,49 +1622,201 @@ providers:
   "uid": "lms-ai-overview",
   "title": "LMS-AI — Tổng quan",
   "schemaVersion": 39,
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "refresh": "10s",
   "panels": [
     {
-      "id": 1, "type": "timeseries", "title": "Request mỗi giây",
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [ { "refId": "A", "expr": "sum(rate(http_requests_total[1m]))", "legendFormat": "tổng" } ]
-    },
-    {
-      "id": 2, "type": "timeseries", "title": "Độ trễ toàn hệ thống p50 / p95 (giây)",
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request mỗi giây",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_highr_seconds_bucket[5m])))", "legendFormat": "p50" },
-        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_highr_seconds_bucket[5m])))", "legendFormat": "p95" }
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_requests_total[1m]))",
+          "legendFormat": "tổng"
+        }
       ]
     },
     {
-      "id": 3, "type": "timeseries", "title": "Tỉ lệ lỗi 5xx",
-      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percentunit" } },
-      "targets": [ { "refId": "A", "expr": "sum(rate(http_requests_total{status=\"5xx\"}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1e-9)", "legendFormat": "5xx" } ]
+      "id": 2,
+      "type": "timeseries",
+      "title": "Độ trễ toàn hệ thống p50 / p95 (giây)",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_request_duration_highr_seconds_bucket[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_highr_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        }
+      ]
     },
     {
-      "id": 4, "type": "timeseries", "title": "Request theo endpoint (top 8)",
-      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [ { "refId": "A", "expr": "topk(8, sum by (handler) (rate(http_requests_total[5m])))", "legendFormat": "{{handler}}" } ]
+      "id": 3,
+      "type": "timeseries",
+      "title": "Tỉ lệ lỗi 5xx",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_requests_total{status=\"5xx\"}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 1e-9)",
+          "legendFormat": "5xx"
+        }
+      ]
     },
     {
-      "id": 5, "type": "timeseries", "title": "Job: đang chờ / đang chạy / lỗi trong 1 giờ",
-      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [ { "refId": "A", "expr": "sum by (status) (lms_jobs)", "legendFormat": "{{status}}" } ]
+      "id": 4,
+      "type": "timeseries",
+      "title": "Request theo endpoint (top 8)",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, sum by (handler) (rate(http_requests_total[5m])))",
+          "legendFormat": "{{handler}}"
+        }
+      ]
     },
     {
-      "id": 6, "type": "stat", "title": "AI Tutor: thời gian tới token đầu p95 (ms, 15 phút)",
-      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ms" } },
-      "targets": [ { "refId": "A", "expr": "lms_tutor_ttft_p95_ms" } ]
+      "id": 5,
+      "type": "timeseries",
+      "title": "Job: đang chờ / đang chạy / lỗi trong 1 giờ",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (lms_jobs)",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "AI Tutor: thời gian tới token đầu p95 (ms, 15 phút)",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "lms_tutor_ttft_p95_ms"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Email: chờ gửi / lỗi hẳn (24 giờ)",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "lms_email_outbox",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Token AI 1 giờ gần nhất theo tác vụ",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (op) (lms_ai_tokens_1h)",
+          "legendFormat": "{{op}}"
+        }
+      ]
     }
   ]
 }
@@ -1555,8 +1834,9 @@ Mở `.env.prod` và điền để diễn tập trên máy:
 
 - `APP_DOMAIN=localhost`, `FILES_DOMAIN=files.localhost`, `GRAFANA_DOMAIN=grafana.localhost`
 - `ACME_EMAIL=dev@example.com`
-- Tất cả mật khẩu: sinh bằng `openssl rand -base64 36`.
-- `JWT_SECRET`: sinh bằng `openssl rand -base64 48`.
+- Tất cả mật khẩu: sinh bằng `openssl rand -hex 32`. **Không dùng `-base64`**: ký tự `/` trong mật khẩu làm hỏng `REDIS_URL` (arq báo `invalid literal for int()`).
+- `JWT_SECRET`: sinh bằng `openssl rand -hex 48`.
+- SMTP để trống cũng được: email nằm lại hộp thư đi và báo lỗi trong log worker, không ảnh hưởng phần còn lại. Muốn thử gửi thật thì điền tài khoản Brevo (Task 12).
 - `EMBED_PROVIDER=fake`, `VISION_PROVIDER=fake`, `LLM_PROVIDER=fake` (diễn tập không tốn API).
 
 Run: `./infra/prod.sh config --quiet`
@@ -1574,11 +1854,18 @@ Kiểm tra (Caddy tự cấp chứng chỉ nội bộ cho `*.localhost`, nên c�
 curl -k https://localhost/api/v1/ready
 curl -k -o /dev/null -w "%{http_code}\n" https://localhost/metrics
 curl -k -I https://localhost/api/v1/health | grep -i strict-transport
+curl -k -s https://localhost/ | grep -o "<title>[^<]*"
+for i in $(seq 1 21); do curl -k -s -o /dev/null -w "%{http_code} " -H "X-Forwarded-For: 10.0.0.$i" \
+  -H "Content-Type: application/json" -d '{"email":"x@example.com","password":"password123"}' https://localhost/api/v1/auth/login; done; echo
 ```
 Expected, theo thứ tự:
 1. `{"status":"ready","checks":{"db":"ok","redis":"ok","storage":"ok"}}`
 2. `404` (metrics bị chặn từ bên ngoài)
 3. Có header `strict-transport-security`.
+4. `<title>LMS-AI` (trang web chạy qua Caddy).
+5. 20 lần `401` rồi `429`: Caddy bỏ `X-Forwarded-For` do người gọi tự gửi, nên không lách được giới hạn bằng cách đổi header.
+
+Mở `https://localhost` bằng trình duyệt (chấp nhận chứng chỉ nội bộ), tạo admin bằng `./infra/prod.sh exec api python -m app.scripts.seed_admin --email admin@example.com --password '<mật khẩu>'`, đăng nhập và mở một khóa học: trang hiện bình thường, AI Tutor trả lời được (provider giả).
 
 Mở `https://grafana.localhost`, đăng nhập `admin` với `GRAFANA_ADMIN_PASSWORD`. Vào thư mục **LMS-AI** và mở dashboard "LMS-AI — Tổng quan": các panel phải có dữ liệu sau khoảng 30 giây.
 
@@ -1594,7 +1881,7 @@ Thay `latest` trong `docker-compose.prod.yml` bằng đúng phiên bản vừa i
 ./infra/prod.sh down        # giữ volume; thêm -v nếu muốn xóa sạch dữ liệu diễn tập
 docker compose start        # bật lại stack dev
 git add docker-compose.prod.yml .env.prod.example infra .gitignore
-git commit -m "feat(ops): production compose with Caddy HTTPS, Prometheus, Grafana and backups"
+git commit -m "feat(ops): production compose with web, Caddy HTTPS, Prometheus, Grafana and backups"
 ```
 
 ---
@@ -1707,7 +1994,7 @@ git add infra/backup && git commit -m "feat(ops): daily Postgres and MinIO backu
 ```bash
 #!/usr/bin/env bash
 # Deploy đúng một commit: ./infra/deploy/deploy.sh <git-sha>
-# Nếu API không sẵn sàng trong khoảng 2 phút → rollback về commit chạy tốt gần nhất rồi báo lỗi.
+# Nếu API hoặc web không sẵn sàng trong khoảng 2 phút → rollback về commit chạy tốt gần nhất rồi báo lỗi.
 #
 # Toàn bộ logic nằm trong main(): bash đọc hết hàm trước khi chạy, nên việc `git checkout` đổi chính
 # file này giữa chừng không làm hỏng lần chạy đang diễn ra.
@@ -1736,7 +2023,7 @@ main() {
     return 0
   fi
 
-  echo "==> $sha không sẵn sàng sau 2 phút, rollback về ${prev:-<không có>}" >&2
+  echo "==> $sha không sẵn sàng sau 2 phút (API /ready hoặc web), rollback về ${prev:-<không có>}" >&2
   if [ -n "$prev" ]; then
     git checkout --quiet --detach "$prev"
     ./infra/prod.sh up -d --build --remove-orphans
@@ -1749,7 +2036,8 @@ wait_ready() {
   for _ in $(seq 1 40); do
     if ./infra/prod.sh exec -T api python -c \
       "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready', timeout=3).status == 200 else 1)" \
-      >/dev/null 2>&1; then
+      >/dev/null 2>&1 \
+      && ./infra/prod.sh exec -T web wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1; then
       return 0
     fi
     sleep 3
@@ -1829,6 +2117,10 @@ Yêu cầu: Ubuntu 24.04, tối thiểu 2 vCPU / 4 GB RAM / 40 GB ổ đĩa, có
 
 ```bash
 # Trên VPS, đăng nhập bằng root
+# Swap 4 GB: build Next.js + backend cùng lúc trên máy 4 GB RAM dễ bị kill vì hết bộ nhớ
+fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
 adduser --disabled-password --gecos "" deploy
 mkdir -p /home/deploy/.ssh && cp ~/.ssh/authorized_keys /home/deploy/.ssh/
 chown -R deploy:deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh
@@ -1860,7 +2152,8 @@ cd /opt/lms-ai
 cp .env.prod.example .env.prod && nano .env.prod
 # Domain không mua: thay IP 203.0.113.10 bằng IP VPS, dấu chấm đổi thành dấu gạch:
 #   APP_DOMAIN=lms.203-0-113-10.sslip.io   FILES_DOMAIN=files.203-0-113-10.sslip.io   GRAFANA_DOMAIN=grafana.203-0-113-10.sslip.io
-# Mật khẩu: openssl rand -base64 36   |   JWT_SECRET: openssl rand -base64 48
+# Mật khẩu: openssl rand -hex 32   |   JWT_SECRET: openssl rand -hex 48   (không dùng -base64)
+# SMTP_USER / SMTP_PASSWORD / MAIL_FROM: xem mục 3b
 ./infra/prod.sh up -d --build
 ./infra/prod.sh ps
 curl -fsS "https://$(grep ^APP_DOMAIN .env.prod | cut -d= -f2)/api/v1/ready"
@@ -1868,7 +2161,17 @@ curl -fsS "https://$(grep ^APP_DOMAIN .env.prod | cut -d= -f2)/api/v1/ready"
 git rev-parse HEAD > .deploy/last_good_sha 2>/dev/null || (mkdir -p .deploy && git rev-parse HEAD > .deploy/last_good_sha)
 ```
 
-> Email phải có đuôi tên miền thật: `.local`, `.test`, `.localhost` không đăng nhập được (trang đăng nhập dùng `EmailStr`). Script sẽ từ chối các email này.
+> Email phải có đuôi tên miền thật: `.local`, `.test`, `.localhost` không đăng nhập được (trang đăng nhập dùng `EmailStr`). Script sẽ từ chối các email này. Admin tạo bằng script được coi là đã xác minh email.
+
+## 3b. Email thật (Brevo)
+
+1. Tạo tài khoản Brevo (gói miễn phí: 300 email / ngày).
+2. **Senders, Domains & Dedicated IPs:**
+   - Có tên miền riêng: thêm domain, tạo các bản ghi DNS (DKIM, DMARC) Brevo đưa ra. `MAIL_FROM=LMS-AI <no-reply@ten-mien>`.
+   - Chưa có tên miền (dùng sslip.io): thêm **một địa chỉ email của bạn** làm sender và bấm link xác minh Brevo gửi về. `MAIL_FROM=LMS-AI <email-đó>`. Cách này chạy được nhưng thư dễ vào mục Spam; ghi vào phần hạn chế của báo cáo.
+3. **SMTP & API → SMTP:** lấy `SMTP login` (điền `SMTP_USER`) và tạo `SMTP key` (điền `SMTP_PASSWORD`).
+4. `./infra/prod.sh up -d api worker` để nạp lại `.env.prod`.
+5. Thử: đăng ký một tài khoản học viên bằng email thật trên trang web → nhận được thư → bấm link → đăng nhập được. Nếu không nhận được: `./infra/prod.sh logs worker | grep -i smtp`.
 
 ## 4. Bật CD trên GitHub (một lần)
 
@@ -1909,9 +2212,13 @@ Xóa file `lms-actions` trên máy sau khi đã dán vào GitHub.
 - **Không cấp được HTTPS:** DNS chưa trỏ đúng IP, hoặc cổng 80/443 bị chặn. Xem `./infra/prod.sh logs caddy`.
 - **`/ready` báo `redis: error`:** kiểm tra `REDIS_PASSWORD` trong `.env.prod` trùng với lúc Redis khởi tạo. Đổi mật khẩu thì phải khởi động lại cả `redis`, `api`, `worker`.
 - **Upload bị 403 `SignatureDoesNotMatch`:** `FILES_DOMAIN` phải đúng host mà trình duyệt gọi tới, và `MINIO_PUBLIC_SECURE=true`.
+- **Upload bị chặn CORS:** `MINIO_API_CORS_ALLOW_ORIGIN` phải đúng `https://<APP_DOMAIN>` (đã đặt sẵn trong compose).
+- **Worker báo `invalid literal for int()`:** mật khẩu Redis có ký tự `/`. Sinh lại bằng `openssl rand -hex 32`, rồi khởi động lại `redis`, `api`, `worker`.
+- **Build bị dừng giữa chừng (`Killed`, exit 137):** hết RAM khi build Next.js. Kiểm tra swap (`swapon --show`), hoặc build từng service: `./infra/prod.sh build api && ./infra/prod.sh build web`.
+- **Không nhận được email:** xem `./infra/prod.sh logs worker`; kiểm tra `SMTP_*`, `MAIL_FROM` đã xác minh trong Brevo, và thư mục Spam.
 ````
 
-- [ ] **Step 2: Bạn làm theo runbook mục 1–4 trên VPS thật.** Claude Code hướng dẫn từng lệnh và kiểm tra kết quả bạn dán lại.
+- [ ] **Step 2: Bạn làm theo runbook mục 1–4 (cả 3b) trên VPS thật.** Claude Code hướng dẫn từng lệnh và kiểm tra kết quả bạn dán lại.
 
 - [ ] **Step 3: Thử CD end-to-end**
 
@@ -1955,6 +2262,9 @@ git add docs/ops/runbook.md && git commit -m "docs(ops): VPS provisioning, CD se
 
 Chạy từ backend/ (DB dev của docker compose):  uv run python -m scripts.perf_seed
 Ghi thông tin đăng nhập và id bài học vào ../perf/seed.json cho k6.
+
+Email dùng đuôi example.com (trang đăng nhập dùng EmailStr, từ chối .local) và được đánh dấu đã xác nhận
+(chưa xác nhận thì đăng nhập nhận 403 EMAIL_NOT_VERIFIED).
 """
 
 import asyncio
@@ -1962,8 +2272,10 @@ import json
 import uuid
 from pathlib import Path
 
+import app.models_registry  # noqa: F401 — nạp mọi model (FK lessons → assets cần bảng assets)
 from app.core.db import SessionLocal
 from app.core.security import hash_password
+from app.core.time import utcnow
 from app.modules.auth.models import Role, TeacherStatus, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.enrollment.models import Enrollment
@@ -1975,15 +2287,27 @@ OUT = Path(__file__).resolve().parents[2] / "perf" / "seed.json"
 async def main() -> None:
     tag = uuid.uuid4().hex[:6]
     pw = hash_password(PASSWORD)
+    now = utcnow()
     async with SessionLocal() as db:
-        teacher = User(email=f"perf-gv-{tag}@lms.local", password_hash=pw, full_name="GV Perf",
-                       role=Role.teacher, teacher_status=TeacherStatus.approved)
+        teacher = User(
+            email=f"perf-gv-{tag}@example.com",
+            password_hash=pw,
+            full_name="GV Perf",
+            role=Role.teacher,
+            teacher_status=TeacherStatus.approved,
+            email_verified_at=now,
+        )
         db.add(teacher)
         await db.flush()
         first_course, lesson_ids = None, []
         for c in range(20):
-            course = Course(teacher_id=teacher.id, title=f"Khóa đo tải {c + 1}", slug=f"perf-{tag}-{c + 1}",
-                            description="Dữ liệu load test " * 10, status=CourseStatus.published)
+            course = Course(
+                teacher_id=teacher.id,
+                title=f"Khóa đo tải {c + 1}",
+                slug=f"perf-{tag}-{c + 1}",
+                description="Dữ liệu load test " * 10,
+                status=CourseStatus.published,
+            )
             db.add(course)
             await db.flush()
             first_course = first_course or course
@@ -1992,30 +2316,48 @@ async def main() -> None:
                 db.add(section)
                 await db.flush()
                 for i in range(5):
-                    lesson = Lesson(section_id=section.id, title=f"Bài {i + 1}", position=i + 1,
-                                    content_md="# Nội dung\n\n" + "Văn bản bài học. " * 200)
+                    lesson = Lesson(
+                        section_id=section.id,
+                        title=f"Bài {i + 1}",
+                        position=i + 1,
+                        content_md="# Nội dung\n\n" + "Văn bản bài học. " * 200,
+                    )
                     db.add(lesson)
                     await db.flush()
                     if course is first_course:
                         lesson_ids.append(str(lesson.id))
         students = []
         for n in range(10):
-            email = f"perf-sv-{tag}-{n}@lms.local"
-            student = User(email=email, password_hash=pw, full_name=f"SV Perf {n}", role=Role.student)
+            email = f"perf-sv-{tag}-{n}@example.com"
+            student = User(
+                email=email,
+                password_hash=pw,
+                full_name=f"SV Perf {n}",
+                role=Role.student,
+                email_verified_at=now,
+            )
             db.add(student)
             await db.flush()
             db.add(Enrollment(user_id=student.id, course_id=first_course.id))
             students.append(email)
         await db.commit()
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"password": PASSWORD, "students": students, "lesson_ids": lesson_ids},
-                              ensure_ascii=False, indent=2), encoding="utf-8")
+    OUT.write_text(
+        json.dumps(
+            {"password": PASSWORD, "students": students, "lesson_ids": lesson_ids},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(f"Đã tạo 20 khóa, 10 học viên. Ghi {OUT}")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+Run: `uv run python -m scripts.perf_seed` → `Đã tạo 20 khóa, 10 học viên. Ghi …/perf/seed.json`.
 
 Thêm `perf/seed.json` vào `.gitignore` (file chứa mật khẩu test).
 
@@ -2083,7 +2425,7 @@ export const options = {
   summaryTrendStats: ["avg", "med", "p(90)", "p(95)", "max"],
 };
 
-// Đăng nhập 10 tài khoản một lần (dưới giới hạn 20 lần/phút/IP), các VU dùng chung token
+// Đăng nhập 10 tài khoản một lần (dưới giới hạn LOGIN_RATE_LIMIT_PER_MIN = 20 lần/phút/IP), các VU dùng chung token
 export function setup() {
   const tokens = seed.students.map((email) => {
     const r = http.post(`${BASE}/api/v1/auth/login`, JSON.stringify({ email, password: seed.password }),
@@ -2222,16 +2564,16 @@ Trước khi viết, Claude Code phải **đối chiếu từng dòng với code
 
 | # | Rủi ro | Biện pháp trong hệ thống | Ở đâu (file / test) | Trạng thái |
 |---|---|---|---|---|
-| A01 | Broken Access Control | Dependency `require_role`, `require_staff`, `require_course_owner`, `ensure_lesson_access`; truy cập tài nguyên của người khác trả 404; test IDOR cho khóa học, bài học, upload, job | `app/core/deps.py`, `app/modules/enrollment/service.py`, `tests/test_lesson_access.py`, `tests/test_uploads.py` | Đã xử lý |
-| A02 | Cryptographic Failures | Mật khẩu hash bằng argon2 (pwdlib); refresh token chỉ lưu SHA-256; HTTPS + HSTS qua Caddy; cookie `HttpOnly; Secure; SameSite=Lax` ở production | `app/core/security.py`, `infra/caddy/Caddyfile`, `docker-compose.prod.yml` | Đã xử lý. Chưa: chặn khởi động khi JWT secret là giá trị mặc định (production sinh ngẫu nhiên theo runbook) |
-| A03 | Injection | SQLAlchemy tham số hóa, không nối chuỗi SQL từ input; prompt injection khi chấm bài: bọc `<submission>` và hậu kiểm điểm | `app/modules/*/service.py`, (tuần 3) chấm assignment | Đã xử lý (SQL). Prompt injection: tuần 3 |
-| A04 | Insecure Design | Upload qua staging key rồi server copy sang key chính thức (không ghi đè được sau khi kiểm tra); partial unique index chống tạo job trùng; chốt bài quiz bằng câu UPDATE có điều kiện | `app/modules/materials/assets.py`, `app/modules/jobs/service.py` | Đã xử lý |
-| A05 | Security Misconfiguration | Chỉ Caddy mở cổng 80/443; Redis có mật khẩu và nằm trong mạng nội bộ; CORS chỉ cho đúng origin; security headers; `/metrics` bị chặn từ Internet; lỗi 500 không lộ traceback | `docker-compose.prod.yml`, `app/core/middleware.py`, `app/core/errors.py` | Đã xử lý |
-| A06 | Vulnerable Components | Khóa phiên bản bằng `uv.lock`; `pip-audit` chạy trong CI; ghim tag các image Docker | `.github/workflows/ci.yml`, `docker-compose*.yml` | Đã xử lý |
-| A07 | Identification & Authentication Failures | Access token 15 phút; refresh token xoay vòng, phát hiện token cũ bị dùng lại thì thu hồi cả họ token; rate limit đăng nhập/đăng ký theo IP; khóa tài khoản | `app/modules/auth/service.py`, `app/modules/auth/ratelimit.py`, `tests/test_refresh.py`, `tests/test_auth_ratelimit.py` | Đã xử lý |
+| A01 | Broken Access Control | Dependency `require_role`, `require_staff`, `require_course_owner`, `ensure_lesson_access`; truy cập tài nguyên của người khác trả 404; khu `/admin/*` chỉ cho admin; tài liệu / đoạn trích / PDF (AI Studio) chỉ cho người đã đăng ký khóa; ghi chú chỉ chủ sở hữu thấy | `app/core/deps.py`, `app/modules/enrollment/service.py`, `app/modules/studio/service.py`, `tests/test_lesson_access.py`, `tests/test_uploads.py`, `tests/test_admin.py`, `tests/test_studio.py`, `tests/test_notes.py` | Đã xử lý |
+| A02 | Cryptographic Failures | Mật khẩu hash bằng argon2 (pwdlib); refresh token và token xác minh email chỉ lưu SHA-256; HTTPS + HSTS qua Caddy; cookie `HttpOnly; Secure; SameSite=Lax` ở production; SMTP dùng STARTTLS có kiểm chứng chỉ | `app/core/security.py`, `app/modules/auth/service.py`, `app/modules/notify/mailer.py`, `infra/caddy/Caddyfile`, `docker-compose.prod.yml` | Đã xử lý. Chưa: chặn khởi động khi JWT secret là giá trị mặc định (production sinh ngẫu nhiên theo runbook) |
+| A03 | Injection | SQLAlchemy tham số hóa, không nối chuỗi SQL từ input; tìm kiếm `LIKE` có escape ký tự đặc biệt; xuất CSV chặn công thức Excel (`= + - @`); prompt AI bọc tài liệu và câu hỏi trong thẻ (`<context>`, `<question>`) và dặn coi là dữ liệu; trích nguồn `[n]` không có thật bị xóa | `app/modules/*/service.py`, `app/modules/admin/service.py`, `app/ai/prompts/*.md`, `tests/test_admin.py`, `tests/test_tutor_text.py` | Đã xử lý (SQL, CSV). Prompt injection: giảm thiểu, không loại bỏ hoàn toàn được |
+| A04 | Insecure Design | Upload qua staging key rồi server copy sang key chính thức (không ghi đè được sau khi kiểm tra); partial unique index chống tạo job trùng; chốt bài quiz bằng câu UPDATE có điều kiện; email qua hộp thư đi (outbox) cùng transaction; khóa tư vấn (advisory lock) chống sinh tài liệu AI trùng | `app/modules/materials/assets.py`, `app/modules/jobs/service.py`, `app/modules/notify/outbox.py`, `app/modules/studio/service.py` | Đã xử lý |
+| A05 | Security Misconfiguration | Chỉ Caddy mở cổng 80/443; Redis có mật khẩu và nằm trong mạng nội bộ; CORS chỉ cho đúng origin (cả MinIO); security headers cho API và web; `/metrics` bị chặn từ Internet; lỗi 500 không lộ traceback | `docker-compose.prod.yml`, `infra/caddy/Caddyfile`, `app/core/middleware.py`, `app/core/errors.py` | Đã xử lý. Chưa: CSP cho trang web |
+| A06 | Vulnerable Components | Khóa phiên bản bằng `uv.lock` và `package-lock.json`; `pip-audit` và `npm audit` chạy trong CI; ghim tag các image Docker | `.github/workflows/ci.yml`, `docker-compose*.yml` | Đã xử lý |
+| A07 | Identification & Authentication Failures | Access token 15 phút; refresh token xoay vòng, phát hiện token cũ bị dùng lại thì thu hồi cả họ token; bắt xác minh email trước khi đăng nhập; rate limit đăng nhập / đăng ký / gửi lại email theo IP (và theo email); khóa tài khoản thu hồi mọi phiên | `app/modules/auth/service.py`, `app/modules/auth/router.py`, `tests/test_refresh.py`, `tests/test_auth_ratelimit.py`, `tests/test_email.py`, `tests/test_locked.py` | Đã xử lý |
 | A08 | Software & Data Integrity Failures | Kiểm tra magic bytes khi upload; arq dùng pickle nên Redis bắt buộc có mật khẩu và chỉ nằm nội bộ; CD chỉ deploy commit đã qua CI | `app/modules/materials/assets.py`, `.github/workflows/deploy.yml` | Đã xử lý |
-| A09 | Security Logging & Monitoring Failures | `request_id` trong mọi response và log; log exception kèm request_id; Grafana theo dõi tỉ lệ 5xx và job lỗi | `app/core/middleware.py`, `infra/grafana/dashboards/lms-overview.json` | Đã xử lý. Chưa: cảnh báo tự động (alerting) |
-| A10 | Server-Side Request Forgery | Server không tải URL do người dùng nhập; chỉ gọi MinIO và Gemini qua địa chỉ cấu hình sẵn | — | Không áp dụng |
+| A09 | Security Logging & Monitoring Failures | `request_id` trong mọi response và log; log exception kèm request_id; nhật ký thao tác quản trị (`admin_actions`); nhật ký lượt gọi AI (`ai_calls`); Grafana theo dõi tỉ lệ 5xx, job lỗi, email lỗi, token AI | `app/core/middleware.py`, `app/modules/admin/models.py`, `app/ai/models.py`, `infra/grafana/dashboards/lms-overview.json` | Đã xử lý. Chưa: cảnh báo tự động (alerting) |
+| A10 | Server-Side Request Forgery | Server không tải URL do người dùng nhập; chỉ gọi MinIO, Gemini và SMTP qua địa chỉ cấu hình sẵn | — | Không áp dụng |
 ```
 
 - [ ] **Step 2: Commit**
@@ -2258,7 +2600,19 @@ from scripts.gen_erd import render
 def test_erd_lists_core_tables_and_relationships():
     md = render()
     assert "erDiagram" in md
-    for table in ("users", "courses", "sections", "lessons", "chunks", "jobs"):
+    for table in (
+        "users",
+        "courses",
+        "sections",
+        "lessons",
+        "chunks",
+        "jobs",
+        "admin_actions",
+        "email_outbox",
+        "ai_calls",
+        "study_artifacts",
+        "notes",
+    ):
         assert f"    {table} {{" in md
     assert 'courses ||--o{ sections : "course_id"' in md
     assert "uuid id PK" in md
@@ -2363,10 +2717,11 @@ Trước khi commit, Claude Code **đối chiếu với code**: tên service tro
 
 ```mermaid
 flowchart LR
-    SV([Học viên]) -->|học, hỏi AI Tutor, làm quiz| LMS[Hệ thống LMS-AI]
-    GV([Giảng viên]) -->|tạo khóa, tải tài liệu, duyệt quiz, chấm bài| LMS
-    AD([Quản trị viên]) -->|duyệt giảng viên, quản lý| LMS
+    SV([Học viên]) -->|học, hỏi AI Tutor, Studio, flashcard, ghi chú, làm quiz| LMS[Hệ thống LMS-AI]
+    GV([Giảng viên]) -->|tạo khóa, tải tài liệu, duyệt quiz, sửa tài liệu AI| LMS
+    AD([Quản trị viên]) -->|duyệt giảng viên, khóa tài khoản, ẩn khóa, xem token AI| LMS
     LMS -->|sinh văn bản, embedding, đọc ảnh trang PDF| GEM[(Google Gemini API)]
+    LMS -->|email xác minh, thông báo| MAIL[(Brevo SMTP)]
 ```
 
 ## 2. Container (C4 mức 2) và triển khai
@@ -2375,13 +2730,14 @@ flowchart LR
 flowchart TB
     U([Trình duyệt]) -->|HTTPS 443| C[Caddy<br/>reverse proxy, TLS]
     subgraph VPS["VPS — mạng Docker nội bộ"]
-        C -->|/api/*| API[FastAPI API<br/>auth, khóa học, tutor, quiz]
+        C -->|/| WEB[Next.js web<br/>giao diện]
+        C -->|/api/*| API[FastAPI API<br/>auth, khóa học, tutor, quiz, studio, admin]
         C -->|files.*| M[(MinIO<br/>PDF, video, bài nộp)]
         C -->|grafana.*| G[Grafana]
         API --> PG[(PostgreSQL 16<br/>+ pgvector + unaccent)]
         API --> R[(Redis<br/>hàng đợi, cache, rate limit)]
         API --> M
-        W[Worker arq<br/>xử lý PDF, sinh quiz, sweeper] --> PG
+        W[Worker arq<br/>xử lý PDF, sinh quiz, AI Studio, gửi email, sweeper] --> PG
         W --> R
         W --> M
         P[Prometheus] -->|scrape /metrics| API
@@ -2390,6 +2746,7 @@ flowchart TB
     end
     API -->|HTTPS| GEM[(Gemini API)]
     W -->|HTTPS| GEM
+    W -->|SMTP 587 STARTTLS| MAIL[(Brevo)]
 ```
 
 ## 3. Thành phần backend (C4 mức 3)
@@ -2398,19 +2755,25 @@ flowchart TB
 flowchart LR
     subgraph API[FastAPI]
         MW[Middleware<br/>request_id, CORS, security headers, metrics]
-        AUTH[auth<br/>JWT, refresh xoay vòng, rate limit]
+        AUTH[auth<br/>JWT, refresh xoay vòng, xác minh email, rate limit]
         CRS[courses<br/>CRUD, catalog + cache]
         ENR[enrollment<br/>đăng ký, tiến độ, quyền xem bài]
         MAT[materials<br/>upload staging, sources]
         TUT[tutor<br/>RAG, SSE]
         QZ[quiz<br/>sinh, duyệt, làm bài]
+        STU[studio<br/>hướng dẫn tài liệu, báo cáo, flashcard, ghi chú]
+        ADM[admin<br/>duyệt, khóa, ẩn khóa, nhật ký, CSV]
+        NTF[notify<br/>hộp thư đi email]
         JOB[jobs<br/>tạo job chống trùng]
     end
     MAT --> JOB
     QZ --> JOB
+    STU --> JOB
+    AUTH --> NTF
+    ADM --> NTF
     TUT --> RET[retrieval<br/>vector + full-text]
     JOB -->|enqueue sau commit| Q[(Redis / arq)]
-    Q --> WK[worker: ingest_pdf, quiz_gen, sweep_stale_jobs]
+    Q --> WK[worker: ingest_pdf, source_guide, quiz_gen, studio_gen, notes_synth, gửi email, sweep_stale_jobs]
     WK --> ING[ingestion<br/>extract → chunk → embed]
 ```
 
@@ -2491,23 +2854,48 @@ sequenceDiagram
     API-->>SV: kết quả, đáp án, giải thích
 ```
 
-### 4.4 Nộp bài và chấm (tầng B, tuần 3)
+### 4.4 Đăng ký và xác minh email
+
+```mermaid
+sequenceDiagram
+    actor U as Người dùng
+    participant API
+    participant DB as PostgreSQL
+    participant W as Worker
+    participant M as Brevo SMTP
+    U->>API: POST /auth/register
+    API->>API: rate limit theo IP (Redis)
+    API->>DB: tạo user + token xác minh (SHA-256) + dòng email_outbox (cùng transaction)
+    API-->>U: 201 (chưa đăng nhập được: 403 EMAIL_NOT_VERIFIED)
+    W->>DB: nhận một email (SKIP LOCKED, có hạn giữ chỗ)
+    W->>M: gửi thư
+    W->>DB: sent / thử lại có backoff / failed
+    U->>API: POST /auth/verify-email {token}
+    API->>DB: email_verified_at = now
+```
+
+### 4.5 AI Studio: sinh tài liệu học dùng chung
 
 ```mermaid
 sequenceDiagram
     actor SV as Học viên
-    actor GV as Giảng viên
     participant API
     participant DB as PostgreSQL
     participant W as Worker
     participant L as Gemini
-    SV->>API: PUT /assignments/{id}/submission
-    API->>DB: version += 1, tạo job grade_submission (ref_version = version)
-    W->>L: rubric + bài làm trong <submission>
-    L-->>W: điểm, lý do, trích dẫn từng tiêu chí
-    W->>DB: chỉ ghi nếu version vẫn khớp → ai_graded
-    GV->>API: POST /submissions/{id}/grade
-    API->>DB: final_scores (không ghi đè ai_result) → graded
+    SV->>API: POST /studio/{kind}
+    API->>DB: advisory lock theo phạm vi; đã có bản mới (cùng fingerprint) → trả luôn (200)
+    API->>DB: rate limit 10 lần/giờ/học viên; tạo artifact (generating) + job
+    API-->>SV: 202 + job_id
+    W->>DB: lấy mọi đoạn của bài / khóa
+    alt tài liệu ngắn
+        W->>L: một lượt viết báo cáo
+    else tài liệu dài
+        W->>L: tóm tắt từng lô (giữ nhãn [n])
+        W->>L: viết báo cáo từ các tóm tắt
+    end
+    W->>DB: lọc [n] không có thật, lưu nội dung + citations → ready
+    SV->>API: GET /studio (poll 3 giây) → Mở
 ```
 ````
 
@@ -2538,7 +2926,7 @@ uv run pytest -q
 uv run ruff check . && uv run ruff format --check .
 uv run python -m scripts.gen_erd --check
 ```
-Expected: tất cả đều xanh. Sau khi push, CI cũng phải xanh cả 4 job (`lint`, `test`, `docker`, `audit`).
+Expected: tất cả đều xanh (backend **706 passed** nếu chưa thêm test nào khác). Sau khi push, CI phải xanh cả 5 job (`lint`, `test`, `frontend`, `docker`, `audit`).
 
 - [ ] **Step 2: Cập nhật spec**
   - **Bảng tiến độ (mục 0):**
@@ -2546,10 +2934,10 @@ Expected: tất cả đều xanh. Sau khi push, CI cũng phải xanh cả 4 job 
     - S2/S3 chỉ đánh `[x]` khi CD đã chạy thật trên VPS (Task 12 Step 3). Nếu chưa có VPS thì để `[~]`.
     - Đánh dấu D2 (deploy VPS) cùng lúc với S2.
   - **Mục 6.4:** thêm `GET /api/v1/ready` và `GET /metrics` (nội bộ).
-  - **Mục 7:** ghi `RATE_LIMITED` cũng áp dụng cho `/auth/login` và `/auth/register`.
+  - **Mục 7:** ghi `RATE_LIMITED` cũng áp dụng cho `/auth/login` (20 / phút / IP), cùng với giới hạn đăng ký và gửi lại email đã có.
   - **Mục 11 (rủi ro):** thêm dòng "Rollback chỉ quay lại code, không hạ migration. Migration phải tương thích ngược."
   - **Mục 13 (nhật ký quyết định):** thêm dòng:
-    `2026-xx-xx | Tầng S: cache có phiên bản (fail-open), rate limit auth 20/phút và 20/giờ theo IP (vì NAT ở trường), Caddy + sslip.io, deploy bằng build trên VPS + rollback tự động theo /ready, backup pg_dump + tar MinIO giữ 7 ngày`
+    `2026-xx-xx | Tầng S: cache có phiên bản (fail-open), rate limit đăng nhập 20/phút/IP (vì NAT ở trường), Caddy + sslip.io (web và API cùng tên miền, /api đi thẳng tới FastAPI), email qua Brevo, deploy bằng build trên VPS + rollback tự động theo /ready, backup pg_dump + tar MinIO giữ 7 ngày`
 
 - [ ] **Step 3: Commit**
 
@@ -2568,6 +2956,6 @@ git add docs/specs && git commit -m "docs: update spec progress after tier S"
 | S3 CD: tự deploy sau khi CI xanh, migration trước khi khởi động lại API | Task 11, 12 (migration chạy trong lệnh khởi động `api`) |
 | S4 Giám sát: `/health`, `/ready`, Prometheus, Grafana | Task 6, 7, 9 |
 | S5 Hiệu năng: k6, cache Redis, số liệu trước/sau | Task 4, 5, 13 |
-| S6 Bảo mật: rate limit auth, CORS (đã có), security headers, OWASP | Task 1, 2, 3, 14 |
+| S6 Bảo mật: rate limit auth (đăng ký đã có từ plan admin), CORS (đã có), security headers, OWASP | Task 1, 2, 3, 14 |
 | S7 Tài liệu kiến trúc: C4, ERD, sequence | Task 15 |
 | 9.7 Đánh giá hệ thống: p95, throughput, thời gian khôi phục, deploy | Task 12, 13 |
