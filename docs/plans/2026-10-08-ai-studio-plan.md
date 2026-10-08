@@ -460,7 +460,7 @@ git add backend && git commit -m "feat(ai): record every LLM call in ai_calls, a
 - Create: `backend/app/modules/studio/__init__.py` (rỗng), `backend/app/modules/studio/models.py`, `backend/alembic/versions/e3b8c1f4a902_ai_studio.py`
 - Modify: `backend/app/modules/tutor/models.py`, `backend/app/models_registry.py`
 
-- [ ] **Bước 1: Models** (`app/modules/studio/models.py`)
+- [x] **Bước 1: Models** (`app/modules/studio/models.py`)
 
 ```python
 import enum
@@ -574,7 +574,7 @@ class Note(IdMixin, TimestampMixin, Base):
     )
 ```
 
-- [ ] **Bước 2: Gợi ý hỏi tiếp lưu ngay trên tin nhắn** (`app/modules/tutor/models.py`)
+- [x] **Bước 2: Gợi ý hỏi tiếp lưu ngay trên tin nhắn** (`app/modules/tutor/models.py`)
 
 ```diff
 --- a/app/modules/tutor/models.py
@@ -587,7 +587,7 @@ class Note(IdMixin, TimestampMixin, Base):
 +    followups: Mapped[list[str] | None] = mapped_column(JSONB)
 ```
 
-- [ ] **Bước 3: Đăng ký models** (`app/models_registry.py`)
+- [x] **Bước 3: Đăng ký models** (`app/models_registry.py`)
 
 ```diff
 --- a/app/models_registry.py
@@ -600,7 +600,7 @@ class Note(IdMixin, TimestampMixin, Base):
  from app.modules.tutor import models as tutor_models  # noqa: F401
 ```
 
-- [ ] **Bước 4: Migration** (`alembic/versions/e3b8c1f4a902_ai_studio.py`). **Không dùng bản autogenerate**: nó tạo enum `studio_status` hai lần (hai bảng cùng dùng). Bản dưới tạo enum một lần, `create_type=False` ở các cột.
+- [x] **Bước 4: Migration** (`alembic/versions/e3b8c1f4a902_ai_studio.py`). **Không dùng bản autogenerate**: nó tạo enum `studio_status` hai lần (hai bảng cùng dùng). Bản dưới tạo enum một lần, `create_type=False` ở các cột.
 
 ```python
 """ai studio: ai_calls, source_guides, study_artifacts, flashcard_reviews, notes, chat_messages.followups
@@ -764,7 +764,7 @@ def downgrade() -> None:
     STUDIO_STATUS.drop(op.get_bind(), checkfirst=True)
 ```
 
-- [ ] **Bước 5: Kiểm tra**
+- [x] **Bước 5: Kiểm tra**
 
 Trước khi tạo file, chạy `uv run alembic heads`: phải ra `d7a4b9c2e615` (migration cuối của plan admin). Nếu khác, sửa `down_revision` theo head thật và ghi vào commit.
 
@@ -774,7 +774,7 @@ uv run alembic check          # Expected: No new upgrade operations detected.
 uv run alembic downgrade -1 && uv run alembic upgrade head
 ```
 
-- [ ] **Bước 6: Commit**
+- [x] **Bước 6: Commit**
 
 ```bash
 git add backend && git commit -m "feat(studio): tables for source guides, artifacts, flashcard reviews, notes"
