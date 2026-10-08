@@ -6179,7 +6179,7 @@ Hai reviewer độc lập đã đọc code phần 1 và phần 2 (backend và fr
 - Create: `backend/alembic/versions/d7a4b9c2e615_review_fixes.py`, `backend/tests/test_review_fixes.py`
 - Modify: `backend/app/modules/notify/{models,outbox}.py`, `backend/app/modules/auth/{models,service,router}.py`, `backend/app/modules/admin/{schemas,service}.py`, `backend/tests/{test_admin,test_email,test_tutor_api}.py`
 
-- [ ] **Bước 1: Viết test (sẽ fail)** (`tests/test_review_fixes.py`)
+- [x] **Bước 1: Viết test (sẽ fail)** (`tests/test_review_fixes.py`)
 
 ```python
 """Các sửa sau code review: gửi email từng cái một có hạn thuê, tách lý do khóa, chặn CSV injection,
@@ -6298,7 +6298,7 @@ async def test_unlock_does_not_touch_other_users(client):
     assert r.json()["lock_reason"] is None and r.json()["locked_at"] is None
 ```
 
-- [ ] **Bước 2: Migration** (`alembic/versions/d7a4b9c2e615_review_fixes.py`)
+- [x] **Bước 2: Migration** (`alembic/versions/d7a4b9c2e615_review_fixes.py`)
 
 ```python
 """review fixes: users.lock_reason, email_outbox.next_attempt_at
@@ -6341,7 +6341,7 @@ def downgrade() -> None:
     op.drop_column("users", "lock_reason")
 ```
 
-- [ ] **Bước 3: Model**
+- [x] **Bước 3: Model**
 
 ```diff
 --- a/backend/app/modules/auth/models.py
@@ -6372,7 +6372,7 @@ def downgrade() -> None:
 +    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 ```
 
-- [ ] **Bước 4: Outbox gửi từng email** (`app/modules/notify/outbox.py`, thay toàn bộ)
+- [x] **Bước 4: Outbox gửi từng email** (`app/modules/notify/outbox.py`, thay toàn bộ)
 
 ```python
 import logging
@@ -6505,7 +6505,7 @@ async def send_pending(session_factory: async_sessionmaker, mailer: Mailer, limi
     return sent
 ```
 
-- [ ] **Bước 5: Tách lý do khóa, chặn CSV injection, escape LIKE, cờ xác nhận email** (admin)
+- [x] **Bước 5: Tách lý do khóa, chặn CSV injection, escape LIKE, cờ xác nhận email** (admin)
 
 ```diff
 --- a/backend/app/modules/admin/schemas.py
@@ -6655,7 +6655,7 @@ async def send_pending(session_factory: async_sessionmaker, mailer: Mailer, limi
          courses_draft=by_status.get(CourseStatus.draft, 0),
 ```
 
-- [ ] **Bước 6: Báo admin lúc đăng ký khi tắt xác nhận; giới hạn theo IP** (auth)
+- [x] **Bước 6: Báo admin lúc đăng ký khi tắt xác nhận; giới hạn theo IP** (auth)
 
 ```diff
 --- a/backend/app/modules/auth/service.py
@@ -6763,7 +6763,7 @@ async def send_pending(session_factory: async_sessionmaker, mailer: Mailer, limi
 
 > Ở tầng S, API chạy sau Caddy: thêm `--proxy-headers --forwarded-allow-ips="*"` vào lệnh `uvicorn`, nếu không mọi request đều mang IP của Caddy và giới hạn theo IP sẽ chặn cả hệ thống. Ghi chú này vào plan tầng S.
 
-- [ ] **Bước 7: Sửa test cũ cho khớp**
+- [x] **Bước 7: Sửa test cũ cho khớp**
 
 - `test_admin.py`: lý do khóa giờ nằm ở `lock_reason`.
 - `test_email.py`: gửi lỗi thì chờ lùi, test phải cho email "đến hạn" trước khi gửi lại.
@@ -6887,7 +6887,7 @@ async def send_pending(session_factory: async_sessionmaker, mailer: Mailer, limi
  async def test_unpublished_after_session_creation_cannot_ask(client, db):
 ```
 
-- [ ] **Bước 8: Kiểm tra và commit**
+- [x] **Bước 8: Kiểm tra và commit**
 
 ```bash
 uv run ruff check . && uv run ruff format --check . && uv run pytest -q
