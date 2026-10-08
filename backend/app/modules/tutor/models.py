@@ -56,3 +56,5 @@ class ChatMessage(IdMixin, TimestampMixin, Base):
     tokens_in: Mapped[int | None] = mapped_column(Integer)
     tokens_out: Mapped[int | None] = mapped_column(Integer)
     prompt_version: Mapped[str | None] = mapped_column(String(80))
+    # 3 câu hỏi gợi ý tiếp theo (AI Studio S5), sinh lần đầu khi frontend xin rồi lưu lại. NULL = chưa sinh.
+    followups: Mapped[list[str] | None] = mapped_column(JSONB)
