@@ -4967,7 +4967,7 @@ git add backend && git commit -m "feat(api): admin notification emails, teacher 
 - Modify: `frontend/src/lib/api/schema.d.ts` (sinh lại), `frontend/src/lib/auth/auth-context.tsx`, `frontend/src/app/(auth)/register/register-form.tsx`, `frontend/src/app/(auth)/login/login-form.tsx`
 - Create: `frontend/src/lib/auth/email-verification.ts` (+test), `frontend/src/components/auth/resend-verification.tsx`, `frontend/src/components/auth/check-email.tsx`, `frontend/src/app/(auth)/verify-email/page.tsx`, `verify-email.tsx`
 
-- [ ] **Bước 1: Sinh lại kiểu API**
+- [x] **Bước 1: Sinh lại kiểu API**
 
 ```bash
 npm run gen:api
@@ -4975,7 +4975,7 @@ npm run gen:api
 
 Expected: chỉ thêm dòng (các route `verify-email`, `resend-verification`, `teacher-request`, `users/export`, `tutor-feedback`; trường `email_verified`, `tutor_downvotes_7d`).
 
-- [ ] **Bước 2: `reloadUser` trong auth context** (`src/lib/auth/auth-context.tsx`)
+- [x] **Bước 2: `reloadUser` trong auth context** (`src/lib/auth/auth-context.tsx`)
 
 Thêm vào kiểu `AuthValue`:
 
@@ -4991,7 +4991,7 @@ và trong `useMemo`:
     [user, userId, status, login, register, logout, loadMe],
 ```
 
-- [ ] **Bước 3: Viết test (sẽ fail)** (`src/lib/auth/email-verification.test.ts`)
+- [x] **Bước 3: Viết test (sẽ fail)** (`src/lib/auth/email-verification.test.ts`)
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -5011,7 +5011,7 @@ describe("resendErrorMessage", () => {
 });
 ```
 
-- [ ] **Bước 4: `src/lib/auth/email-verification.ts`**
+- [x] **Bước 4: `src/lib/auth/email-verification.ts`**
 
 ```ts
 "use client";
@@ -5051,7 +5051,7 @@ export function resendErrorMessage(err: unknown) {
 
 > `useVerifyEmail` dùng `useQuery` (không gọi API trong `useEffect`): mỗi token chỉ gửi đúng một lần kể cả khi React Strict Mode chạy effect hai lần, và tránh luật eslint `set-state-in-effect`.
 
-- [ ] **Bước 5: Component**
+- [x] **Bước 5: Component**
 
 `src/components/auth/resend-verification.tsx`:
 
@@ -5127,7 +5127,7 @@ export function CheckEmail({ email, teacher }: { email: string; teacher: boolean
 }
 ```
 
-- [ ] **Bước 6: Đăng ký** (`src/app/(auth)/register/register-form.tsx`, thay toàn bộ)
+- [x] **Bước 6: Đăng ký** (`src/app/(auth)/register/register-form.tsx`, thay toàn bộ)
 
 Đăng ký xong **không tự đăng nhập** nữa, mà hiện màn "Kiểm tra hộp thư".
 
@@ -5230,7 +5230,7 @@ export function RegisterForm() {
 }
 ```
 
-- [ ] **Bước 7: Đăng nhập** (`src/app/(auth)/login/login-form.tsx`, thay toàn bộ)
+- [x] **Bước 7: Đăng nhập** (`src/app/(auth)/login/login-form.tsx`, thay toàn bộ)
 
 ```tsx
 "use client";
@@ -5312,7 +5312,7 @@ export function LoginForm() {
 }
 ```
 
-- [ ] **Bước 8: Trang `/verify-email`**
+- [x] **Bước 8: Trang `/verify-email`**
 
 `src/app/(auth)/verify-email/page.tsx`:
 
@@ -5422,7 +5422,7 @@ function ResendForm() {
 }
 ```
 
-- [ ] **Bước 9: Kiểm tra và commit**
+- [x] **Bước 9: Kiểm tra và commit**
 
 ```bash
 npm run lint && npm run typecheck && npm test
