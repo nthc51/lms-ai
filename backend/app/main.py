@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
-from app.core.middleware import RequestIdMiddleware, StrictCORSMiddleware
+from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, StrictCORSMiddleware
 from app.core.ratelimit import close_rate_limiter
 from app.core.storage import get_storage
 from app.modules.admin.router import router as admin_router
@@ -43,6 +43,8 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
         expose_headers=["x-request-id", "retry-after"],
     )
+    # Thêm sau cùng = lớp ngoài cùng: bọc cả response CORS preflight và 500
+    app.add_middleware(SecurityHeadersMiddleware)
     register_error_handlers(app)
 
     @app.get("/api/v1/health")

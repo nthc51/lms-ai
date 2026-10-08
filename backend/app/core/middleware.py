@@ -83,3 +83,42 @@ class StrictCORSMiddleware(CORSMiddleware):
             await send(msg)
 
         await super().send(message, _send, request_headers)
+
+
+_SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+    (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),
+]
+# API chỉ trả JSON nên không cần tải bất kỳ tài nguyên nào; chặn luôn việc bị nhúng vào iframe
+_API_CSP = (b"content-security-policy", b"default-src 'none'; frame-ancestors 'none'")
+_DOCS_PREFIXES = ("/docs", "/redoc", "/openapi.json")
+
+
+class SecurityHeadersMiddleware:
+    """Thêm security headers vào mọi response HTTP, kể cả lỗi 404/500.
+
+    Đặt ngoài cùng (add_middleware sau cùng) để bọc cả response 500 do RequestIdMiddleware tạo.
+    HSTS do Caddy gắn ở production (Task 9), vì chỉ có ý nghĩa khi chạy HTTPS.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        extra = list(_SECURITY_HEADERS)
+        if not scope["path"].startswith(_DOCS_PREFIXES):
+            extra.append(_API_CSP)
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = message.setdefault("headers", [])
+                existing = {k.lower() for k, _ in headers}
+                headers.extend((k, v) for k, v in extra if k not in existing)
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
