@@ -1,0 +1,5 @@
+// Bộ mẫu cho test: tài liệu 3 trang sinh bởi tests/test_eval.py (SAMPLE_PAGES).
+{"id": "s1", "type": "single", "question": "Tìm kiếm nhị phân yêu cầu mảng như thế nào?", "gold_pages": [1], "gold_answer": "Mảng đã sắp xếp", "must_refuse": false}
+{"id": "s2", "type": "single", "question": "Độ phức tạp của tìm kiếm nhị phân là gì?", "gold_pages": [2], "gold_answer": "O(log n)", "must_refuse": false}
+{"id": "s3", "type": "paraphrase", "question": "Sắp xếp nổi bọt hoán đổi những phần tử nào?", "gold_pages": [3], "gold_answer": "Hai phần tử kề nhau sai thứ tự", "must_refuse": false}
+{"id": "s4", "type": "refuse", "question": "Thủ đô của nước Pháp là gì?", "gold_pages": [], "gold_answer": "", "must_refuse": true}
