@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     tutor_rate_limit_per_hour: int = 30  # số câu hỏi Tutor mỗi học viên mỗi giờ (spec 5.3 bước 7)
     # Đếm cả lần sai mật khẩu. Rộng tay vì cả lớp dùng chung một IP khi ở WiFi trường (NAT)
     login_rate_limit_per_min: int = 20
+    cache_enabled: bool = True
+    cache_ttl_s: int = 60
     # Hạn chót tổng của bước viết lại câu hỏi (gồm cả retry); quá hạn thì dùng câu hỏi gốc.
     tutor_rewrite_deadline_s: float = 20.0
     # Hạn chót tổng trước token đầu tiên: viết lại + tìm tài liệu + mở stream (gồm retry). Quá hạn → event error.

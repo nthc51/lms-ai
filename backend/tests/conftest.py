@@ -7,6 +7,7 @@ os.environ["DATABASE_URL"] = os.environ.get(
 )
 assert os.environ["DATABASE_URL"].rsplit("/", 1)[-1].endswith("_test"), "Test chỉ được chạy trên DB *_test"
 os.environ["DB_NULL_POOL"] = "true"
+os.environ["CACHE_ENABLED"] = "false"  # test mặc định không dùng cache; test cache tự bật (Task 4, 5)
 os.environ["EMBED_PROVIDER"] = "fake"
 os.environ["VISION_PROVIDER"] = "fake"
 os.environ["LLM_PROVIDER"] = "fake"
