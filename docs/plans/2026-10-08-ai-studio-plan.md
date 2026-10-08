@@ -4859,7 +4859,7 @@ git add frontend && git commit -m "feat(web): studio API types and queries"
 - Create trong `frontend/src/components/studio/`: `cited-markdown.tsx`, `artifact-viewer.tsx`, `flashcard-deck.tsx`, `flashcard-deck.test.tsx`, `studio-panel.tsx`, `documents-panel.tsx`, `lesson-notes.tsx`, `study-tabs.tsx`
 - Modify: `frontend/src/components/tutor/citation-chip.tsx`, `frontend/src/components/tutor/tutor-panel.tsx`, `frontend/src/components/lesson/lesson-view.tsx`, `frontend/e2e/student.spec.ts`
 
-- [ ] **Bước 1: Test flashcard (sẽ fail)** (`flashcard-deck.test.tsx`)
+- [x] **Bước 1: Test flashcard (sẽ fail)** (`flashcard-deck.test.tsx`)
 
 ```tsx
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -4930,7 +4930,7 @@ describe("FlashcardDeck", () => {
 });
 ```
 
-- [ ] **Bước 2: Markdown có `[n]` bấm được** (`cited-markdown.tsx`)
+- [x] **Bước 2: Markdown có `[n]` bấm được** (`cited-markdown.tsx`)
 
 ```tsx
 "use client";
@@ -4974,7 +4974,7 @@ export function CitedMarkdown({
 }
 ```
 
-- [ ] **Bước 3: Chip nguồn tải đoạn tài liệu khi mở + "Mở PDF trang N"** (`citation-chip.tsx`)
+- [x] **Bước 3: Chip nguồn tải đoạn tài liệu khi mở + "Mở PDF trang N"** (`citation-chip.tsx`)
 
 ```diff
 --- a/src/components/tutor/citation-chip.tsx
@@ -5050,7 +5050,7 @@ export function CitedMarkdown({
                  Tua tới {formatTimestamp(c.start_sec)}
 ```
 
-- [ ] **Bước 4: Trình xem báo cáo / flashcard** (`artifact-viewer.tsx`, `flashcard-deck.tsx`)
+- [x] **Bước 4: Trình xem báo cáo / flashcard** (`artifact-viewer.tsx`, `flashcard-deck.tsx`)
 
 ```tsx
 "use client";
@@ -5388,7 +5388,7 @@ function CardEditor({ artifact, index, onDone }: { artifact: Artifact; index: nu
 }
 ```
 
-- [ ] **Bước 5: Các tab** (`studio-panel.tsx`, `documents-panel.tsx`, `lesson-notes.tsx`, `study-tabs.tsx`)
+- [x] **Bước 5: Các tab** (`studio-panel.tsx`, `documents-panel.tsx`, `lesson-notes.tsx`, `study-tabs.tsx`)
 
 ```tsx
 "use client";
@@ -5802,7 +5802,7 @@ export function StudyTabs({
 }
 ```
 
-- [ ] **Bước 6: AI Tutor: nút "Lưu vào ghi chú" + "Gợi ý hỏi tiếp"** (`tutor-panel.tsx`)
+- [x] **Bước 6: AI Tutor: nút "Lưu vào ghi chú" + "Gợi ý hỏi tiếp"** (`tutor-panel.tsx`)
 
 ```diff
 --- a/src/components/tutor/tutor-panel.tsx
@@ -5930,7 +5930,7 @@ export function StudyTabs({
      </div>
 ```
 
-- [ ] **Bước 7: Trang bài học dùng 4 tab** (`lesson-view.tsx`). Cột phải và khung trượt điện thoại đổi tên thành "Trợ lý học tập"; phím `/` vẫn mở AI Tutor.
+- [x] **Bước 7: Trang bài học dùng 4 tab** (`lesson-view.tsx`). Cột phải và khung trượt điện thoại đổi tên thành "Trợ lý học tập"; phím `/` vẫn mở AI Tutor.
 
 ```diff
 --- a/src/components/lesson/lesson-view.tsx
@@ -6031,7 +6031,7 @@ export function StudyTabs({
      await expect(page.getByText("Đã học xong bài này")).toBeVisible();
 ```
 
-- [ ] **Bước 8:** `npx vitest run src/components/studio && npx tsc --noEmit && npx eslint src` → sạch. Commit:
+- [x] **Bước 8:** `npx vitest run src/components/studio && npx tsc --noEmit && npx eslint src` → sạch. Commit:
 
 ```bash
 git add frontend && git commit -m "feat(web): study assistant tabs: studio, documents, notes, source preview, followups"
