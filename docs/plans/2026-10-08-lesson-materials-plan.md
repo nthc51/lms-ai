@@ -852,7 +852,7 @@ git add frontend && git commit -m "feat(web): show lesson PDFs to students with 
 **Files:**
 - Modify: `frontend/e2e/studio.spec.ts`
 
-- [ ] **Bước 1:** Sửa mock tab Tài liệu cho đủ trường mới, thêm 2 kịch bản: bài chỉ có PDF (đang xử lý vẫn hiện, xem trong trang ở 1280px / mở thẻ mới ở 375px, tải xuống gửi `download=true`) và bài trống thật sự.
+- [x] **Bước 1:** Sửa mock tab Tài liệu cho đủ trường mới, thêm 2 kịch bản: bài chỉ có PDF (đang xử lý vẫn hiện, xem trong trang ở 1280px / mở thẻ mới ở 375px, tải xuống gửi `download=true`) và bài trống thật sự.
 
 ```diff
 --- a/e2e/studio.spec.ts
@@ -944,7 +944,7 @@ git add frontend && git commit -m "feat(web): show lesson PDFs to students with 
      await mockApi(page, {
 ```
 
-- [ ] **Bước 2:** `npx playwright test` → **77 passed, 1 skipped**. Commit:
+- [x] **Bước 2:** `npx playwright test` → **77 passed, 1 skipped**. Commit:
 
 ```bash
 git add frontend && git commit -m "test(web): E2E for lesson PDFs"
