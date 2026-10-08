@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Cookie, Depends, Response
+from fastapi import APIRouter, Cookie, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -37,11 +37,43 @@ def set_refresh_cookie(response: Response, raw: str) -> None:
     )
 
 
+REGISTER_IP_LIMIT = 20  # mỗi IP tối đa 20 lần đăng ký / giờ (mỗi lần đăng ký gửi một email)
+RESEND_LIMIT = 3  # mỗi email tối đa 3 lần / giờ
+RESEND_IP_LIMIT = 10  # mỗi IP tối đa 10 lần / giờ (chặn spam nhiều email khác nhau)
+
+
+def _too_many(wait: int) -> AppError:
+    return AppError(
+        "RATE_LIMITED",
+        "Bạn thao tác quá nhiều lần, vui lòng thử lại sau",
+        429,
+        {"retry_after": wait},
+        headers={"Retry-After": str(wait)},
+    )
+
+
+async def _limit(limiter: RateLimiter, key: str, limit: int) -> None:
+    wait = await limiter.hit(key, limit, 3600)
+    if wait is not None:
+        raise _too_many(wait)
+
+
+def _ip(request: Request) -> str:
+    # Sau reverse proxy (Caddy ở tầng S) cần chạy uvicorn với --proxy-headers để đây là IP thật.
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("/auth/register", response_model=UserOut, status_code=201)
 async def register(
-    data: RegisterIn, db: AsyncSession = Depends(get_db), kicker: MailKicker = Depends(get_mail_kicker)
+    data: RegisterIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+    kicker: MailKicker = Depends(get_mail_kicker),
 ):
-    """Tạo tài khoản và gửi email xác nhận. Chưa xác nhận thì đăng nhập nhận 403 EMAIL_NOT_VERIFIED."""
+    """Tạo tài khoản và gửi email xác nhận. Chưa xác nhận thì đăng nhập nhận 403 EMAIL_NOT_VERIFIED.
+    429 RATE_LIMITED khi một IP đăng ký quá 20 lần / giờ."""
+    await _limit(limiter, f"register-ip:{_ip(request)}", REGISTER_IP_LIMIT)
     user = await service.register(db, data)
     await kicker.kick()
     return user
@@ -57,26 +89,18 @@ async def verify_email(
     return user
 
 
-RESEND_LIMIT = 3  # mỗi email tối đa 3 lần / giờ
-
-
 @router.post("/auth/resend-verification", status_code=202)
 async def resend_verification(
     data: ResendVerificationIn,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     limiter: RateLimiter = Depends(get_rate_limiter),
     kicker: MailKicker = Depends(get_mail_kicker),
 ) -> dict:
-    """Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi gửi quá 3 lần mỗi giờ cho một email."""
-    wait = await limiter.hit(f"verify-resend:{data.email}", RESEND_LIMIT, 3600)
-    if wait is not None:
-        raise AppError(
-            "RATE_LIMITED",
-            "Bạn đã yêu cầu gửi lại quá nhiều lần, vui lòng thử lại sau",
-            429,
-            {"retry_after": wait},
-            headers={"Retry-After": str(wait)},
-        )
+    """Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi quá 3 lần/giờ cho một email
+    hoặc quá 10 lần/giờ từ một IP."""
+    await _limit(limiter, f"verify-resend-ip:{_ip(request)}", RESEND_IP_LIMIT)
+    await _limit(limiter, f"verify-resend:{data.email}", RESEND_LIMIT)
     if await service.resend_verification(db, data.email):
         await kicker.kick()
     return {"status": "accepted"}

@@ -1309,6 +1309,7 @@ services:
     environment: *backend_env
     # --proxy-headers: lấy IP thật từ X-Forwarded-For (rate limit theo IP). Tin mọi nguồn là an toàn
     # vì API không publish port nào, chỉ Caddy trong mạng nội bộ gọi tới được.
+    # Bắt buộc giữ cờ này (admin plan Task 15): đăng ký / gửi lại email xác nhận giới hạn theo IP, thiếu nó thì mọi request mang IP của Caddy và giới hạn chặn cả hệ thống.
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).status == 200 else 1)"]

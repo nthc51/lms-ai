@@ -57,19 +57,26 @@ def _log(
 
 
 def _like(q: str) -> str:
-    return f"%{q.strip().lower()}%"
+    """Mẫu LIKE từ chuỗi người dùng gõ: % và _ được coi là ký tự thường (dùng kèm escape="\\")."""
+    q = q.strip().lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{q}%"
+
+
+def _ilike(column, pattern: str):
+    return func.immutable_unaccent(func.lower(column)).like(func.immutable_unaccent(pattern), escape="\\")
 
 
 def _url(path: str) -> str:
     return f"{get_settings().app_base_url}{path}"
 
 
-# Giảng viên chỉ vào hàng chờ duyệt khi đã xác nhận email (tránh hàng chờ đầy email giả).
-_PENDING = (
-    User.role == Role.teacher,
-    User.teacher_status == TeacherStatus.pending,
-    User.email_verified_at.is_not(None),
-)
+def _pending():
+    """Giảng viên chờ duyệt. Khi bắt buộc xác nhận email thì chỉ tính người đã xác nhận (tránh hàng chờ
+    đầy email giả); tắt EMAIL_VERIFICATION_REQUIRED thì tính mọi người."""
+    conds = [User.role == Role.teacher, User.teacher_status == TeacherStatus.pending]
+    if get_settings().email_verification_required:
+        conds.append(User.email_verified_at.is_not(None))
+    return conds
 
 
 # ---------- người dùng ----------
@@ -99,6 +106,7 @@ def _user_out(user: User, course_count: int, enrollment_count: int) -> AdminUser
         teacher_status=user.teacher_status,
         locked_at=user.locked_at,
         review_note=user.review_note,
+        lock_reason=user.lock_reason,
         email_verified=user.email_verified_at is not None,
         created_at=user.created_at,
         course_count=course_count,
@@ -111,7 +119,7 @@ def _users_stmt(role: Role | None, status: str | None, q: str | None) -> Select:
     if role is not None:
         stmt = stmt.where(User.role == role)
     if status == "pending":
-        stmt = stmt.where(*_PENDING)
+        stmt = stmt.where(*_pending())
     elif status == "unverified":
         stmt = stmt.where(User.email_verified_at.is_(None))
     elif status in ("approved", "rejected"):
@@ -122,8 +130,8 @@ def _users_stmt(role: Role | None, status: str | None, q: str | None) -> Select:
         pattern = _like(q)
         stmt = stmt.where(
             or_(
-                func.immutable_unaccent(func.lower(User.full_name)).like(func.immutable_unaccent(pattern)),
-                User.email.like(pattern),
+                _ilike(User.full_name, pattern),
+                User.email.like(pattern, escape="\\"),
             )
         )
     # Chờ duyệt: ai đăng ký trước được xử lý trước. Còn lại: mới nhất lên đầu.
@@ -150,6 +158,14 @@ _STATUS_VI = {
 }
 
 
+_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _cell(value: str) -> str:
+    """Chặn CSV injection: ô bắt đầu bằng = + - @ bị Excel coi là công thức (vd. =HYPERLINK(...) trong họ tên)."""
+    return f"'{value}" if value.startswith(_FORMULA_START) else value
+
+
 async def export_users_csv(db: AsyncSession, role: Role | None, status: str | None, q: str | None) -> str:
     """CSV theo đúng bộ lọc đang xem. Có BOM UTF-8 để Excel hiện đúng tiếng Việt."""
     rows = (await db.execute(_users_stmt(role, status, q).limit(CSV_MAX_ROWS))).all()
@@ -172,8 +188,8 @@ async def export_users_csv(db: AsyncSession, role: Role | None, status: str | No
     for u, cc, ec in rows:
         w.writerow(
             [
-                u.full_name,
-                u.email,
+                _cell(u.full_name),
+                _cell(u.email),
                 _ROLE_VI[u.role],
                 _STATUS_VI.get(u.teacher_status, "") if u.teacher_status else "",
                 "Có" if u.email_verified_at else "Chưa",
@@ -236,7 +252,7 @@ async def lock_user(db: AsyncSession, admin: User, user_id: uuid.UUID, reason: s
         raise AppError("CANNOT_LOCK_ADMIN", "Không thể khóa tài khoản quản trị viên", 409)
     if user.locked_at is None:
         user.locked_at = utcnow()
-        user.review_note = reason
+        user.lock_reason = reason
         # Thu hồi mọi phiên: refresh bị chặn ngay; access token còn hạn cũng bị deps chặn vì locked_at.
         await db.execute(
             update(RefreshToken)
@@ -255,9 +271,7 @@ async def unlock_user(db: AsyncSession, admin: User, user_id: uuid.UUID) -> Admi
         raise not_found("Người dùng")
     if user.locked_at is not None:
         user.locked_at = None
-        # Lý do khóa không còn đúng nữa; lý do từ chối giảng viên (nếu có) thì giữ.
-        if user.teacher_status != TeacherStatus.rejected:
-            user.review_note = None
+        user.lock_reason = None
         _log(db, admin, "unlock_user", "user", user.id, user.email, None)
         await db.commit()
     return await _get_user_row(db, user.id)
@@ -319,8 +333,8 @@ async def list_courses(
         pattern = _like(q)
         stmt = stmt.where(
             or_(
-                func.immutable_unaccent(func.lower(Course.title)).like(func.immutable_unaccent(pattern)),
-                func.immutable_unaccent(func.lower(User.full_name)).like(func.immutable_unaccent(pattern)),
+                _ilike(Course.title, pattern),
+                _ilike(User.full_name, pattern),
             )
         )
     total, paged = await paginate(db, stmt.order_by(Course.created_at.desc(), Course.id), params)
@@ -409,7 +423,7 @@ async def stats(db: AsyncSession) -> AdminStats:
     return AdminStats(
         students=by_role.get(Role.student, 0),
         teachers=by_role.get(Role.teacher, 0),
-        pending_teachers=await count(select(func.count()).select_from(User).where(*_PENDING)),
+        pending_teachers=await count(select(func.count()).select_from(User).where(*_pending())),
         locked_users=await count(select(func.count()).select_from(User).where(User.locked_at.is_not(None))),
         courses_published=by_status.get(CourseStatus.published, 0),
         courses_draft=by_status.get(CourseStatus.draft, 0),

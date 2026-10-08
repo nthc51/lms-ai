@@ -181,7 +181,17 @@ async def test_admin_actions_email_the_affected_person(client, kicker):
     assert kicker.kicks - before == 5
 
 
-async def test_send_pending_marks_sent_and_retries_then_gives_up():
+async def _make_due(to: str | None = None) -> None:
+    """Cho email đang chờ lùi (backoff / hạn thuê) đến hạn gửi ngay."""
+    async with SessionLocal() as db:
+        stmt = update(EmailOutbox).values(next_attempt_at=None)
+        if to:
+            stmt = stmt.where(EmailOutbox.to_email == to)
+        await db.execute(stmt)
+        await db.commit()
+
+
+async def test_send_pending_marks_sent_and_retries_with_backoff_then_gives_up():
     async with SessionLocal() as db:
         db.add(
             EmailOutbox(to_email="a@x.com", subject="S", body_text="T", body_html="<p>T</p>", template="t")
@@ -196,6 +206,9 @@ async def test_send_pending_marks_sent_and_retries_then_gives_up():
         1,
         "ConnectionError: SMTP down",
     )
+    assert mail.next_attempt_at > utcnow()  # chờ lùi, không thử lại ngay
+    assert await send_pending(SessionLocal, flaky) == 0
+    await _make_due()
     assert await send_pending(SessionLocal, flaky) == 1
     (mail,) = await _outbox()
     assert (mail.status, mail.attempts, mail.last_error) == (EmailStatus.sent, 2, None)

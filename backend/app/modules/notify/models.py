@@ -34,3 +34,6 @@ class EmailOutbox(IdMixin, TimestampMixin, Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_error: Mapped[str | None] = mapped_column(Text)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Lần gửi kế tiếp được phép (NULL = ngay). Khi nhận email để gửi, đặt lùi ra sau CLAIM_LEASE: nếu worker
+    # chết giữa chừng thì hết hạn thuê, lượt sau gửi lại (ít nhất một lần, không kẹt mãi).
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -35,8 +35,10 @@ class User(IdMixin, TimestampMixin, Base):
     role: Mapped[Role] = mapped_column(SAEnum(Role, name="user_role"))
     teacher_status: Mapped[TeacherStatus | None] = mapped_column(SAEnum(TeacherStatus, name="teacher_status"))
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # Lý do quản trị viên ghi khi từ chối giảng viên hoặc khóa tài khoản (hiện cho chính người dùng).
+    # Lý do quản trị viên ghi khi từ chối giảng viên (hiện cho chính người dùng).
     review_note: Mapped[str | None] = mapped_column(String(500))
+    # Lý do khóa tài khoản. Tách khỏi review_note để khóa / mở khóa không đè lý do từ chối.
+    lock_reason: Mapped[str | None] = mapped_column(String(500))
 
     # NULL = chưa bấm link xác nhận email (không đăng nhập được khi EMAIL_VERIFICATION_REQUIRED=true).
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

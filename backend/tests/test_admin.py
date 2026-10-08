@@ -106,14 +106,14 @@ async def test_lock_revokes_sessions_and_unlock_restores(client):
 
     r = await client.post(f"{API}/admin/users/{sv_id}/lock", json={"reason": "Spam diễn đàn"}, headers=ad)
     assert r.status_code == 200 and r.json()["locked_at"] is not None
-    assert r.json()["review_note"] == "Spam diễn đàn"
+    assert r.json()["lock_reason"] == "Spam diễn đàn"
     assert _code(await client.get(f"{API}/me", headers=sv)) == (403, "ACCOUNT_LOCKED")
     client.cookies.clear()
     refreshed = await client.post(f"{API}/auth/refresh", headers={"Cookie": f"refresh_token={raw}"})
     assert refreshed.status_code in (401, 403)
 
     r = await client.post(f"{API}/admin/users/{sv_id}/unlock", headers=ad)
-    assert (r.json()["locked_at"], r.json()["review_note"]) == (None, None)
+    assert (r.json()["locked_at"], r.json()["lock_reason"]) == (None, None)
     assert (await client.get(f"{API}/me", headers=await login(client, "sv@x.com"))).status_code == 200
 
     # không khóa được quản trị viên (kể cả chính mình); khóa không cần lý do
@@ -122,7 +122,7 @@ async def test_lock_revokes_sessions_and_unlock_restores(client):
         "CANNOT_LOCK_ADMIN",
     )
     r = await client.post(f"{API}/admin/users/{sv_id}/lock", json={}, headers=ad)
-    assert r.status_code == 200 and r.json()["review_note"] is None
+    assert r.status_code == 200 and r.json()["lock_reason"] is None
 
 
 async def test_users_filter_by_role_status_and_search_without_accents(client):

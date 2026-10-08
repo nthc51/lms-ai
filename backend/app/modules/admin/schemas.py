@@ -42,7 +42,8 @@ class AdminUserOut(BaseModel):
     role: Role
     teacher_status: TeacherStatus | None
     locked_at: datetime | None
-    review_note: str | None
+    review_note: str | None  # lý do từ chối giảng viên
+    lock_reason: str | None
     email_verified: bool
     created_at: datetime
     course_count: int  # giảng viên: số khóa đang sở hữu

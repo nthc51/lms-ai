@@ -33,6 +33,7 @@ export interface paths {
         /**
          * Register
          * @description Tạo tài khoản và gửi email xác nhận. Chưa xác nhận thì đăng nhập nhận 403 EMAIL_NOT_VERIFIED.
+         *     429 RATE_LIMITED khi một IP đăng ký quá 20 lần / giờ.
          */
         post: operations["register_api_v1_auth_register_post"];
         delete?: never;
@@ -72,7 +73,8 @@ export interface paths {
         put?: never;
         /**
          * Resend Verification
-         * @description Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi gửi quá 3 lần mỗi giờ cho một email.
+         * @description Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi quá 3 lần/giờ cho một email
+         *     hoặc quá 10 lần/giờ từ một IP.
          */
         post: operations["resend_verification_api_v1_auth_resend_verification_post"];
         delete?: never;
@@ -1173,6 +1175,8 @@ export interface components {
             locked_at: string | null;
             /** Review Note */
             review_note: string | null;
+            /** Lock Reason */
+            lock_reason: string | null;
             /** Email Verified */
             email_verified: boolean;
             /**

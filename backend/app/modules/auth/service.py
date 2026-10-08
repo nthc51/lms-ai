@@ -42,6 +42,9 @@ async def register(db: AsyncSession, data: RegisterIn) -> User:
     try:
         await db.flush()  # cần user.id cho link xác nhận
         await _issue_verify_token(db, user)
+        if role == Role.teacher and not get_settings().email_verification_required:
+            # Không bắt buộc xác nhận email: giảng viên vào hàng chờ ngay, báo admin luôn lúc đăng ký.
+            await notify_admins_pending_teacher(db, user)
         await db.commit()
     except IntegrityError:
         # Hai request đăng ký cùng email chạy song song: cả hai qua được bước kiểm tra ở trên,

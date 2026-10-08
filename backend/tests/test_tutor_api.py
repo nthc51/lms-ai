@@ -20,6 +20,11 @@ from tests.helpers import API, make_published_course, make_student, make_teacher
 TEST_TIMEOUT_S = 15  # mọi request chờ stream đều có giới hạn: hồi quy thì hỏng chứ không treo
 
 
+def _tutor_counts(limiter) -> dict[str, int]:
+    """Chỉ lượt đếm của Tutor (đăng ký tài khoản trong test cũng đi qua rate limiter theo IP)."""
+    return {k: v for k, v in limiter.counts.items() if k.startswith("tutor:")}
+
+
 async def _ready_session(client, db):
     _, gv = await make_teacher(client)
     course, _, lesson = await make_published_course(client, gv)
@@ -96,13 +101,15 @@ async def test_rate_limit_returns_429_with_retry_after(client, db, limiter, monk
     msgs = (await client.get(f"{API}/tutor/sessions/{session['id']}/messages", headers=sv)).json()
     assert msgs["total"] == 4  # câu bị chặn không được lưu
     student = await db.scalar(select(User).where(User.email == "sv@x.com"))
-    assert limiter.counts == {f"tutor:{student.id}": 3}  # RedisRateLimiter thêm tiền tố → rl:tutor:<id>
+    assert _tutor_counts(limiter) == {
+        f"tutor:{student.id}": 3
+    }  # RedisRateLimiter thêm tiền tố → rl:tutor:<id>
     # giảng viên không bị giới hạn (và không bị đếm)
     body = {"course_id": course["id"], "lesson_id": lesson["id"]}
     teacher_session = (await client.post(f"{API}/tutor/sessions", json=body, headers=gv)).json()
     for _ in range(3):
         assert (await _ask(client, gv, teacher_session["id"])).status_code == 200
-    assert list(limiter.counts) == [f"tutor:{student.id}"]
+    assert list(_tutor_counts(limiter)) == [f"tutor:{student.id}"]
 
 
 async def test_other_users_session_and_blank_question(client, db, limiter):
@@ -111,7 +118,7 @@ async def test_other_users_session_and_blank_question(client, db, limiter):
     assert (await _ask(client, other, session["id"])).status_code == 404
     r = await _ask(client, sv, session["id"], "   ")
     assert (r.status_code, r.json()["error"]["code"]) == (422, "VALIDATION_ERROR")
-    assert limiter.counts == {}  # bị từ chối trước rate limit: không tốn lượt
+    assert _tutor_counts(limiter) == {}  # bị từ chối trước rate limit: không tốn lượt
     assert await _messages(db, session["id"]) == []
 
 
@@ -121,7 +128,7 @@ async def test_unenrolled_after_session_creation_cannot_ask(client, db, limiter)
     await db.commit()
     r = await _ask(client, sv, session["id"])
     assert (r.status_code, r.json()["error"]["code"]) == (403, "NOT_ENROLLED")  # như khi tạo phiên
-    assert await _messages(db, session["id"]) == [] and limiter.counts == {}
+    assert await _messages(db, session["id"]) == [] and _tutor_counts(limiter) == {}
 
 
 async def test_unpublished_after_session_creation_cannot_ask(client, db):

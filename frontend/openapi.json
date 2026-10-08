@@ -31,7 +31,7 @@
           "auth"
         ],
         "summary": "Register",
-        "description": "Tạo tài khoản và gửi email xác nhận. Chưa xác nhận thì đăng nhập nhận 403 EMAIL_NOT_VERIFIED.",
+        "description": "Tạo tài khoản và gửi email xác nhận. Chưa xác nhận thì đăng nhập nhận 403 EMAIL_NOT_VERIFIED.\n429 RATE_LIMITED khi một IP đăng ký quá 20 lần / giờ.",
         "operationId": "register_api_v1_auth_register_post",
         "requestBody": {
           "content": {
@@ -115,7 +115,7 @@
           "auth"
         ],
         "summary": "Resend Verification",
-        "description": "Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi gửi quá 3 lần mỗi giờ cho một email.",
+        "description": "Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi quá 3 lần/giờ cho một email\nhoặc quá 10 lần/giờ từ một IP.",
         "operationId": "resend_verification_api_v1_auth_resend_verification_post",
         "requestBody": {
           "content": {
@@ -4119,6 +4119,17 @@
             ],
             "title": "Review Note"
           },
+          "lock_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lock Reason"
+          },
           "email_verified": {
             "type": "boolean",
             "title": "Email Verified"
@@ -4146,6 +4157,7 @@
           "teacher_status",
           "locked_at",
           "review_note",
+          "lock_reason",
           "email_verified",
           "created_at",
           "course_count",
