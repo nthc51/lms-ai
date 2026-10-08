@@ -4042,6 +4042,13 @@
             "type": "integer",
             "title": "Tutor Downvotes 7D"
           },
+          "ai_usage_7d": {
+            "items": {
+              "$ref": "#/components/schemas/AiUsageRow"
+            },
+            "type": "array",
+            "title": "Ai Usage 7D"
+          },
           "signups_14d": {
             "items": {
               "$ref": "#/components/schemas/DayCount"
@@ -4064,6 +4071,7 @@
           "quiz_submissions_7d",
           "failed_jobs_7d",
           "tutor_downvotes_7d",
+          "ai_usage_7d",
           "signups_14d"
         ],
         "title": "AdminStats"
@@ -4195,6 +4203,40 @@
           "size"
         ],
         "title": "AdminUserPage"
+      },
+      "AiUsageRow": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "title": "Op"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "cached_calls": {
+            "type": "integer",
+            "title": "Cached Calls"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In"
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op",
+          "calls",
+          "cached_calls",
+          "tokens_in",
+          "tokens_out"
+        ],
+        "title": "AiUsageRow",
+        "description": "Token AI 7 ngày theo loại việc (op của LLMClient: tutor_answer, quiz_generate, studio_faq, ...)."
       },
       "AnswerIn": {
         "properties": {

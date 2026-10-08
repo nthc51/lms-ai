@@ -26,7 +26,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.ai.llm import LLMProvider, ProviderResult, ProviderStream, get_llm_provider, split_pieces
-from app.ai.models import LLMCache
+from app.ai.models import AiCall, LLMCache
 from app.ai.prompts import RenderedPrompt
 from app.ai.retry import Sleep, call_with_retry
 from app.core.config import Settings, get_settings
@@ -259,6 +259,53 @@ class LLMClient:
             finish_reason,
         )
 
+    async def _note(
+        self,
+        op: str,
+        prompt: RenderedPrompt,
+        model: str,
+        status: str,
+        *,
+        cached: bool,
+        tokens_in: int | None,
+        tokens_out: int | None,
+        latency_ms: int,
+        finish_reason: str | None = None,
+    ) -> None:
+        """Ghi log + một dòng ai_calls (best-effort: DB lỗi chỉ cảnh báo, không làm hỏng lời gọi)."""
+        tokens_in, tokens_out = tokens_in or 0, tokens_out or 0
+        self._log(
+            op,
+            prompt,
+            model,
+            status,
+            cached=cached,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            latency_ms=latency_ms,
+            finish_reason=finish_reason,
+        )
+        if not self._settings.ai_usage_log_enabled:
+            return
+        try:
+            async with self._session_factory() as db:
+                db.add(
+                    AiCall(
+                        op=op,
+                        provider=self.provider.name,
+                        model=model,
+                        prompt_version=prompt.prompt_version,
+                        status=status,
+                        cached=cached,
+                        tokens_in=tokens_in,
+                        tokens_out=tokens_out,
+                        latency_ms=latency_ms,
+                    )
+                )
+                await db.commit()
+        except Exception as exc:  # noqa: BLE001 — nhật ký không được làm hỏng lời gọi LLM
+            logger.warning("ai_calls write failed op=%s error=%r", op, exc)
+
     async def _attempt(
         self, prompt: RenderedPrompt, *, op: str, model: str, timeout_s: float, json_schema: dict | None
     ) -> ProviderResult:
@@ -291,7 +338,7 @@ class LLMClient:
                 pass
             else:
                 result = LLMResult(hit, model, prompt.prompt_version, 0, 0, _ms(start), cached=True)
-                self._log(
+                await self._note(
                     op,
                     prompt,
                     model,
@@ -312,8 +359,8 @@ class LLMClient:
         )
         finish_reason = res.finish_reason
 
-        def log(status: str) -> None:
-            self._log(
+        async def log(status: str) -> None:
+            await self._note(
                 op,
                 prompt,
                 model,
@@ -328,16 +375,16 @@ class LLMClient:
         # Output rỗng (bị chặn an toàn, hết token trước khi có chữ...) không bao giờ là câu trả lời hợp lệ.
         # Ném sau call_with_retry nên không bị retry; caller quyết định.
         if not res.text.strip():
-            log("empty_output")
+            await log("empty_output")
             raise LLMOutputError(op, res.text, f"output rỗng (finish_reason={finish_reason})", result)
         try:
             parsed = parse(res.text)
         except ValueError as e:  # pydantic.ValidationError là ValueError
-            log("invalid_output")
+            await log("invalid_output")
             raise LLMOutputError(op, res.text, str(e)[:1000], result) from None
         # Chỉ cache output kết thúc bình thường; bị cắt (MAX_TOKENS, SAFETY...) vẫn trả về nhưng không cache.
         complete = finish_reason in (None, "STOP")
-        log("ok" if complete else "incomplete")
+        await log("ok" if complete else "incomplete")
         if caching and complete:
             await self._cache_put(key, model, res.text)
         return parsed, result
@@ -407,7 +454,9 @@ class LLMClient:
         start = time.perf_counter()
         hit = await self._cache_get(key) if caching else None
         if hit is not None:
-            self._log(op, prompt, model, "ok", cached=True, tokens_in=0, tokens_out=0, latency_ms=_ms(start))
+            await self._note(
+                op, prompt, model, "ok", cached=True, tokens_in=0, tokens_out=0, latency_ms=_ms(start)
+            )
             replay = LLMStream(_replay(hit), prompt, None)
             try:
                 yield replay
@@ -433,19 +482,19 @@ class LLMClient:
             status = "cancelled"
             raise
         finally:
-            with anyio.CancelScope(shield=True):  # bị hủy (client ngắt) vẫn đóng được upstream
+            with anyio.CancelScope(shield=True):  # bị hủy (client ngắt) vẫn đóng được upstream và ghi nhật ký
                 await stream.aclose()
-            self._log(
-                op,
-                prompt,
-                model,
-                status,
-                cached=False,
-                tokens_in=stream.tokens_in,
-                tokens_out=stream.tokens_out,
-                latency_ms=_ms(start),
-                finish_reason=stream.finish_reason,
-            )
+                await self._note(
+                    op,
+                    prompt,
+                    model,
+                    status,
+                    cached=False,
+                    tokens_in=stream.tokens_in,
+                    tokens_out=stream.tokens_out,
+                    latency_ms=_ms(start),
+                    finish_reason=stream.finish_reason,
+                )
         if caching and stream.cacheable:
             await self._cache_put(key, model, stream.text)
 

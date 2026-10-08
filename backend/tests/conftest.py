@@ -11,6 +11,7 @@ os.environ["EMBED_PROVIDER"] = "fake"
 os.environ["VISION_PROVIDER"] = "fake"
 os.environ["LLM_PROVIDER"] = "fake"
 os.environ["LLM_CACHE_ENABLED"] = "false"  # test nào cần cache tự bật bằng Settings riêng
+os.environ["AI_USAGE_LOG_ENABLED"] = "false"  # test nào cần nhật ký ai_calls tự bật bằng Settings riêng
 os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef-0123456789"
 
 # Test không đọc backend/.env của máy dev (CI cũng không có file này): cấu hình riêng của từng máy,

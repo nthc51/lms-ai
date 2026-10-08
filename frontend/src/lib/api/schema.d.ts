@@ -1155,6 +1155,8 @@ export interface components {
             failed_jobs_7d: number;
             /** Tutor Downvotes 7D */
             tutor_downvotes_7d: number;
+            /** Ai Usage 7D */
+            ai_usage_7d: components["schemas"]["AiUsageRow"][];
             /** Signups 14D */
             signups_14d: components["schemas"]["DayCount"][];
         };
@@ -1199,6 +1201,22 @@ export interface components {
             page: number;
             /** Size */
             size: number;
+        };
+        /**
+         * AiUsageRow
+         * @description Token AI 7 ngày theo loại việc (op của LLMClient: tutor_answer, quiz_generate, studio_faq, ...).
+         */
+        AiUsageRow: {
+            /** Op */
+            op: string;
+            /** Calls */
+            calls: number;
+            /** Cached Calls */
+            cached_calls: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
         };
         /** AnswerIn */
         AnswerIn: {

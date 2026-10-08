@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.models import AiCall
 from app.core.config import get_settings
 from app.core.errors import AppError, not_found
 from app.core.pagination import PageParams, paginate
@@ -20,6 +21,7 @@ from app.modules.admin.schemas import (
     AdminStats,
     AdminUserOut,
     AdminUserPage,
+    AiUsageRow,
     DayCount,
 )
 from app.modules.auth.models import RefreshToken, Role, TeacherStatus, User
@@ -455,6 +457,23 @@ async def stats(db: AsyncSession) -> AdminStats:
                 ChatMessage.created_at >= week_ago,
             )
         ),
+        ai_usage_7d=[
+            AiUsageRow(op=op, calls=calls, cached_calls=cached, tokens_in=t_in, tokens_out=t_out)
+            for op, calls, cached, t_in, t_out in (
+                await db.execute(
+                    select(
+                        AiCall.op,
+                        func.count(),
+                        func.count().filter(AiCall.cached),
+                        func.coalesce(func.sum(AiCall.tokens_in), 0),
+                        func.coalesce(func.sum(AiCall.tokens_out), 0),
+                    )
+                    .where(AiCall.created_at >= week_ago)
+                    .group_by(AiCall.op)
+                    .order_by((func.sum(AiCall.tokens_in) + func.sum(AiCall.tokens_out)).desc(), AiCall.op)
+                )
+            ).all()
+        ],
         signups_14d=[DayCount(day=d, count=per_day.get(d, 0)) for d in days],
     )
 

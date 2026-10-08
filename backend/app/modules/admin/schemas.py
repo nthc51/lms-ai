@@ -78,6 +78,16 @@ class DayCount(BaseModel):
     count: int
 
 
+class AiUsageRow(BaseModel):
+    """Token AI 7 ngày theo loại việc (op của LLMClient: tutor_answer, quiz_generate, studio_faq, ...)."""
+
+    op: str
+    calls: int
+    cached_calls: int
+    tokens_in: int
+    tokens_out: int
+
+
 class AdminStats(BaseModel):
     students: int
     teachers: int
@@ -91,6 +101,7 @@ class AdminStats(BaseModel):
     quiz_submissions_7d: int
     failed_jobs_7d: int
     tutor_downvotes_7d: int  # câu trả lời AI bị học viên bấm 👎 trong 7 ngày
+    ai_usage_7d: list[AiUsageRow]  # nhiều token nhất trước
     signups_14d: list[DayCount]  # đủ 14 ngày (giờ Việt Nam), ngày không có ai đăng ký = 0
 
 

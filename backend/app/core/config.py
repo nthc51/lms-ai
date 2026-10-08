@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     llm_stream_timeout_s: float = 120.0  # stream câu trả lời của Tutor
     llm_rewrite_timeout_s: float = 15.0
     llm_cache_enabled: bool = True
+    ai_usage_log_enabled: bool = True  # ghi mỗi lời gọi LLM vào bảng ai_calls (token theo loại việc)
     # Chốt chặn Tutor (spec 5.3 bước 3): similarity cao nhất < τ thì từ chối, không gọi LLM.
     # Giá trị tạm, sẽ chọn lại trên tập dev ở tuần 3 (spec 9.2).
     tutor_refuse_threshold: float = 0.3
@@ -77,6 +78,15 @@ class Settings(BaseSettings):
     smtp_timeout_s: float = 20.0
     mail_from: str = "LMS-AI <no-reply@example.com>"
     mail_max_attempts: int = 5  # gửi lỗi quá số lần này thì bỏ (status failed)
+
+    # AI Studio (đề cương, FAQ, flashcard...): tổng token tài liệu gửi trong MỘT lời gọi. Tài liệu dài hơn thì
+    # tóm tắt từng phần trước (map) rồi gộp (reduce).
+    studio_max_input_tokens: int = 12000
+    studio_rate_limit_per_hour: int = 10  # số lần một học viên được yêu cầu sinh mới mỗi giờ
+    source_guide_max_input_tokens: int = 6000  # hướng dẫn tài liệu: chỉ đọc phần đầu mỗi mục tới mức này
+    # Kích thước đoạn khi chia tài liệu (benchmark dùng để so cấu hình). Đổi thì phải xử lý lại tài liệu.
+    chunk_max_tokens: int = 700
+    chunk_overlap_tokens: int = 100
 
     @field_validator("cors_origins", mode="before")
     @classmethod
