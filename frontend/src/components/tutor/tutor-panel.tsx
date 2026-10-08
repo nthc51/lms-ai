@@ -1,12 +1,13 @@
 "use client";
 
-import { MessageCircleQuestion, RotateCcw, SendHorizontal, Square, ThumbsDown, ThumbsUp } from "lucide-react";
+import { BookmarkPlus, MessageCircleQuestion, RotateCcw, SendHorizontal, Sparkles, Square, ThumbsDown, ThumbsUp } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Markdown } from "@/components/content/markdown";
 import { Button } from "@/components/ui/button";
 import { Skeleton, Tip } from "@/components/ui/misc";
 import { errorMessage } from "@/lib/api/errors";
+import { useFollowups, useNoteMutations } from "@/lib/studio/queries";
 import { linkCitations } from "@/lib/tutor/citations";
 import type { ChatMessage } from "@/lib/tutor/types";
 import type { useTutorChat } from "@/lib/tutor/use-tutor-chat";
@@ -67,7 +68,7 @@ export function TutorPanel({
             <p>Hỏi bất cứ điều gì về bài này. AI chỉ trả lời dựa trên tài liệu của khóa và ghi rõ nguồn.</p>
           </div>
         ) : (
-          chat.messages.map((m) =>
+          chat.messages.map((m, i) =>
             m.role === "user" ? (
               <div key={m.id} className="ml-auto max-w-[85%] rounded-lg bg-muted px-3 py-2 whitespace-pre-wrap">
                 {m.content}
@@ -80,6 +81,10 @@ export function TutorPanel({
                 onSeek={onSeek}
                 onOpenLesson={onOpenLesson}
                 onRetry={chat.retry}
+                isLast={i === chat.messages.length - 1}
+                onAsk={(q) => {
+                  if (!chat.busy && countdown === 0) void chat.send(q);
+                }}
                 onFeedback={async (v) => {
                   try {
                     await chat.feedback(m.id, v);
@@ -138,6 +143,8 @@ function AssistantMessage({
   onOpenLesson,
   onRetry,
   onFeedback,
+  isLast,
+  onAsk,
 }: {
   m: ChatMessage;
   lessonId: string | null;
@@ -145,7 +152,27 @@ function AssistantMessage({
   onOpenLesson?: (id: string) => void;
   onRetry: () => void;
   onFeedback: (v: 1 | -1 | null) => void;
+  isLast: boolean;
+  onAsk: (question: string) => void;
 }) {
+  const notes = useNoteMutations();
+  const saved = React.useRef(false);
+  const persisted = m.status === "done" && !m.id.startsWith("local-");
+  // Gợi ý hỏi tiếp chỉ cho câu trả lời mới nhất (đỡ tốn lượt AI cho lịch sử cũ)
+  const followups = useFollowups(m.id, persisted && isLast && !m.refused);
+
+  async function saveNote() {
+    if (saved.current) return;
+    saved.current = true;
+    try {
+      await notes.fromMessage.mutateAsync(m.id);
+      toast.success("Đã lưu vào ghi chú");
+    } catch (err) {
+      saved.current = false;
+      toast.error(errorMessage(err));
+    }
+  }
+
   const numbers = new Set([...m.sources.map((s) => s.n), ...m.citations.map((c) => c.n)]);
   const body = linkCitations(m.content, numbers);
   return (
@@ -193,7 +220,7 @@ function AssistantMessage({
       ) : null}
       {m.status === "stopped" ? <p className="mt-1 text-xs text-muted-foreground">Đã dừng.</p> : null}
 
-      {m.status === "done" && !m.id.startsWith("local-") ? (
+      {persisted ? (
         <div className="mt-1 flex gap-1">
           <Tip label="Câu trả lời hữu ích">
             <Button
@@ -219,6 +246,39 @@ function AssistantMessage({
               <ThumbsDown />
             </Button>
           </Tip>
+          {!m.refused ? (
+            <Tip label="Lưu câu trả lời vào ghi chú">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Lưu vào ghi chú"
+                className="size-8"
+                disabled={notes.fromMessage.isPending || notes.fromMessage.isSuccess}
+                onClick={saveNote}
+              >
+                <BookmarkPlus />
+              </Button>
+            </Tip>
+          ) : null}
+        </div>
+      ) : null}
+      {followups.data?.questions.length ? (
+        <div className="mt-2">
+          <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <Sparkles className="size-3.5" aria-hidden /> Gợi ý hỏi tiếp
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {followups.data.questions.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => onAsk(q)}
+                className="rounded-full border px-3 py-1 text-left text-sm hover:bg-muted"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>

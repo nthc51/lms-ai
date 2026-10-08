@@ -21,6 +21,10 @@ import { toast } from "sonner";
 import { ThemeSwitcher } from "@/components/app/theme-switcher";
 import { ErrorState } from "@/components/app/states";
 import { Markdown } from "@/components/content/markdown";
+import { DocumentsPanel } from "@/components/studio/documents-panel";
+import { LessonNotes } from "@/components/studio/lesson-notes";
+import { StudioPanel } from "@/components/studio/studio-panel";
+import { type StudyTab, StudyTabs } from "@/components/studio/study-tabs";
 import { TutorPanel } from "@/components/tutor/tutor-panel";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/dialog";
@@ -32,7 +36,7 @@ import { flattenLessons, useCourse, useLesson, useLessonVideo, useSaveProgress }
 import { lastLesson, READER_MAX, READER_MIN, readerSize } from "@/lib/study/storage";
 import { useShortcuts } from "@/lib/study/use-shortcuts";
 import { useVideoProgress } from "@/lib/study/use-video-progress";
-import { useTutorChat } from "@/lib/tutor/use-tutor-chat";
+import { canAskTutor, useTutorChat } from "@/lib/tutor/use-tutor-chat";
 import { cn } from "@/lib/utils";
 import { BreakReminder } from "./break-reminder";
 import { LessonQuizzes } from "./lesson-quizzes";
@@ -66,6 +70,7 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
   const [outlineOpen, setOutlineOpen] = React.useState(true); // desktop
   const [outlineSheet, setOutlineSheet] = React.useState(false); // điện thoại
   const [tutorOpen, setTutorOpen] = React.useState(false);
+  const [tab, setTab] = React.useState<StudyTab>("tutor");
   const [helpOpen, setHelpOpen] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
@@ -88,7 +93,10 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
   const chat = useTutorChat({ courseId: course.data?.id ?? "", lessonId }, !!course.data && tutorOpen);
 
   useShortcuts({
-    "/": () => setTutorOpen(true),
+    "/": () => {
+      setTab("tutor");
+      setTutorOpen(true);
+    },
     f: () => setFocus((v) => !v),
     ArrowLeft: () => prev && go(prev.id),
     ArrowRight: () => next && go(next.id),
@@ -122,7 +130,27 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
     go(id);
   };
   const tutor = course.data ? (
-    <TutorPanel chat={chat} lessonId={lessonId} onSeek={seek} onOpenLesson={openLesson} />
+    <StudyTabs
+      value={tab}
+      onChange={setTab}
+      panels={{
+        tutor: <TutorPanel chat={chat} lessonId={lessonId} onSeek={seek} onOpenLesson={openLesson} />,
+        studio: <StudioPanel courseId={course.data.id} lessonId={lessonId} />,
+        documents: (
+          <DocumentsPanel
+            lessonId={lessonId}
+            disabled={!canAskTutor(chat)}
+            onAsk={(q) => {
+              // Lệch plan (5c): giữ fix B của FE-1: chưa tải xong lịch sử / đang đếm ngược 429 thì không gửi
+              if (!canAskTutor(chat)) return;
+              setTab("tutor");
+              void chat.send(q);
+            }}
+          />
+        ),
+        notes: <LessonNotes courseId={course.data.id} lessonId={lessonId} />,
+      }}
+    />
   ) : null;
 
   return (
@@ -236,10 +264,10 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
 
         {/* Tutor bên phải (desktop) */}
         {desktop && tutorOpen ? (
-          <aside aria-label="AI Tutor" className="sticky top-14 flex h-[calc(100dvh-3.5rem)] w-[400px] shrink-0 flex-col border-l bg-surface">
+          <aside aria-label="Trợ lý học tập" className="sticky top-14 flex h-[calc(100dvh-3.5rem)] w-[400px] shrink-0 flex-col border-l bg-surface">
             <div className="flex h-12 items-center justify-between border-b px-4">
-              <h2 className="font-semibold">AI Tutor</h2>
-              <Button variant="ghost" size="icon" aria-label="Đóng AI Tutor" onClick={() => setTutorOpen(false)}>
+              <h2 className="font-semibold">Trợ lý học tập</h2>
+              <Button variant="ghost" size="icon" aria-label="Đóng trợ lý học tập" onClick={() => setTutorOpen(false)}>
                 <X />
               </Button>
             </div>
@@ -254,7 +282,7 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
           <Button size="lg" className="fixed bottom-4 right-4 z-30 rounded-full shadow-lg" onClick={() => setTutorOpen(true)}>
             <MessageCircleQuestion /> Hỏi AI
           </Button>
-          <Sheet open={tutorOpen} onOpenChange={setTutorOpen} title="AI Tutor">
+          <Sheet open={tutorOpen} onOpenChange={setTutorOpen} title="Trợ lý học tập">
             {tutor}
           </Sheet>
           <Sheet open={outlineSheet} onOpenChange={setOutlineSheet} title="Mục lục" side="left">

@@ -24,6 +24,14 @@ function fromServer(m: {
 }
 
 /**
+ * Gửi câu hỏi từ ngoài ô nhập (tab Tài liệu) được không: không khi đang trả lời, đang tải lịch sử
+ * (gửi lúc chưa biết phiên sẽ tạo phiên thứ hai) hoặc đang đếm ngược sau 429.
+ */
+export function canAskTutor(chat: { busy: boolean; loadingHistory: boolean; retryAt: number | null }) {
+  return !chat.busy && !chat.loadingHistory && !chat.retryAt;
+}
+
+/**
  * Hội thoại AI Tutor của một bài (hoặc cả khóa khi lessonId = null).
  * - Dùng lại phiên gần nhất cùng phạm vi; chưa có thì tạo khi gửi câu đầu.
  * - Trả lời stream qua SSE: sources → token… → done | error (error có thể là event đầu).

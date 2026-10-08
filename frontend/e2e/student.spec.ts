@@ -58,7 +58,7 @@ test.describe("học viên", () => {
     await expect(page.getByText("Đạo hàm là giới hạn của tỉ số gia số…")).toBeVisible();
     await page.keyboard.press("Escape"); // đóng popover nguồn
     await page.keyboard.press("Escape"); // đóng panel
-    if (isMobile) await expect(page.getByRole("dialog", { name: "AI Tutor" })).toBeHidden();
+    if (isMobile) await expect(page.getByRole("dialog", { name: "Trợ lý học tập" })).toBeHidden();
 
     await page.getByRole("button", { name: "Đánh dấu đã học xong" }).click();
     await expect(page.getByText("Đã học xong bài này")).toBeVisible();
