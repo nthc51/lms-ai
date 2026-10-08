@@ -12,8 +12,11 @@ from pathlib import Path
 
 import httpx
 import pymupdf
+from sqlalchemy import update
 
 from app.core.db import SessionLocal, engine
+from app.core.time import utcnow
+from app.modules.auth.models import User
 from app.modules.auth.service import approve_teacher
 
 API = "http://localhost:8000/api/v1"
@@ -40,6 +43,14 @@ async def _approve(email: str) -> None:
     await engine.dispose()  # asyncio.run đóng event loop: không giữ connection sang loop khác
 
 
+async def _verify(email: str) -> None:
+    """Đánh dấu email đã xác nhận ngay trong DB (smoke không đọc mail), để đăng nhập không bị 403."""
+    async with SessionLocal() as db:
+        await db.execute(update(User).where(User.email == email.lower()).values(email_verified_at=utcnow()))
+        await db.commit()
+    await engine.dispose()
+
+
 def main(pdf_path: str | None) -> int:
     data = Path(pdf_path).read_bytes() if pdf_path else sample_pdf()
     email = f"smoke-{uuid.uuid4().hex[:6]}@example.com"
@@ -56,6 +67,7 @@ def main(pdf_path: str | None) -> int:
             "/auth/register",
             json={"email": email, "password": "password123", "full_name": "Smoke GV", "role": "teacher"},
         )
+        asyncio.run(_verify(email))
         asyncio.run(_approve(email))
         h["Authorization"] = (
             "Bearer " + post("/auth/login", json={"email": email, "password": "password123"})["access_token"]

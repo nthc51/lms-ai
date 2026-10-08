@@ -13,7 +13,7 @@ import uuid
 
 import httpx
 
-from scripts.smoke_week1 import API, _approve, sample_pdf
+from scripts.smoke_week1 import API, _approve, _verify, sample_pdf
 
 
 def parse_sse(body: str) -> list[tuple[str, dict]]:
@@ -44,6 +44,7 @@ def main() -> int:
         def register(email: str, role: str) -> None:
             body = {"email": email, "password": "password123", "full_name": f"Smoke {role}", "role": role}
             call("POST", "/auth/register", {}, json=body)
+            asyncio.run(_verify(email))
 
         def wait_job(job_id: str, headers: dict) -> dict:
             deadline = time.time() + 300

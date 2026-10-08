@@ -20,7 +20,7 @@ from pathlib import Path
 
 import httpx
 
-from scripts.smoke_week1 import API, _approve
+from scripts.smoke_week1 import API, _approve, _verify
 
 DEFAULT_QUESTIONS = [
     "Tóm tắt ý chính của tài liệu này trong 3 câu.",
@@ -69,6 +69,7 @@ def main() -> int:
         def account(email: str, role: str) -> dict[str, str]:
             body = {"email": email, "password": "password123", "full_name": f"Thử {role}", "role": role}
             call("POST", "/auth/register", {}, json=body)
+            asyncio.run(_verify(email))
             if role == "teacher":
                 asyncio.run(_approve(email))
             login = {"email": email, "password": "password123"}
