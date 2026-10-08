@@ -1159,7 +1159,7 @@ git add backend && git commit -m "feat(ai): prompts for studio, source guide, fo
 
 `notes.py` (Task 6) được `router.py` import, nên bước 4 tạo luôn file đó (nội dung ở Task 6), hoặc làm Task 6 Bước 2 trước rồi quay lại.
 
-- [ ] **Bước 1: Viết test (sẽ fail)** (`tests/test_studio.py`)
+- [x] **Bước 1: Viết test (sẽ fail)** (`tests/test_studio.py`)
 
 ```python
 """AI Studio: sinh báo cáo / flashcard / hướng dẫn tài liệu, API studio, tài liệu và nguồn cho học viên, gợi ý hỏi tiếp."""
@@ -1548,7 +1548,7 @@ async def test_followups_empty_for_refusal_and_on_ai_error(client, db, llm):
 
 Chạy `uv run pytest tests/test_studio.py -q`. Expected: fail ở bước import.
 
-- [ ] **Bước 2: Kích thước đoạn lấy từ cấu hình** (`app/ingestion/pipeline.py`): benchmark cần thử nhiều cỡ đoạn.
+- [x] **Bước 2: Kích thước đoạn lấy từ cấu hình** (`app/ingestion/pipeline.py`): benchmark cần thử nhiều cỡ đoạn.
 
 ```diff
 --- a/app/ingestion/pipeline.py
@@ -1588,7 +1588,7 @@ Chạy `uv run pytest tests/test_studio.py -q`. Expected: fail ở bước impor
          vectors = await embedder.embed_documents([d.content for d in drafts])
 ```
 
-- [ ] **Bước 3: Bộ sinh** (`app/modules/studio/generation.py`)
+- [x] **Bước 3: Bộ sinh** (`app/modules/studio/generation.py`)
 
 ```python
 """Thân các job AI Studio: hướng dẫn tài liệu (source_guide), báo cáo / flashcard (studio_gen), tổng hợp ghi chú
@@ -1854,7 +1854,7 @@ def cited_numbers(text: str) -> set[int]:
     return {int(n) for n in _CITE_RE.findall(text)}
 ```
 
-- [ ] **Bước 4: Schemas, service, jobs, router**
+- [x] **Bước 4: Schemas, service, jobs, router**
 
 `app/modules/studio/schemas.py`:
 
@@ -2831,7 +2831,7 @@ async def delete_note(
     await notes.delete_note(db, user, note_id)
 ```
 
-- [ ] **Bước 5: Job nền** (`app/worker/tasks.py`, `app/worker/settings.py`). `ingest_pdf` xong thì xếp hàng `source_guide`; lỗi xếp hàng chỉ ghi log, không làm hỏng việc xử lý PDF.
+- [x] **Bước 5: Job nền** (`app/worker/tasks.py`, `app/worker/settings.py`). `ingest_pdf` xong thì xếp hàng `source_guide`; lỗi xếp hàng chỉ ghi log, không làm hỏng việc xử lý PDF.
 
 ```diff
 --- a/app/worker/tasks.py
@@ -2956,7 +2956,7 @@ async def delete_note(
      # job pending bị kẹt → enqueue lại một lần, vẫn kẹt → failed "Không đưa được job vào hàng đợi"
 ```
 
-- [ ] **Bước 6: Gắn router** (`app/main.py`)
+- [x] **Bước 6: Gắn router** (`app/main.py`)
 
 ```diff
 --- a/app/main.py
@@ -2979,7 +2979,7 @@ async def delete_note(
  
 ```
 
-- [ ] **Bước 7:** `uv run pytest tests/test_studio.py -q` → **20 pass** (cần có `notes.py` của Task 6). Commit:
+- [x] **Bước 7:** `uv run pytest tests/test_studio.py -q` → **20 pass** (cần có `notes.py` của Task 6). Commit:
 
 ```bash
 git add backend && git commit -m "feat(studio): source guides, reports, flashcards, source preview, followups"
