@@ -9,6 +9,19 @@ EXPECTED_VARS = {
     "tutor_rewrite": {"history", "question"},
     "quiz_generate": {"count", "difficulties", "heading", "source", "avoid", "feedback"},
     "quiz_self_check": {"source", "stem", "options"},
+    # AI Studio
+    "source_guide": {"document"},
+    "studio_study_guide": {"scope", "context"},
+    "studio_briefing": {"scope", "context"},
+    "studio_faq": {"scope", "context"},
+    "studio_timeline": {"scope", "context"},
+    "studio_map": {"scope", "context"},
+    "studio_flashcards": {"scope", "count", "context"},
+    "tutor_followups": {"question", "answer", "sections"},
+    "notes_synthesize": {"notes"},
+    # benchmark
+    "eval_judge": {"question", "gold", "context", "answer"},
+    "eval_draft": {"count", "source"},
 }
 
 

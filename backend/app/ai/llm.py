@@ -110,6 +110,54 @@ def default_reply(call: FakeCall) -> str:
         return json.dumps(_fake_questions(source, int(m.group(1)) if m else 2), ensure_ascii=False)
     if call.op == "quiz_self_check":
         return json.dumps({"answer_option_id": "A"})
+    if call.op == "source_guide":
+        return json.dumps(
+            {
+                "title": "Tài liệu mô phỏng",
+                "summary": "Tóm tắt mô phỏng của tài liệu (chế độ giả lập, không gọi AI).",
+                "topics": ["Chủ đề 1", "Chủ đề 2", "Chủ đề 3"],
+                "questions": [f"Câu hỏi gợi ý {i} về tài liệu?" for i in range(1, 6)],
+            },
+            ensure_ascii=False,
+        )
+    if call.op == "studio_map":
+        return "- Ý chính mô phỏng của phần này [1]"
+    if call.op == "studio_flashcards":
+        m = re.search(r"Số thẻ cần soạn: (\d+)", call.prompt)
+        count = int(m.group(1)) if m else 3
+        cards = [
+            {"front": f"Thuật ngữ {i}?", "back": f"Định nghĩa mô phỏng {i}.", "sources": [1]}
+            for i in range(1, count + 1)
+        ]
+        return json.dumps({"cards": cards}, ensure_ascii=False)
+    if call.op.startswith("studio_"):
+        return "## Nội dung mô phỏng\n\n- Ý thứ nhất [1]\n- Ý thứ hai [1]\n\n(chế độ giả lập, không gọi AI)"
+    if call.op == "tutor_followups":
+        return json.dumps(
+            {"questions": ["Câu hỏi tiếp 1?", "Câu hỏi tiếp 2?", "Câu hỏi tiếp 3?"]}, ensure_ascii=False
+        )
+    if call.op == "eval_judge":
+        cited = sorted(
+            {int(n) for n in re.findall(r"\[(\d+)\]", _between(call.prompt, "<answer>", "</answer>"))}
+        )
+        return json.dumps(
+            {
+                "correct": 1,
+                "faithful": 1,
+                "unsupported": [],
+                "citations": [{"n": n, "supports": True} for n in cited],
+            }
+        )
+    if call.op == "eval_draft":
+        m = re.search(r"soạn (\d+) câu hỏi", call.prompt)
+        count = int(m.group(1)) if m else 2
+        items = [
+            {"type": "single", "question": f"Câu hỏi mô phỏng {i}?", "gold_answer": "Đáp án mô phỏng."}
+            for i in range(1, count + 1)
+        ]
+        return json.dumps({"questions": items}, ensure_ascii=False)
+    if call.op == "notes_synthesize":
+        return "## Đề cương từ ghi chú\n\n- Ý gộp từ ghi chú (chế độ giả lập)\n\n## Câu hỏi tự kiểm tra\n\n1. Câu hỏi?"
     return "OK"
 
 
