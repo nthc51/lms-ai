@@ -6,8 +6,10 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.errors import AppError, not_found
 from app.core.pagination import PageParams, paginate
+from app.core.ratelimit import RateLimiter
 from app.modules.auth.models import User
 from app.modules.jobs.queue import JobQueue
 from app.modules.jobs.service import create_and_enqueue
@@ -21,15 +23,22 @@ from app.modules.studio.schemas import (
     NoteSynthOut,
     NoteUpdate,
 )
-from app.modules.studio.service import ensure_scope
+from app.modules.studio.service import dead_generating, ensure_scope
 from app.modules.tutor.models import ChatMessage, ChatRole, ChatSession
 
 NOTES_JOB = "notes_synth"
 TITLE_FROM_QUESTION = 80
 
 
-def note_out(n: Note) -> NoteOut:
-    return NoteOut.model_validate(n, from_attributes=True)
+NOTE_INTERRUPTED = "Không tổng hợp được: Sinh nội dung bị gián đoạn"
+
+
+def note_out(n: Note, *, dead: bool = False) -> NoteOut:
+    """dead: ghi chú còn 'generating' nhưng job đã kết thúc / mất (quá hạn, worker chết): trả như đã lỗi."""
+    out = NoteOut.model_validate(n, from_attributes=True)
+    if dead and n.status == StudioStatus.generating:
+        out = out.model_copy(update={"status": StudioStatus.failed, "content_md": NOTE_INTERRUPTED})
+    return out
 
 
 async def list_notes(
@@ -42,7 +51,10 @@ async def list_notes(
         stmt = stmt.where(Note.lesson_id == lesson_id)
     total, paged = await paginate(db, stmt.order_by(Note.updated_at.desc(), Note.id), params)
     rows = (await db.scalars(paged)).all()
-    return NotePage(items=[note_out(n) for n in rows], total=total, page=params.page, size=params.size)
+    dead = await dead_generating(db, NOTES_JOB, [n.id for n in rows if n.status == StudioStatus.generating])
+    return NotePage(
+        items=[note_out(n, dead=n.id in dead) for n in rows], total=total, page=params.page, size=params.size
+    )
 
 
 async def _own(db: AsyncSession, user: User, note_id: uuid.UUID) -> Note:
@@ -60,7 +72,7 @@ async def create_note(db: AsyncSession, user: User, data: NoteIn) -> NoteOut:
         lesson_id=data.lesson_id,
         title=data.title,
         content_md=data.content_md,
-        citations=data.citations,
+        citations=[c.model_dump() for c in data.citations],
     )
     db.add(note)
     await db.commit()
@@ -120,7 +132,11 @@ _CITE_RE = re.compile(r"\[(\d+)\]")
 async def update_note(db: AsyncSession, user: User, note_id: uuid.UUID, data: NoteUpdate) -> NoteOut:
     note = await _own(db, user, note_id)
     if note.status == StudioStatus.generating:
-        raise AppError("NOTE_GENERATING", "Ghi chú đang được AI tổng hợp, chờ xong rồi sửa", 409)
+        if note.id not in await dead_generating(db, NOTES_JOB, [note.id]):
+            raise AppError("NOTE_GENERATING", "Ghi chú đang được AI tổng hợp, chờ xong rồi sửa", 409)
+        # job đã chết giữa chừng (CancelledError không qua except Exception): chốt failed để sửa / xóa được
+        note.status = StudioStatus.failed
+        note.content_md = NOTE_INTERRUPTED
     if data.title is not None:
         note.title = data.title
     if data.content_md is not None:
@@ -138,7 +154,9 @@ async def delete_note(db: AsyncSession, user: User, note_id: uuid.UUID) -> None:
     await db.commit()
 
 
-async def synthesize(db: AsyncSession, queue: JobQueue, user: User, data: NotesSynthesizeIn) -> NoteSynthOut:
+async def synthesize(
+    db: AsyncSession, queue: JobQueue, limiter: RateLimiter, user: User, data: NotesSynthesizeIn
+) -> NoteSynthOut:
     """Tạo ghi chú mới (đang tổng hợp) từ các ghi chú đã chọn — cùng một khóa — rồi giao job nền."""
     notes = (await db.scalars(select(Note).where(Note.id.in_(data.note_ids), Note.user_id == user.id))).all()
     if len(notes) != len(set(data.note_ids)):
@@ -148,6 +166,16 @@ async def synthesize(db: AsyncSession, queue: JobQueue, user: User, data: NotesS
         raise AppError("MIXED_COURSES", "Chỉ tổng hợp được các ghi chú của cùng một khóa học", 422)
     course_id = courses.pop()
     await ensure_scope(db, user, course_id, None)
+    # tính lượt chỉ khi chắc chắn tạo job (đã qua mọi kiểm tra), cùng hạn mức với Studio
+    wait = await limiter.hit(f"notes_synth:{user.id}", get_settings().studio_rate_limit_per_hour, 3600)
+    if wait is not None:
+        raise AppError(
+            "RATE_LIMITED",
+            "Bạn đã yêu cầu tổng hợp quá nhiều lần, vui lòng thử lại sau",
+            429,
+            {"retry_after": wait},
+            headers={"Retry-After": str(wait)},
+        )
     lessons = {n.lesson_id for n in notes}
     note = Note(
         user_id=user.id,

@@ -4454,7 +4454,7 @@
           "studio"
         ],
         "summary": "Synthesize",
-        "description": "Gộp các ghi chú (cùng khóa) thành một đề cương: tạo ghi chú mới đang tổng hợp, job nền điền nội dung.",
+        "description": "Gộp các ghi chú (cùng khóa) thành một đề cương: tạo ghi chú mới đang tổng hợp, job nền điền nội dung.\n429 RATE_LIMITED khi quá hạn mức mỗi giờ (chung hạn mức Studio).",
         "operationId": "synthesize_api_v1_notes_synthesize_post",
         "requestBody": {
           "content": {
@@ -6776,6 +6776,22 @@
         ],
         "title": "MyCoursePage"
       },
+      "NoteCitation": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "N"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "n"
+        ],
+        "title": "NoteCitation",
+        "description": "Một nguồn [n] của ghi chú. Chỉ n là bắt buộc (update_note / merge_notes dựa vào n); các trường còn lại\n(chunk_id, lesson_id, page_no, start_sec, snippet...) giữ nguyên như bản ghi nguồn của Tutor / Studio."
+      },
       "NoteFromMessageIn": {
         "properties": {
           "message_id": {
@@ -6823,8 +6839,7 @@
           },
           "citations": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/NoteCitation"
             },
             "type": "array",
             "maxItems": 200,

@@ -1246,6 +1246,7 @@ export interface paths {
         /**
          * Synthesize
          * @description Gộp các ghi chú (cùng khóa) thành một đề cương: tạo ghi chú mới đang tổng hợp, job nền điền nội dung.
+         *     429 RATE_LIMITED khi quá hạn mức mỗi giờ (chung hạn mức Studio).
          */
         post: operations["synthesize_api_v1_notes_synthesize_post"];
         delete?: never;
@@ -2156,6 +2157,17 @@ export interface components {
             /** Size */
             size: number;
         };
+        /**
+         * NoteCitation
+         * @description Một nguồn [n] của ghi chú. Chỉ n là bắt buộc (update_note / merge_notes dựa vào n); các trường còn lại
+         *     (chunk_id, lesson_id, page_no, start_sec, snippet...) giữ nguyên như bản ghi nguồn của Tutor / Studio.
+         */
+        NoteCitation: {
+            /** N */
+            n: number;
+        } & {
+            [key: string]: unknown;
+        };
         /** NoteFromMessageIn */
         NoteFromMessageIn: {
             /**
@@ -2181,9 +2193,7 @@ export interface components {
              */
             content_md: string;
             /** Citations */
-            citations?: {
-                [key: string]: unknown;
-            }[];
+            citations?: components["schemas"]["NoteCitation"][];
         };
         /** NoteOut */
         NoteOut: {

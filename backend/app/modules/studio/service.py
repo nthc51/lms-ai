@@ -62,6 +62,20 @@ async def ensure_scope(
 # ---------- tài liệu (S1) và xem trước nguồn (S5) ----------
 
 
+async def dead_generating(db: AsyncSession, job_type: str, ref_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """Trong các hàng đang 'generating' (ref_ids), những hàng mà job gần nhất đã done / failed hoặc không còn:
+    handler bị hủy (quá hạn, worker chết) nên không ghi được failed. Đọc coi như lỗi, giống _item."""
+    if not ref_ids:
+        return set()
+    rows = await db.execute(
+        select(Job.ref_id, Job.status)
+        .where(Job.type == job_type, Job.ref_id.in_(ref_ids))
+        .order_by(Job.created_at)
+    )
+    latest = {ref: status for ref, status in rows}  # job mới nhất ghi đè
+    return {r for r in ref_ids if latest.get(r) in (None, JobStatus.failed, JobStatus.done)}
+
+
 async def lesson_documents(db: AsyncSession, user: User, lesson_id: uuid.UUID) -> list[DocumentOut]:
     await ensure_lesson_access(db, lesson_id, user)
     pages = select(SourcePage.source_id, func.count().label("n")).group_by(SourcePage.source_id).subquery()
@@ -78,6 +92,11 @@ async def lesson_documents(db: AsyncSession, user: User, lesson_id: uuid.UUID) -
             .order_by(Source.created_at, Source.id)
         )
     ).all()
+    dead = await dead_generating(
+        db,
+        "source_guide",
+        [r[0] for r in rows if r[2] is not None and r[2].status == StudioStatus.generating],
+    )
     out = []
     for i, (source_id, page_count, guide) in enumerate(rows, 1):
         title = guide.title if guide is not None and guide.title else f"Tài liệu {i}"
@@ -89,7 +108,7 @@ async def lesson_documents(db: AsyncSession, user: User, lesson_id: uuid.UUID) -
                 guide=None
                 if guide is None
                 else GuideOut(
-                    status=guide.status,
+                    status=StudioStatus.failed if source_id in dead else guide.status,
                     title=guide.title,
                     summary=guide.summary,
                     topics=guide.topics,

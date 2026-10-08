@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.pagination import Page
 from app.modules.studio.models import ArtifactKind, StudioStatus
@@ -121,13 +121,22 @@ def _title(v: str | None) -> str | None:
     return v
 
 
+class NoteCitation(BaseModel):
+    """Một nguồn [n] của ghi chú. Chỉ n là bắt buộc (update_note / merge_notes dựa vào n); các trường còn lại
+    (chunk_id, lesson_id, page_no, start_sec, snippet...) giữ nguyên như bản ghi nguồn của Tutor / Studio."""
+
+    model_config = ConfigDict(extra="allow")
+
+    n: int = Field(ge=1)
+
+
 class NoteIn(BaseModel):
     course_id: uuid.UUID
     lesson_id: uuid.UUID | None = None
     title: str = Field(min_length=1, max_length=200)
     content_md: str = Field(default="", max_length=50_000)
-    # nguồn [n] đi kèm nội dung (vd. lưu một báo cáo Studio vào ghi chú); ghi chú riêng nên không cần kiểm
-    citations: list[dict] = Field(default_factory=list, max_length=200)
+    # nguồn [n] đi kèm nội dung (vd. lưu một báo cáo Studio vào ghi chú); n bắt buộc, trường khác tùy ý
+    citations: list[NoteCitation] = Field(default_factory=list, max_length=200)
 
     clean_title = field_validator("title")(_title)
 

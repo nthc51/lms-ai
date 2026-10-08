@@ -173,9 +173,11 @@ async def synthesize(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     queue: JobQueue = Depends(get_queue),
+    limiter: RateLimiter = Depends(get_rate_limiter),
 ):
-    """Gộp các ghi chú (cùng khóa) thành một đề cương: tạo ghi chú mới đang tổng hợp, job nền điền nội dung."""
-    return await notes.synthesize(db, queue, user, data)
+    """Gộp các ghi chú (cùng khóa) thành một đề cương: tạo ghi chú mới đang tổng hợp, job nền điền nội dung.
+    429 RATE_LIMITED khi quá hạn mức mỗi giờ (chung hạn mức Studio)."""
+    return await notes.synthesize(db, queue, limiter, user, data)
 
 
 @router.patch("/notes/{note_id}", response_model=NoteOut)
