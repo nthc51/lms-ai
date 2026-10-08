@@ -3413,7 +3413,7 @@ git add backend docker-compose.yml && git commit -m "feat(api): email outbox, SM
 - Modify: `backend/app/modules/auth/schemas.py`, `service.py`, `router.py`, `backend/tests/{conftest,helpers,fakes}.py`
 - Test: `backend/tests/test_email.py`
 
-- [ ] **Bước 1: Hạ tầng test**
+- [x] **Bước 1: Hạ tầng test**
 
 `tests/fakes.py`, thêm ở cuối:
 
@@ -3482,7 +3482,7 @@ async def verify_email_in_db(user_id: str) -> None:
         await db.commit()
 ```
 
-- [ ] **Bước 2: Viết test (sẽ fail)** (`tests/test_email.py`, cả file; phần admin / CSV / 👎 sẽ pass ở Task 11)
+- [x] **Bước 2: Viết test (sẽ fail)** (`tests/test_email.py`, cả file; phần admin / CSV / 👎 sẽ pass ở Task 11)
 
 ```python
 """Xác nhận email khi đăng ký, email thông báo (outbox), gửi lại yêu cầu duyệt, xuất CSV, phản hồi 👎 của AI Tutor."""
@@ -3766,7 +3766,7 @@ async def test_tutor_feedback_lists_downvoted_answers(client):
     ).status_code == 404
 ```
 
-- [ ] **Bước 3: Schemas** (`app/modules/auth/schemas.py`)
+- [x] **Bước 3: Schemas** (`app/modules/auth/schemas.py`)
 
 Thêm trước `TokenOut`:
 
@@ -3787,7 +3787,7 @@ Cuối `UserOut`:
     email_verified: bool = False  # đọc từ property User.email_verified
 ```
 
-- [ ] **Bước 4: Service** (`app/modules/auth/service.py`, thay toàn bộ)
+- [x] **Bước 4: Service** (`app/modules/auth/service.py`, thay toàn bộ)
 
 ```python
 from datetime import timedelta
@@ -4015,7 +4015,7 @@ async def request_teacher_review(db: AsyncSession, user: User) -> User:
 
 > `flush` nằm **trong** khối `try`: nếu hai request đăng ký cùng email chạy song song, request thua sẽ vấp unique constraint ngay ở `flush` (chứ không phải ở `commit` như trước), và vẫn phải trả 409. Test `test_register_race…` trong `test_auth.py` kiểm tra đúng chỗ này.
 
-- [ ] **Bước 5: Router** (`app/modules/auth/router.py`, thay toàn bộ)
+- [x] **Bước 5: Router** (`app/modules/auth/router.py`, thay toàn bộ)
 
 ```python
 from fastapi import APIRouter, Cookie, Depends, Response
@@ -4146,7 +4146,7 @@ async def logout(refresh_token: str | None = Cookie(default=None), db: AsyncSess
     return resp
 ```
 
-- [ ] **Bước 6: Chạy test**
+- [x] **Bước 6: Chạy test**
 
 ```bash
 uv run pytest tests/test_email.py -q -k "register_sends or verify_rejects or resend or me_reports or send_pending"
@@ -4155,7 +4155,7 @@ uv run pytest -q --ignore=tests/test_email.py
 
 Expected: 5 passed; phần còn lại vẫn 628 passed.
 
-- [ ] **Bước 7: Commit**
+- [x] **Bước 7: Commit**
 
 ```bash
 git add backend && git commit -m "feat(api): email verification on sign-up with resend and rate limit"
