@@ -4,12 +4,15 @@ import { Check, ChevronLeft, ChevronRight, Pencil, RotateCcw, X as XIcon } from 
 import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { Progress } from "@/components/ui/misc";
 import { errorMessage } from "@/lib/api/errors";
 import { type Artifact, type Card, useReviewCard, useUpdateArtifact } from "@/lib/studio/queries";
 import { cn } from "@/lib/utils";
 import { CitedMarkdown } from "./cited-markdown";
+
+const INTERACTIVE = "button, a[href], select, summary, [role='button'], [role='tab'], [role='checkbox'], [role='switch']";
 
 /**
  * Bộ thẻ: lật xem đáp án, đánh dấu Nhớ / Chưa nhớ, lọc "chỉ thẻ chưa nhớ" để ôn lại.
@@ -25,6 +28,7 @@ export function FlashcardDeck({ artifact, canEdit, lessonId }: { artifact: Artif
   const [pos, setPos] = React.useState(0);
   const [flipped, setFlipped] = React.useState(false);
   const [editing, setEditing] = React.useState(false);
+  const hintId = React.useId();
 
   const current = deck[Math.min(pos, deck.length - 1)];
   const card = current !== undefined ? cards[current] : undefined;
@@ -60,6 +64,8 @@ export function FlashcardDeck({ artifact, canEdit, lessonId }: { artifact: Artif
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      // Lệch plan: focus đang ở nút / phần tử tương tác khác (Nhớ rồi, Đóng…) thì để phím làm việc của nó
+      if (t?.closest?.(INTERACTIVE) && !t.closest("[data-flashcard]")) return;
       if (e.key === " ") {
         e.preventDefault();
         setFlipped((f) => !f);
@@ -101,7 +107,8 @@ export function FlashcardDeck({ artifact, canEdit, lessonId }: { artifact: Artif
           <button
             type="button"
             onClick={() => setFlipped((f) => !f)}
-            aria-label={flipped ? "Đang xem đáp án, bấm để xem câu hỏi" : "Đang xem câu hỏi, bấm để lật xem đáp án"}
+            data-flashcard
+            aria-describedby={hintId}
             className={cn(
               "flex min-h-64 w-full flex-col items-center justify-center rounded-xl border-2 p-6 text-center transition-colors md:min-h-80",
               flipped ? "border-accent/60 bg-accent/5" : "bg-surface hover:bg-muted",
@@ -110,6 +117,10 @@ export function FlashcardDeck({ artifact, canEdit, lessonId }: { artifact: Artif
             <span className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">{flipped ? "Đáp án" : "Câu hỏi"}</span>
             <span className="text-xl font-medium">{flipped ? card.back : card.front}</span>
             {known.has(current!) ? <span className="mt-3 text-xs text-muted-foreground">Đã nhớ</span> : null}
+            {/* Lệch plan: tên của nút là nội dung thẻ (trình đọc màn hình đọc được); gợi ý thao tác là mô tả */}
+            <span id={hintId} className="sr-only">
+              {flipped ? "Đang xem đáp án, bấm để xem câu hỏi" : "Đang xem câu hỏi, bấm để lật xem đáp án"}
+            </span>
           </button>
           {flipped && card.sources?.length ? (
             <div className="text-sm text-muted-foreground">
@@ -156,6 +167,7 @@ function CardEditor({ artifact, index, onDone }: { artifact: Artifact; index: nu
   const cards = artifact.cards ?? [];
   const [front, setFront] = React.useState(cards[index].front);
   const [back, setBack] = React.useState(cards[index].back);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   async function save(remove = false) {
     const next: Card[] = remove
@@ -167,6 +179,7 @@ function CardEditor({ artifact, index, onDone }: { artifact: Artifact; index: nu
       onDone();
     } catch (err) {
       toast.error(errorMessage(err));
+      if (remove) throw err; // giữ hộp thoại xác nhận mở khi xóa lỗi
     }
   }
 
@@ -179,7 +192,8 @@ function CardEditor({ artifact, index, onDone }: { artifact: Artifact; index: nu
         <Textarea value={back} onChange={(e) => setBack(e.target.value)} rows={4} maxLength={800} />
       </Field>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="destructive-outline" onClick={() => save(true)} disabled={update.isPending || cards.length <= 1}>
+        {/* Lệch plan: xóa thẻ không hoàn tác được và bỏ dấu Nhớ của thẻ đó → hỏi xác nhận (quy ước §0.5) */}
+        <Button variant="destructive-outline" onClick={() => setConfirmDelete(true)} disabled={update.isPending || cards.length <= 1}>
           Xóa thẻ
         </Button>
         <Button variant="ghost" onClick={onDone}>
@@ -189,6 +203,16 @@ function CardEditor({ artifact, index, onDone }: { artifact: Artifact; index: nu
           Lưu và duyệt
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Xóa thẻ này?"
+        description="Thẻ bị xóa khỏi bộ của cả lớp, dấu Nhớ / Chưa nhớ của thẻ cũng mất. Không hoàn tác được."
+        confirmLabel="Xóa thẻ"
+        pendingLabel="Đang xóa…"
+        destructive
+        onConfirm={() => save(true)}
+      />
     </div>
   );
 }
