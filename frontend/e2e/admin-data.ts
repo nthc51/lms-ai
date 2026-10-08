@@ -39,6 +39,10 @@ export const stats = (over: Record<string, unknown> = {}) => ({
   quiz_submissions_7d: 41,
   failed_jobs_7d: 2,
   tutor_downvotes_7d: 3,
+  ai_usage_7d: [
+    { op: "tutor_answer", calls: 42, cached_calls: 5, tokens_in: 81234, tokens_out: 9120 },
+    { op: "studio_flashcards", calls: 3, cached_calls: 0, tokens_in: 21000, tokens_out: 4300 },
+  ],
   signups_14d: Array.from({ length: 14 }, (_, i) => ({ day: new Date(Date.UTC(2026, 8, 23 + i)).toISOString().slice(0, 10), count: i % 4 })),
   ...over,
 });

@@ -43,6 +43,40 @@ export const lesson = (id = L1) => ({
   progress: null,
 });
 
+export const STUDIO_KINDS = ["study_guide", "briefing", "faq", "timeline", "flashcards"] as const;
+
+export const studioItem = (kind: string, over: Record<string, unknown> = {}) => ({
+  kind,
+  status: "none",
+  artifact_id: null,
+  job_id: null,
+  error: null,
+  stale: false,
+  reviewed: false,
+  created_at: null,
+  ...over,
+});
+
+export const studioOverview = (over: Record<string, Record<string, unknown>> = {}, canRegenerate = false) => ({
+  has_content: true,
+  can_regenerate: canRegenerate,
+  items: STUDIO_KINDS.map((k) => studioItem(k, over[k])),
+});
+
+export const note = (over: Record<string, unknown> = {}) => ({
+  id: "n-1",
+  course_id: COURSE_ID,
+  lesson_id: L1,
+  title: "Đạo hàm là gì?",
+  content_md: "Đạo hàm là giới hạn của tỉ số gia số [1].",
+  citations: [{ n: 1, chunk_id: "k1", lesson_id: L1, page_no: 4, start_sec: null, lesson_title: "Định nghĩa đạo hàm", heading_path: "Chương 2", snippet: "Đạo hàm là giới hạn…" }],
+  status: "ready",
+  from_message_id: "m-1",
+  created_at: "2026-10-01T00:00:00Z",
+  updated_at: "2026-10-01T00:00:00Z",
+  ...over,
+});
+
 type Handler = (route: Route, url: URL) => Promise<void> | void;
 
 const json = (route: Route, body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -100,6 +134,11 @@ export async function mockApi(page: Page, opts: { user?: typeof student | typeof
     "POST /tutor/messages/*/feedback": (r) => json(r, {}),
     "GET /quizzes": (r) => json(r, { items: [], total: 0, page: 1, size: 50 }),
     "GET /courses/*/tutor-feedback": (r) => json(r, { items: [], total: 0, page: 1, size: 20 }),
+    // AI Studio: mặc định chưa có gì (spec studio.spec.ts ghi đè khi cần)
+    "GET /studio": (r) => json(r, studioOverview()),
+    "GET /lessons/*/documents": (r) => json(r, []),
+    "POST /tutor/messages/*/followups": (r) => json(r, { questions: [] }),
+    "GET /notes": (r) => json(r, { items: [], total: 0, page: 1, size: 20 }),
     ...opts.extra,
   };
 
