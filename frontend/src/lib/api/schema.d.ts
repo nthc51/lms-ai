@@ -805,6 +805,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courses/{course_id}/tutor-feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Course Tutor Feedback
+         * @description Câu trả lời AI Tutor bị học viên chê trong khóa (không kèm tên học viên).
+         */
+        get: operations["course_tutor_feedback_api_v1_courses__course_id__tutor_feedback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/stats": {
         parameters: {
             query?: never;
@@ -831,6 +851,26 @@ export interface paths {
         };
         /** List Users */
         get: operations["list_users_api_v1_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Users
+         * @description CSV theo bộ lọc đang xem (tối đa 10.000 dòng).
+         */
+        get: operations["export_users_api_v1_admin_users_export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -975,6 +1015,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/tutor-feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tutor Feedback
+         * @description Câu trả lời AI Tutor bị học viên bấm 👎 trên mọi khóa, mới nhất trước (kèm tên học viên).
+         */
+        get: operations["tutor_feedback_api_v1_admin_tutor_feedback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1091,6 +1151,8 @@ export interface components {
             quiz_submissions_7d: number;
             /** Failed Jobs 7D */
             failed_jobs_7d: number;
+            /** Tutor Downvotes 7D */
+            tutor_downvotes_7d: number;
             /** Signups 14D */
             signups_14d: components["schemas"]["DayCount"][];
         };
@@ -1111,6 +1173,8 @@ export interface components {
             locked_at: string | null;
             /** Review Note */
             review_note: string | null;
+            /** Email Verified */
+            email_verified: boolean;
             /**
              * Created At
              * Format: date-time
@@ -2229,6 +2293,54 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+        };
+        /**
+         * TutorFeedbackItem
+         * @description Một câu trả lời AI Tutor bị học viên bấm 👎 (D1), kèm câu hỏi ngay trước nó.
+         */
+        TutorFeedbackItem: {
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+            /** Question */
+            question: string | null;
+            /** Answer */
+            answer: string;
+            /** Refused */
+            refused: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /** Course Title */
+            course_title: string;
+            /** Course Slug */
+            course_slug: string;
+            /** Lesson Id */
+            lesson_id: string | null;
+            /** Lesson Title */
+            lesson_title: string | null;
+            /** Student Name */
+            student_name: string | null;
+        };
+        /** TutorFeedbackPage */
+        TutorFeedbackPage: {
+            /** Items */
+            items: components["schemas"]["TutorFeedbackItem"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
         };
         /** TutorStat */
         TutorStat: {
@@ -4090,6 +4202,40 @@ export interface operations {
             };
         };
     };
+    course_tutor_feedback_api_v1_courses__course_id__tutor_feedback_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TutorFeedbackPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_stats_api_v1_admin_stats_get: {
         parameters: {
             query?: never;
@@ -4114,7 +4260,7 @@ export interface operations {
         parameters: {
             query?: {
                 role?: ("student" | "teacher" | "admin") | null;
-                status?: ("pending" | "approved" | "rejected" | "locked") | null;
+                status?: ("pending" | "approved" | "rejected" | "locked" | "unverified") | null;
                 q?: string | null;
                 page?: number;
                 size?: number;
@@ -4132,6 +4278,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminUserPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_users_api_v1_admin_users_export_get: {
+        parameters: {
+            query?: {
+                role?: ("student" | "teacher" | "admin") | null;
+                status?: ("pending" | "approved" | "rejected" | "locked" | "unverified") | null;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4396,6 +4575,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminActionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tutor_feedback_api_v1_admin_tutor_feedback_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TutorFeedbackPage"];
                 };
             };
             /** @description Validation Error */

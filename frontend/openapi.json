@@ -2912,6 +2912,79 @@
         }
       }
     },
+    "/api/v1/courses/{course_id}/tutor-feedback": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Course Tutor Feedback",
+        "description": "Câu trả lời AI Tutor bị học viên chê trong khóa (không kèm tên học viên).",
+        "operationId": "course_tutor_feedback_api_v1_courses__course_id__tutor_feedback_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Course Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutorFeedbackPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/stats": {
       "get": {
         "tags": [
@@ -2983,7 +3056,8 @@
                     "pending",
                     "approved",
                     "rejected",
-                    "locked"
+                    "locked",
+                    "unverified"
                   ],
                   "type": "string"
                 },
@@ -3045,6 +3119,102 @@
                   "$ref": "#/components/schemas/AdminUserPage"
                 }
               }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/export": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Export Users",
+        "description": "CSV theo bộ lọc đang xem (tối đa 10.000 dòng).",
+        "operationId": "export_users_api_v1_admin_users_export_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "student",
+                    "teacher",
+                    "admin"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "approved",
+                    "rejected",
+                    "locked",
+                    "unverified"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/csv": {}
             }
           },
           "422": {
@@ -3539,6 +3709,69 @@
           }
         }
       }
+    },
+    "/api/v1/admin/tutor-feedback": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Tutor Feedback",
+        "description": "Câu trả lời AI Tutor bị học viên bấm 👎 trên mọi khóa, mới nhất trước (kèm tên học viên).",
+        "operationId": "tutor_feedback_api_v1_admin_tutor_feedback_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutorFeedbackPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3805,6 +4038,10 @@
             "type": "integer",
             "title": "Failed Jobs 7D"
           },
+          "tutor_downvotes_7d": {
+            "type": "integer",
+            "title": "Tutor Downvotes 7D"
+          },
           "signups_14d": {
             "items": {
               "$ref": "#/components/schemas/DayCount"
@@ -3826,6 +4063,7 @@
           "tutor_questions_7d",
           "quiz_submissions_7d",
           "failed_jobs_7d",
+          "tutor_downvotes_7d",
           "signups_14d"
         ],
         "title": "AdminStats"
@@ -3881,6 +4119,10 @@
             ],
             "title": "Review Note"
           },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -3904,6 +4146,7 @@
           "teacher_status",
           "locked_at",
           "review_note",
+          "email_verified",
           "created_at",
           "course_count",
           "enrollment_count"
@@ -6644,6 +6887,133 @@
           "access_token"
         ],
         "title": "TokenOut"
+      },
+      "TutorFeedbackItem": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "refused": {
+            "type": "boolean",
+            "title": "Refused"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "course_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Course Id"
+          },
+          "course_title": {
+            "type": "string",
+            "title": "Course Title"
+          },
+          "course_slug": {
+            "type": "string",
+            "title": "Course Slug"
+          },
+          "lesson_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesson Id"
+          },
+          "lesson_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesson Title"
+          },
+          "student_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "question",
+          "answer",
+          "refused",
+          "created_at",
+          "course_id",
+          "course_title",
+          "course_slug",
+          "lesson_id",
+          "lesson_title",
+          "student_name"
+        ],
+        "title": "TutorFeedbackItem",
+        "description": "Một câu trả lời AI Tutor bị học viên bấm 👎 (D1), kèm câu hỏi ngay trước nó."
+      },
+      "TutorFeedbackPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TutorFeedbackItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "title": "TutorFeedbackPage"
       },
       "TutorStat": {
         "properties": {

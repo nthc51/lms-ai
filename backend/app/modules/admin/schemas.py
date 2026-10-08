@@ -43,6 +43,7 @@ class AdminUserOut(BaseModel):
     teacher_status: TeacherStatus | None
     locked_at: datetime | None
     review_note: str | None
+    email_verified: bool
     created_at: datetime
     course_count: int  # giảng viên: số khóa đang sở hữu
     enrollment_count: int  # học viên: số khóa đã đăng ký
@@ -88,6 +89,7 @@ class AdminStats(BaseModel):
     tutor_questions_7d: int
     quiz_submissions_7d: int
     failed_jobs_7d: int
+    tutor_downvotes_7d: int  # câu trả lời AI bị học viên bấm 👎 trong 7 ngày
     signups_14d: list[DayCount]  # đủ 14 ngày (giờ Việt Nam), ngày không có ai đăng ký = 0
 
 

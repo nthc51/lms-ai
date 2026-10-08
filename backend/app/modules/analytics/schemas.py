@@ -1,7 +1,9 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.core.pagination import Page
 from app.modules.quiz.models import QuizStatus
 
 
@@ -37,3 +39,23 @@ class CourseAnalytics(BaseModel):
     lessons: list[LessonStat]
     quizzes: list[QuizStat]
     tutor: TutorStat
+
+
+class TutorFeedbackItem(BaseModel):
+    """Một câu trả lời AI Tutor bị học viên bấm 👎 (D1), kèm câu hỏi ngay trước nó."""
+
+    message_id: uuid.UUID
+    question: str | None
+    answer: str
+    refused: bool
+    created_at: datetime
+    course_id: uuid.UUID
+    course_title: str
+    course_slug: str
+    lesson_id: uuid.UUID | None
+    lesson_title: str | None
+    student_name: str | None  # chỉ trả cho admin; giảng viên không thấy ai chê (để học viên dám bấm)
+
+
+class TutorFeedbackPage(Page[TutorFeedbackItem]):
+    pass

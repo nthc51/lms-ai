@@ -1,9 +1,21 @@
 """Số liệu cơ bản cho dashboard giảng viên (A8). Phân tích sâu (câu hay sai, chủ đề yếu) là B7."""
 
+import uuid
+
 from sqlalchemy import and_, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
-from app.modules.analytics.schemas import CourseAnalytics, LessonStat, QuizStat, TutorStat
+from app.core.pagination import PageParams, paginate
+from app.modules.analytics.schemas import (
+    CourseAnalytics,
+    LessonStat,
+    QuizStat,
+    TutorFeedbackItem,
+    TutorFeedbackPage,
+    TutorStat,
+)
+from app.modules.auth.models import User
 from app.modules.courses.models import Course, Lesson, Section
 from app.modules.enrollment.models import Enrollment, LessonProgress, ProgressStatus
 from app.modules.quiz.models import AttemptStatus, Quiz, QuizAttempt
@@ -102,3 +114,60 @@ async def course_analytics(db: AsyncSession, course: Course) -> CourseAnalytics:
         quizzes=quizzes,
         tutor=TutorStat(sessions=sessions, questions=questions, refused_answers=refused),
     )
+
+
+async def downvoted_answers(
+    db: AsyncSession, params: PageParams, course_id: uuid.UUID | None = None, with_student: bool = False
+) -> TutorFeedbackPage:
+    """Câu trả lời bị bấm 👎, mới nhất trước. course_id=None: mọi khóa (admin)."""
+    question_msg = aliased(ChatMessage)
+    question = (
+        select(question_msg.content)
+        .where(
+            question_msg.session_id == ChatMessage.session_id,
+            question_msg.role == ChatRole.user,
+            question_msg.created_at <= ChatMessage.created_at,
+        )
+        .order_by(question_msg.created_at.desc(), question_msg.id.desc())
+        .limit(1)
+        .correlate(ChatMessage)
+        .scalar_subquery()
+    )
+    stmt = (
+        select(
+            ChatMessage,
+            question,
+            Course.id,
+            Course.title,
+            Course.slug,
+            Lesson.id,
+            Lesson.title,
+            User.full_name,
+        )
+        .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+        .join(Course, Course.id == ChatSession.course_id)
+        .join(User, User.id == ChatSession.user_id)
+        .outerjoin(Lesson, Lesson.id == ChatSession.lesson_id)
+        .where(ChatMessage.role == ChatRole.assistant, ChatMessage.feedback == -1)
+    )
+    if course_id is not None:
+        stmt = stmt.where(ChatSession.course_id == course_id)
+    total, paged = await paginate(db, stmt.order_by(ChatMessage.created_at.desc(), ChatMessage.id), params)
+    rows = (await db.execute(paged)).all()
+    items = [
+        TutorFeedbackItem(
+            message_id=m.id,
+            question=q,
+            answer=m.content,
+            refused=m.refused,
+            created_at=m.created_at,
+            course_id=cid,
+            course_title=ctitle,
+            course_slug=slug,
+            lesson_id=lid,
+            lesson_title=ltitle,
+            student_name=student if with_student else None,
+        )
+        for m, q, cid, ctitle, slug, lid, ltitle, student in rows
+    ]
+    return TutorFeedbackPage(items=items, total=total, page=params.page, size=params.size)

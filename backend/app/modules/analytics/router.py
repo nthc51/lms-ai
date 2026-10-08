@@ -5,8 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.deps import require_staff
+from app.core.pagination import PageParams, page_params
 from app.modules.analytics import service
-from app.modules.analytics.schemas import CourseAnalytics
+from app.modules.analytics.schemas import CourseAnalytics, TutorFeedbackPage
 from app.modules.auth.models import User
 from app.modules.courses.service import get_owned_course
 
@@ -19,3 +20,15 @@ async def course_analytics(
 ):
     course = await get_owned_course(db, course_id, user)  # người khác → 404 (spec 6.6)
     return await service.course_analytics(db, course)
+
+
+@router.get("/courses/{course_id}/tutor-feedback", response_model=TutorFeedbackPage)
+async def course_tutor_feedback(
+    course_id: uuid.UUID,
+    params: PageParams = Depends(page_params),
+    user: User = Depends(require_staff),
+    db: AsyncSession = Depends(get_db),
+):
+    """Câu trả lời AI Tutor bị học viên chê trong khóa (không kèm tên học viên)."""
+    course = await get_owned_course(db, course_id, user)
+    return await service.downvoted_answers(db, params, course.id)

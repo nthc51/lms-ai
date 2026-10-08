@@ -1,9 +1,13 @@
+import csv
+import io
 import uuid
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.errors import AppError, not_found
 from app.core.pagination import PageParams, paginate
 from app.core.time import utcnow
@@ -22,10 +26,13 @@ from app.modules.auth.models import RefreshToken, Role, TeacherStatus, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.enrollment.models import Enrollment
 from app.modules.jobs.models import Job, JobStatus
+from app.modules.notify import templates
+from app.modules.notify.outbox import queue_email
 from app.modules.quiz.models import AttemptStatus, QuizAttempt
 from app.modules.tutor.models import ChatMessage, ChatRole
 
 VN_TZ = "Asia/Ho_Chi_Minh"
+VN = ZoneInfo(VN_TZ)
 
 
 def _log(
@@ -51,6 +58,18 @@ def _log(
 
 def _like(q: str) -> str:
     return f"%{q.strip().lower()}%"
+
+
+def _url(path: str) -> str:
+    return f"{get_settings().app_base_url}{path}"
+
+
+# Giảng viên chỉ vào hàng chờ duyệt khi đã xác nhận email (tránh hàng chờ đầy email giả).
+_PENDING = (
+    User.role == Role.teacher,
+    User.teacher_status == TeacherStatus.pending,
+    User.email_verified_at.is_not(None),
+)
 
 
 # ---------- người dùng ----------
@@ -80,19 +99,22 @@ def _user_out(user: User, course_count: int, enrollment_count: int) -> AdminUser
         teacher_status=user.teacher_status,
         locked_at=user.locked_at,
         review_note=user.review_note,
+        email_verified=user.email_verified_at is not None,
         created_at=user.created_at,
         course_count=course_count,
         enrollment_count=enrollment_count,
     )
 
 
-async def list_users(
-    db: AsyncSession, role: Role | None, status: str | None, q: str | None, params: PageParams
-) -> AdminUserPage:
+def _users_stmt(role: Role | None, status: str | None, q: str | None) -> Select:
     stmt: Select = select(User, _course_count, _enroll_count)
     if role is not None:
         stmt = stmt.where(User.role == role)
-    if status in ("pending", "approved", "rejected"):
+    if status == "pending":
+        stmt = stmt.where(*_PENDING)
+    elif status == "unverified":
+        stmt = stmt.where(User.email_verified_at.is_(None))
+    elif status in ("approved", "rejected"):
         stmt = stmt.where(User.role == Role.teacher, User.teacher_status == TeacherStatus(status))
     elif status == "locked":
         stmt = stmt.where(User.locked_at.is_not(None))
@@ -106,11 +128,62 @@ async def list_users(
         )
     # Chờ duyệt: ai đăng ký trước được xử lý trước. Còn lại: mới nhất lên đầu.
     order = User.created_at.asc() if status == "pending" else User.created_at.desc()
-    total, paged = await paginate(db, stmt.order_by(order, User.id), params)
+    return stmt.order_by(order, User.id)
+
+
+async def list_users(
+    db: AsyncSession, role: Role | None, status: str | None, q: str | None, params: PageParams
+) -> AdminUserPage:
+    total, paged = await paginate(db, _users_stmt(role, status, q), params)
     rows = (await db.execute(paged)).all()
     return AdminUserPage(
         items=[_user_out(u, cc, ec) for u, cc, ec in rows], total=total, page=params.page, size=params.size
     )
+
+
+CSV_MAX_ROWS = 10_000
+_ROLE_VI = {Role.student: "Học viên", Role.teacher: "Giảng viên", Role.admin: "Quản trị"}
+_STATUS_VI = {
+    TeacherStatus.pending: "Chờ duyệt",
+    TeacherStatus.approved: "Đã duyệt",
+    TeacherStatus.rejected: "Bị từ chối",
+}
+
+
+async def export_users_csv(db: AsyncSession, role: Role | None, status: str | None, q: str | None) -> str:
+    """CSV theo đúng bộ lọc đang xem. Có BOM UTF-8 để Excel hiện đúng tiếng Việt."""
+    rows = (await db.execute(_users_stmt(role, status, q).limit(CSV_MAX_ROWS))).all()
+    buf = io.StringIO()
+    buf.write("\ufeff")
+    w = csv.writer(buf)
+    w.writerow(
+        [
+            "Họ tên",
+            "Email",
+            "Vai trò",
+            "Trạng thái giảng viên",
+            "Đã xác nhận email",
+            "Bị khóa",
+            "Ngày tạo",
+            "Số khóa",
+            "Số đăng ký",
+        ]
+    )
+    for u, cc, ec in rows:
+        w.writerow(
+            [
+                u.full_name,
+                u.email,
+                _ROLE_VI[u.role],
+                _STATUS_VI.get(u.teacher_status, "") if u.teacher_status else "",
+                "Có" if u.email_verified_at else "Chưa",
+                "Có" if u.locked_at else "",
+                u.created_at.astimezone(VN).strftime("%d/%m/%Y %H:%M"),
+                cc if u.role == Role.teacher else "",
+                ec if u.role == Role.student else "",
+            ]
+        )
+    return buf.getvalue()
 
 
 async def _get_user_row(db: AsyncSession, user_id: uuid.UUID) -> AdminUserOut:
@@ -133,6 +206,9 @@ async def approve_teacher(db: AsyncSession, admin: User, user_id: uuid.UUID) -> 
     user.teacher_status = TeacherStatus.approved
     user.review_note = None
     _log(db, admin, "approve_teacher", "user", user.id, user.email, None)
+    queue_email(
+        db, user.email, "teacher_approved", templates.teacher_approved(user.full_name, _url("/teach"))
+    )
     await db.commit()
     return await _get_user_row(db, user.id)
 
@@ -145,6 +221,9 @@ async def reject_teacher(db: AsyncSession, admin: User, user_id: uuid.UUID, reas
     user.teacher_status = TeacherStatus.rejected
     user.review_note = reason
     _log(db, admin, "reject_teacher", "user", user.id, user.email, reason)
+    queue_email(
+        db, user.email, "teacher_rejected", templates.teacher_rejected(user.full_name, reason, _url("/"))
+    )
     await db.commit()
     return await _get_user_row(db, user.id)
 
@@ -165,6 +244,7 @@ async def lock_user(db: AsyncSession, admin: User, user_id: uuid.UUID, reason: s
             .values(revoked_at=utcnow())
         )
         _log(db, admin, "lock_user", "user", user.id, user.email, reason)
+        queue_email(db, user.email, "account_locked", templates.account_locked(user.full_name, reason))
         await db.commit()
     return await _get_user_row(db, user.id)
 
@@ -254,6 +334,12 @@ async def _course_row(db: AsyncSession, course_id: uuid.UUID) -> AdminCourseOut:
     return _course_out((await db.execute(_course_stmt().where(Course.id == course_id))).one())
 
 
+async def _mail_owner(db: AsyncSession, course: Course, template: str, build) -> None:
+    teacher = await db.get(User, course.teacher_id)
+    if teacher is not None:
+        queue_email(db, teacher.email, template, build(teacher))
+
+
 async def hide_course(db: AsyncSession, admin: User, course_id: uuid.UUID, reason: str) -> AdminCourseOut:
     course = await db.get(Course, course_id)
     if course is None:
@@ -264,6 +350,12 @@ async def hide_course(db: AsyncSession, admin: User, course_id: uuid.UUID, reaso
     course.hidden_at = utcnow()
     course.hidden_reason = reason
     _log(db, admin, "hide_course", "course", course.id, course.title, reason)
+    await _mail_owner(
+        db,
+        course,
+        "course_hidden",
+        lambda t: templates.course_hidden(t.full_name, course.title, reason, _url(f"/teach/{course.slug}")),
+    )
     await db.commit()
     return await _course_row(db, course.id)
 
@@ -278,6 +370,12 @@ async def unhide_course(db: AsyncSession, admin: User, course_id: uuid.UUID) -> 
     course.hidden_at = None
     course.hidden_reason = None
     _log(db, admin, "unhide_course", "course", course.id, course.title, None)
+    await _mail_owner(
+        db,
+        course,
+        "course_unhidden",
+        lambda t: templates.course_unhidden(t.full_name, course.title, _url(f"/courses/{course.slug}")),
+    )
     await db.commit()
     return await _course_row(db, course.id)
 
@@ -311,11 +409,7 @@ async def stats(db: AsyncSession) -> AdminStats:
     return AdminStats(
         students=by_role.get(Role.student, 0),
         teachers=by_role.get(Role.teacher, 0),
-        pending_teachers=await count(
-            select(func.count())
-            .select_from(User)
-            .where(User.role == Role.teacher, User.teacher_status == TeacherStatus.pending)
-        ),
+        pending_teachers=await count(select(func.count()).select_from(User).where(*_PENDING)),
         locked_users=await count(select(func.count()).select_from(User).where(User.locked_at.is_not(None))),
         courses_published=by_status.get(CourseStatus.published, 0),
         courses_draft=by_status.get(CourseStatus.draft, 0),
@@ -337,6 +431,15 @@ async def stats(db: AsyncSession) -> AdminStats:
             select(func.count())
             .select_from(Job)
             .where(Job.status == JobStatus.failed, Job.created_at >= week_ago)
+        ),
+        tutor_downvotes_7d=await count(
+            select(func.count())
+            .select_from(ChatMessage)
+            .where(
+                ChatMessage.role == ChatRole.assistant,
+                ChatMessage.feedback == -1,
+                ChatMessage.created_at >= week_ago,
+            )
         ),
         signups_14d=[DayCount(day=d, count=per_day.get(d, 0)) for d in days],
     )
