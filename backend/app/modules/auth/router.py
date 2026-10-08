@@ -5,9 +5,18 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.core.errors import AppError
+from app.core.ratelimit import RateLimiter, get_rate_limiter
 from app.modules.auth import service
 from app.modules.auth.models import User
-from app.modules.auth.schemas import LoginIn, RegisterIn, TokenOut, UserOut
+from app.modules.auth.schemas import (
+    LoginIn,
+    RegisterIn,
+    ResendVerificationIn,
+    TokenOut,
+    UserOut,
+    VerifyEmailIn,
+)
+from app.modules.notify.outbox import MailKicker, get_mail_kicker
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
@@ -29,8 +38,60 @@ def set_refresh_cookie(response: Response, raw: str) -> None:
 
 
 @router.post("/auth/register", response_model=UserOut, status_code=201)
-async def register(data: RegisterIn, db: AsyncSession = Depends(get_db)):
-    return await service.register(db, data)
+async def register(
+    data: RegisterIn, db: AsyncSession = Depends(get_db), kicker: MailKicker = Depends(get_mail_kicker)
+):
+    """Tạo tài khoản và gửi email xác nhận. Chưa xác nhận thì đăng nhập nhận 403 EMAIL_NOT_VERIFIED."""
+    user = await service.register(db, data)
+    await kicker.kick()
+    return user
+
+
+@router.post("/auth/verify-email", response_model=UserOut)
+async def verify_email(
+    data: VerifyEmailIn, db: AsyncSession = Depends(get_db), kicker: MailKicker = Depends(get_mail_kicker)
+):
+    """400 INVALID_TOKEN (sai / đã thay bằng link mới) hoặc TOKEN_EXPIRED. Bấm lại link đã dùng thì vẫn 200."""
+    user = await service.verify_email(db, data.token)
+    await kicker.kick()  # giảng viên vừa xác nhận: báo admin
+    return user
+
+
+RESEND_LIMIT = 3  # mỗi email tối đa 3 lần / giờ
+
+
+@router.post("/auth/resend-verification", status_code=202)
+async def resend_verification(
+    data: ResendVerificationIn,
+    db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+    kicker: MailKicker = Depends(get_mail_kicker),
+) -> dict:
+    """Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi gửi quá 3 lần mỗi giờ cho một email."""
+    wait = await limiter.hit(f"verify-resend:{data.email}", RESEND_LIMIT, 3600)
+    if wait is not None:
+        raise AppError(
+            "RATE_LIMITED",
+            "Bạn đã yêu cầu gửi lại quá nhiều lần, vui lòng thử lại sau",
+            429,
+            {"retry_after": wait},
+            headers={"Retry-After": str(wait)},
+        )
+    if await service.resend_verification(db, data.email):
+        await kicker.kick()
+    return {"status": "accepted"}
+
+
+@router.post("/me/teacher-request", response_model=UserOut)
+async def request_teacher_review(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    kicker: MailKicker = Depends(get_mail_kicker),
+):
+    """Giảng viên bị từ chối gửi lại yêu cầu duyệt. 409 NOT_REJECTED nếu không ở trạng thái bị từ chối."""
+    user = await service.request_teacher_review(db, user)
+    await kicker.kick()
+    return user
 
 
 @router.post("/auth/login", response_model=TokenOut)

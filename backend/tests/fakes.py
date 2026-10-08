@@ -73,3 +73,27 @@ class InMemoryRateLimiter:
     async def hit(self, key: str, limit: int, window_s: int) -> int | None:
         self.counts[key] = self.counts.get(key, 0) + 1
         return window_s if self.counts[key] > limit else None
+
+
+class RecordingKicker:
+    """MailKicker giả: chỉ đếm số lần API báo worker gửi email."""
+
+    def __init__(self) -> None:
+        self.kicks = 0
+
+    async def kick(self) -> None:
+        self.kicks += 1
+
+
+class RecordingMailer:
+    """Mailer giả cho send_pending: ghi lại email đã gửi; fail_times > 0 thì ném lỗi N lần đầu."""
+
+    def __init__(self, fail_times: int = 0) -> None:
+        self.sent: list[dict] = []
+        self.fail_times = fail_times
+
+    async def send(self, to: str, subject: str, text: str, html: str) -> None:
+        if self.fail_times > 0:
+            self.fail_times -= 1
+            raise ConnectionError("SMTP down")
+        self.sent.append({"to": to, "subject": subject, "text": text, "html": html})

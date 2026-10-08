@@ -7,13 +7,28 @@ from app.modules.auth.models import TeacherStatus, User
 API = "/api/v1"
 
 
-async def register_user(client, email, password="password123", role="student", full_name="Người dùng"):
+async def register_user(
+    client, email, password="password123", role="student", full_name="Người dùng", verify=True
+):
+    """Đăng ký qua API. verify=True (mặc định): đánh dấu luôn đã xác nhận email trong DB, để test khác
+    không phải đi qua email. Test về xác nhận email truyền verify=False."""
     r = await client.post(
         f"{API}/auth/register",
         json={"email": email, "password": password, "role": role, "full_name": full_name},
     )
     assert r.status_code == 201, r.text
+    if verify:
+        await verify_email_in_db(r.json()["id"])
     return r.json()
+
+
+async def verify_email_in_db(user_id: str) -> None:
+    from app.core.time import utcnow
+
+    async with SessionLocal() as db:
+        user = await db.get(User, uuid.UUID(user_id))
+        user.email_verified_at = utcnow()
+        await db.commit()
 
 
 async def login(client, email, password="password123") -> dict[str, str]:

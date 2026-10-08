@@ -29,7 +29,8 @@ from app.core.ratelimit import get_rate_limiter
 from app.core.storage import get_storage
 from app.main import create_app
 from app.modules.jobs.queue import get_queue
-from tests.fakes import InMemoryRateLimiter, InMemoryStorage, RecordingQueue
+from app.modules.notify.outbox import get_mail_kicker
+from tests.fakes import InMemoryRateLimiter, InMemoryStorage, RecordingKicker, RecordingQueue
 
 
 @pytest.fixture
@@ -57,12 +58,18 @@ def limiter():
 
 
 @pytest.fixture
-async def client(storage, queue, llm, limiter):
+def kicker():
+    return RecordingKicker()
+
+
+@pytest.fixture
+async def client(storage, queue, llm, limiter, kicker):
     app = create_app()
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_queue] = lambda: queue
     app.dependency_overrides[get_llm_client] = lambda: LLMClient(llm, get_settings(), sleep=_no_sleep)
     app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    app.dependency_overrides[get_mail_kicker] = lambda: kicker
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         yield c
 

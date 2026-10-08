@@ -30,6 +30,16 @@ class LoginIn(BaseModel):
     )  # tên không được bắt đầu bằng "_" (pydantic coi là private)
 
 
+class VerifyEmailIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+
+
+class ResendVerificationIn(BaseModel):
+    email: EmailStr
+
+    normalize_email = field_validator("email")(_lower)
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -44,3 +54,4 @@ class UserOut(BaseModel):
     role: Role
     teacher_status: TeacherStatus | None
     review_note: str | None = None  # lý do bị từ chối duyệt giảng viên (nếu có)
+    email_verified: bool = False  # đọc từ property User.email_verified
