@@ -790,7 +790,7 @@ git add backend && git commit -m "feat(studio): tables for source guides, artifa
 
 Prompt dùng `string.Template`: **không viết ký tự `$` trần** trong prompt (kể cả ví dụ LaTeX), nếu không lúc render sẽ lỗi.
 
-- [ ] **Bước 1: Test prompt (sẽ fail)** (`tests/test_prompts.py`)
+- [x] **Bước 1: Test prompt (sẽ fail)** (`tests/test_prompts.py`)
 
 ```diff
 --- a/tests/test_prompts.py
@@ -819,7 +819,7 @@ Prompt dùng `string.Template`: **không viết ký tự `$` trần** trong prom
 
 Chạy `uv run pytest tests/test_prompts.py -q`. Expected: fail (chưa có file prompt).
 
-- [ ] **Bước 2: Các prompt**
+- [x] **Bước 2: Các prompt**
 
 `app/ai/prompts/source_guide.md`:
 
@@ -1080,7 +1080,7 @@ $source
 </source>
 ```
 
-- [ ] **Bước 3: Câu trả lời giả** (`app/ai/llm.py`, hàm `default_reply`): để test và E2E chạy không cần Gemini.
+- [x] **Bước 3: Câu trả lời giả** (`app/ai/llm.py`, hàm `default_reply`): để test và E2E chạy không cần Gemini.
 
 ```diff
 --- a/app/ai/llm.py
@@ -1142,7 +1142,7 @@ $source
  
 ```
 
-- [ ] **Bước 4:** `uv run pytest tests/test_prompts.py -q` → pass. Commit:
+- [x] **Bước 4:** `uv run pytest tests/test_prompts.py -q` → pass. Commit:
 
 ```bash
 git add backend && git commit -m "feat(ai): prompts for studio, source guide, followups, notes, eval"
