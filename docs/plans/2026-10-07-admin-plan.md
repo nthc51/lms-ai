@@ -5950,7 +5950,7 @@ Expected: **102 passed**. `next build` có thêm `○ /admin/feedback` và `○ 
 - Modify: `frontend/e2e/mock-api.ts`, `frontend/e2e/admin-data.ts`, `frontend/e2e/admin.spec.ts`
 - Create: `frontend/e2e/auth-email.spec.ts`
 
-- [ ] **Bước 1: Mock mặc định**
+- [x] **Bước 1: Mock mặc định**
 
 `e2e/mock-api.ts`, thêm ngay dưới `"GET /quizzes"`, để trang Thống kê ở các test cũ không gọi vào route chưa mock:
 
@@ -5966,7 +5966,7 @@ Expected: **102 passed**. `next build` có thêm `○ /admin/feedback` và `○ 
 
 > Thiếu trường này thì trang Tổng quan **sập** (`undefined.toLocaleString`). E2E đã bắt được lỗi này.
 
-- [ ] **Bước 2: `e2e/auth-email.spec.ts`**
+- [x] **Bước 2: `e2e/auth-email.spec.ts`**
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -6084,7 +6084,7 @@ test("giảng viên bị từ chối gửi lại yêu cầu duyệt", async ({ p
 });
 ```
 
-- [ ] **Bước 3: Thêm cuối `e2e/admin.spec.ts`**
+- [x] **Bước 3: Thêm cuối `e2e/admin.spec.ts`**
 
 ```ts
 test.describe("quản trị viên: phản hồi AI và xuất CSV", () => {
@@ -6130,7 +6130,7 @@ test.describe("quản trị viên: phản hồi AI và xuất CSV", () => {
 });
 ```
 
-- [ ] **Bước 4: Chạy và commit**
+- [x] **Bước 4: Chạy và commit**
 
 ```bash
 npx playwright test
