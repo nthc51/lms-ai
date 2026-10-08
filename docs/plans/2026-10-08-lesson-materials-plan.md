@@ -42,7 +42,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 - Modify: `backend/app/modules/studio/schemas.py`, `service.py`, `router.py`
 - Test: `backend/tests/test_studio.py`, `backend/tests/test_storage.py`, `backend/tests/helpers.py`
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `tests/helpers.py`: `upload_file` nhận thêm `filename`.
 
@@ -162,7 +162,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 
 Chạy `uv run pytest tests/test_studio.py tests/test_storage.py -q`. Expected: fail (`filename` bị bỏ qua, chưa có `file_name`, header hỏng với tên có dấu).
 
-- [ ] **Bước 2: Cột `assets.original_name` + migration**
+- [x] **Bước 2: Cột `assets.original_name` + migration**
 
 ```diff
 --- a/app/modules/materials/models.py
@@ -212,7 +212,7 @@ def downgrade() -> None:
     op.drop_column("assets", "original_name")
 ```
 
-- [ ] **Bước 3: Presign giữ tên file; danh sách tài liệu của giảng viên trả `file_name`**
+- [x] **Bước 3: Presign giữ tên file; danh sách tài liệu của giảng viên trả `file_name`**
 
 ```diff
 --- a/app/modules/materials/schemas.py
@@ -330,7 +330,7 @@ def downgrade() -> None:
      return result
 ```
 
-- [ ] **Bước 4: Tải xuống an toàn với tên tiếng Việt** (`app/core/storage.py`)
+- [x] **Bước 4: Tải xuống an toàn với tên tiếng Việt** (`app/core/storage.py`)
 
 ```diff
 --- a/app/core/storage.py
@@ -374,7 +374,7 @@ def downgrade() -> None:
  
 ```
 
-- [ ] **Bước 5: API tài liệu của bài** (`app/modules/studio/schemas.py`, `service.py`, `router.py`)
+- [x] **Bước 5: API tài liệu của bài** (`app/modules/studio/schemas.py`, `service.py`, `router.py`)
 
 ```diff
 --- a/app/modules/studio/schemas.py
@@ -536,7 +536,7 @@ def downgrade() -> None:
  @router.get("/chunks/{chunk_id}", response_model=ChunkOut)
 ```
 
-- [ ] **Bước 6: Chạy**
+- [x] **Bước 6: Chạy**
 
 ```bash
 uv run alembic upgrade head && uv run alembic check      # No new upgrade operations detected.
@@ -546,7 +546,7 @@ uv run ruff check . && uv run ruff format --check .
 docker compose up -d --build api worker
 ```
 
-- [ ] **Bước 7: Commit**
+- [x] **Bước 7: Commit**
 
 ```bash
 git add backend && git commit -m "feat(api): lesson PDFs visible right after upload, original file names, Vietnamese-safe downloads"
