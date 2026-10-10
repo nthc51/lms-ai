@@ -80,3 +80,29 @@ async def test_null_cache_always_loads():
     await c.get_or_load("ns", "k", 60, _counting_loader(calls))
     await c.get_or_load("ns", "k", 60, _counting_loader(calls))
     assert len(calls) == 2
+
+
+async def test_corrupt_cached_json_and_bad_version_fall_through_to_loader():
+    c, calls = _cache(), []
+    try:
+        await c.get_or_load("ns", "k", 60, _counting_loader(calls))
+        ver = await c._redis.get(c._ver_key("ns"))
+        assert ver is None
+        await c._redis.set(f"{c._prefix}:ns:v0:k", "{không phải json", ex=60)
+        assert await c.get_or_load("ns", "k", 60, _counting_loader(calls)) == {"n": 2}
+        await c._redis.set(c._ver_key("ns"), "abc")
+        assert await c.get_or_load("ns", "k", 60, _counting_loader(calls)) == {"n": 3}
+    finally:
+        await c.aclose()
+
+
+async def test_unserializable_value_is_returned_but_not_stored():
+    c = _cache()
+
+    async def loader():
+        return {"x": object()}, True
+
+    try:
+        assert (await c.get_or_load("ns", "k", 60, loader))["x"] is not None
+    finally:
+        await c.aclose()

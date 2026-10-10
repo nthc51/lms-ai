@@ -6,6 +6,9 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core import cache as cache_mod
+from app.core.cache import COURSES_NS
+from app.core.config import get_settings
 from app.core.errors import AppError, not_found
 from app.core.pagination import PageParams, paginate
 from app.modules.auth.models import Role, User
@@ -25,6 +28,11 @@ from app.modules.courses.schemas import (
     SectionUpdate,
     TeacherCoursePage,
 )
+
+
+async def invalidate_courses_cache() -> None:
+    """Gọi sau mọi commit làm đổi dữ liệu hiển thị trên catalog/chi tiết khóa."""
+    await cache_mod.get_cache().bump(COURSES_NS)
 
 
 def make_slug(title: str) -> str:
@@ -74,6 +82,7 @@ async def update_course(db: AsyncSession, course: Course, data: CourseUpdate) ->
     for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(course, field, value)
     await db.commit()
+    await invalidate_courses_cache()
     return course
 
 
@@ -142,6 +151,7 @@ async def delete_course(db: AsyncSession, course: Course) -> None:
     )
     await db.execute(delete(Course).where(Course.id == course.id))
     await db.commit()
+    await invalidate_courses_cache()
 
 
 async def count_lessons(db: AsyncSession, course_id: uuid.UUID) -> int:
@@ -160,6 +170,7 @@ async def publish_course(db: AsyncSession, course: Course) -> Course:
         raise AppError("COURSE_EMPTY", "Khóa học cần ít nhất một bài học trước khi xuất bản", 409)
     course.status = CourseStatus.published
     await db.commit()
+    await invalidate_courses_cache()
     return course
 
 
@@ -172,6 +183,7 @@ async def add_section(db: AsyncSession, course: Course, data: SectionCreate) -> 
     section = Section(course_id=course.id, title=data.title, position=position)
     db.add(section)
     await db.commit()
+    await invalidate_courses_cache()
     return section
 
 
@@ -193,6 +205,7 @@ async def get_owned_section(db: AsyncSession, section_id: uuid.UUID, user: User)
 async def update_section(db: AsyncSession, section: Section, data: SectionUpdate) -> Section:
     section.title = data.title
     await db.commit()
+    await invalidate_courses_cache()
     return section
 
 
@@ -208,6 +221,7 @@ async def delete_section(db: AsyncSession, section: Section) -> None:
     )
     await db.execute(delete(Section).where(Section.id == section.id))
     await db.commit()
+    await invalidate_courses_cache()
 
 
 async def add_lesson(db: AsyncSession, section: Section, data: LessonCreate) -> Lesson:
@@ -215,6 +229,7 @@ async def add_lesson(db: AsyncSession, section: Section, data: LessonCreate) -> 
     lesson = Lesson(section_id=section.id, title=data.title, content_md=data.content_md, position=position)
     db.add(lesson)
     await db.commit()
+    await invalidate_courses_cache()
     return lesson
 
 
@@ -249,6 +264,7 @@ async def update_lesson(db: AsyncSession, lesson: Lesson, data: LessonUpdate) ->
             continue
         setattr(lesson, field, value)
     await db.commit()
+    await invalidate_courses_cache()
     return lesson
 
 
@@ -263,6 +279,7 @@ async def delete_lesson(db: AsyncSession, lesson: Lesson, course: Course) -> Non
     )
     await db.execute(delete(Lesson).where(Lesson.id == lesson.id))
     await db.commit()
+    await invalidate_courses_cache()
 
 
 async def reorder(db: AsyncSession, course: Course, data: ReorderIn) -> None:
@@ -285,6 +302,7 @@ async def reorder(db: AsyncSession, course: Course, data: ReorderIn) -> None:
             lessons[lesson_id].section_id = item.id
             lessons[lesson_id].position = l_pos
     await db.commit()
+    await invalidate_courses_cache()
 
 
 async def list_published(db: AsyncSession, q: str | None, params: PageParams) -> CoursePage:
@@ -307,9 +325,19 @@ async def list_published(db: AsyncSession, q: str | None, params: PageParams) ->
     return CoursePage(items=items, total=total, page=params.page, size=params.size)
 
 
-async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> CourseDetail:
-    from app.modules.enrollment.service import is_enrolled  # import trong hàm để tránh vòng import
+async def list_published_cached(db: AsyncSession, q: str | None, params: PageParams) -> CoursePage:
+    key = f"catalog:{(q or '').strip().lower()[:100]}:{params.page}:{params.size}"
 
+    async def load():
+        page = await list_published(db, q, params)
+        return page.model_dump(mode="json"), True
+
+    data = await cache_mod.get_cache().get_or_load(COURSES_NS, key, get_settings().cache_ttl_s, load)
+    return CoursePage.model_validate(data)
+
+
+async def _load_detail_base(db: AsyncSession, slug: str) -> dict:
+    """Phần giống nhau với mọi người xem (thông tin khóa và mục lục), dạng JSON để cache được."""
     course = await db.scalar(
         select(Course)
         .where(Course.slug == slug)
@@ -317,15 +345,28 @@ async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> C
     )
     if course is None:
         raise not_found("Khóa học")
-    is_owner = user is not None and (user.role == Role.admin or course.teacher_id == user.id)
-    if course.status != CourseStatus.published and not is_owner:
-        raise not_found("Khóa học")
     teacher_name = await db.scalar(select(User.full_name).where(User.id == course.teacher_id))
-    enrolled = user is not None and await is_enrolled(db, user.id, course.id)
-    return CourseDetail(
-        **CourseOut.model_validate(course).model_dump(),
-        teacher_name=teacher_name,
-        sections=[SectionBrief.model_validate(s) for s in course.sections],
-        is_enrolled=enrolled,
-        is_owner=is_owner,
+    return {
+        **CourseOut.model_validate(course).model_dump(mode="json"),
+        "teacher_name": teacher_name,
+        "sections": [SectionBrief.model_validate(s).model_dump(mode="json") for s in course.sections],
+    }
+
+
+async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> CourseDetail:
+    from app.modules.enrollment.service import is_enrolled  # import trong hàm để tránh vòng import
+
+    async def load():
+        base = await _load_detail_base(db, slug)
+        # Chỉ cache khóa đã publish: bản nháp / bị ẩn chỉ chủ khóa xem, không được lọt ra cho người khác
+        return base, base["status"] == CourseStatus.published.value
+
+    base = await cache_mod.get_cache().get_or_load(
+        COURSES_NS, f"detail:{slug}", get_settings().cache_ttl_s, load
     )
+    teacher_id, course_id = uuid.UUID(base["teacher_id"]), uuid.UUID(base["id"])
+    is_owner = user is not None and (user.role == Role.admin or teacher_id == user.id)
+    if base["status"] != CourseStatus.published.value and not is_owner:
+        raise not_found("Khóa học")
+    enrolled = user is not None and await is_enrolled(db, user.id, course_id)
+    return CourseDetail.model_validate({**base, "is_enrolled": enrolled, "is_owner": is_owner})

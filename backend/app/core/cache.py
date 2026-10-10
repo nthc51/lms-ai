@@ -54,17 +54,20 @@ class RedisCache:
             ver = int(await self._redis.get(self._ver_key(ns)) or 0)
             full_key = f"{self._prefix}:{ns}:v{ver}:{key}"
             raw = await self._redis.get(full_key)
-        except RedisError:
+        except (RedisError, ValueError, TypeError):
             logger.warning("Cache: không đọc được Redis (%s/%s), đọc thẳng DB", ns, key)
             value, _ = await loader()
             return value
         if raw is not None:
-            return json.loads(raw)
+            try:
+                return json.loads(raw)
+            except ValueError:
+                logger.warning("Cache: JSON hỏng (%s/%s), đọc thẳng DB", ns, key)
         value, cacheable = await loader()
         if cacheable:
             try:
                 await self._redis.set(full_key, json.dumps(value, ensure_ascii=False), ex=ttl_s)
-            except RedisError:
+            except (RedisError, TypeError, ValueError):
                 logger.warning("Cache: không ghi được Redis (%s/%s)", ns, key)
         return value
 

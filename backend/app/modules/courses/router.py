@@ -152,7 +152,7 @@ async def catalog(
     params: PageParams = Depends(page_params),
     db: AsyncSession = Depends(get_db),
 ):
-    return await service.list_published(db, q, params)
+    return await service.list_published_cached(db, q, params)
 
 
 @router.get("/courses/{slug}", response_model=CourseDetail)

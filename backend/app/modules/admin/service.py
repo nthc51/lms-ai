@@ -26,6 +26,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.auth.models import RefreshToken, Role, TeacherStatus, User
 from app.modules.courses.models import Course, CourseStatus, Lesson, Section
+from app.modules.courses.service import invalidate_courses_cache
 from app.modules.enrollment.models import Enrollment
 from app.modules.jobs.models import Job, JobStatus
 from app.modules.notify import templates
@@ -373,6 +374,7 @@ async def hide_course(db: AsyncSession, admin: User, course_id: uuid.UUID, reaso
         lambda t: templates.course_hidden(t.full_name, course.title, reason, _url(f"/teach/{course.slug}")),
     )
     await db.commit()
+    await invalidate_courses_cache()  # khóa vào / ra khỏi catalog ngay, không chờ hết TTL
     return await _course_row(db, course.id)
 
 
@@ -393,6 +395,7 @@ async def unhide_course(db: AsyncSession, admin: User, course_id: uuid.UUID) -> 
         lambda t: templates.course_unhidden(t.full_name, course.title, _url(f"/courses/{course.slug}")),
     )
     await db.commit()
+    await invalidate_courses_cache()  # khóa vào / ra khỏi catalog ngay, không chờ hết TTL
     return await _course_row(db, course.id)
 
 
