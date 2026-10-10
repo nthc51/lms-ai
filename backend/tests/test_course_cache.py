@@ -129,3 +129,14 @@ async def test_publish_and_delete_invalidate_catalog(client, redis_cache):
     assert (await client.delete(f"{API}/courses/{course['id']}", headers=gv)).status_code == 204
     assert await _titles(client) == []
     assert (await client.get(f"{API}/courses/{course['slug']}")).status_code == 404
+
+
+def test_catalog_key_uses_the_whole_search_text():
+    from app.core.pagination import PageParams
+    from app.modules.courses.service import _catalog_key
+
+    p = PageParams(page=1, size=12)
+    long_a, long_b = "a" * 100 + "x", "a" * 100 + "y"
+    assert _catalog_key(long_a, p) != _catalog_key(long_b, p)
+    assert _catalog_key(" Toán ", p) == _catalog_key("toán", p)
+    assert _catalog_key("toán", p) != _catalog_key("toán", PageParams(page=2, size=12))

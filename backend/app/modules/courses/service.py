@@ -1,3 +1,4 @@
+import hashlib
 import secrets
 import uuid
 
@@ -325,8 +326,14 @@ async def list_published(db: AsyncSession, q: str | None, params: PageParams) ->
     return CoursePage(items=items, total=total, page=params.page, size=params.size)
 
 
+def _catalog_key(q: str | None, params: PageParams) -> str:
+    # băm cả chuỗi tìm kiếm: cắt bớt thì hai từ khóa dài chung 100 ký tự đầu sẽ dùng chung kết quả
+    digest = hashlib.sha256((q or "").strip().lower().encode()).hexdigest()[:32]
+    return f"catalog:{digest}:{params.page}:{params.size}"
+
+
 async def list_published_cached(db: AsyncSession, q: str | None, params: PageParams) -> CoursePage:
-    key = f"catalog:{(q or '').strip().lower()[:100]}:{params.page}:{params.size}"
+    key = _catalog_key(q, params)
 
     async def load():
         page = await list_published(db, q, params)
