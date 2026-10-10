@@ -801,7 +801,7 @@ git add backend && git commit -m "perf(courses): cache catalog and course detail
 - Modify: `backend/app/core/storage.py`, `backend/tests/fakes.py`, `backend/app/main.py`
 - Test: `backend/tests/test_ready.py`
 
-- [ ] **Step 1: Thêm `ping` cho storage**
+- [x] **Step 1: Thêm `ping` cho storage**
   - Trong `app/core/storage.py`:
     - Thêm vào `class Storage(Protocol)`: `async def ping(self) -> None: ...`
     - Thêm vào `class MinioStorage`, ngay dưới `ensure_bucket`:
@@ -822,7 +822,7 @@ git add backend && git commit -m "perf(courses): cache catalog and course detail
             raise ConnectionError("minio giả bị tắt")
 ```
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_ready.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_ready.py`**
 
 ```python
 import httpx
@@ -870,12 +870,12 @@ async def test_ready_uses_real_redis_by_default(client):
     assert r.json()["checks"]["redis"] == "ok"
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_ready.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.core.health'`
 
-- [ ] **Step 4: `app/core/health.py`**
+- [x] **Step 4: `app/core/health.py`**
 
 ```python
 """Readiness: service có dùng được không (khác /health chỉ báo tiến trình còn sống)."""
@@ -934,16 +934,16 @@ async def ready(
 
 (Chỉ trả **tên loại lỗi**, không trả nội dung lỗi, để không lộ host hay mật khẩu trong chuỗi kết nối.)
 
-- [ ] **Step 5: Gắn router** (`app/main.py`)
+- [x] **Step 5: Gắn router** (`app/main.py`)
   - Import: `from app.core.health import router as health_router`
   - Dưới `# routers`: `app.include_router(health_router)`
 
-- [ ] **Step 6: Chạy toàn bộ test**
+- [x] **Step 6: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
 Expected: PASS hết
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend && git commit -m "feat(ops): readiness endpoint checking db, redis and object storage"
