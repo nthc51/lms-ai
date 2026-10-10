@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     login_rate_limit_per_min: int = 20
     cache_enabled: bool = True
     cache_ttl_s: int = 60
+    metrics_refresh_s: int = 15
     # Hạn chót tổng của bước viết lại câu hỏi (gồm cả retry); quá hạn thì dùng câu hỏi gốc.
     tutor_rewrite_deadline_s: float = 20.0
     # Hạn chót tổng trước token đầu tiên: viết lại + tìm tài liệu + mở stream (gồm retry). Quá hạn → event error.

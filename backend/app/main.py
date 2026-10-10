@@ -1,10 +1,12 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.health import router as health_router
+from app.core.metrics import metrics_refresher, setup_metrics
 from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, StrictCORSMiddleware
 from app.core.ratelimit import close_rate_limiter
 from app.core.storage import get_storage
@@ -26,9 +28,13 @@ async def lifespan(app: FastAPI):
     ensure_bucket = getattr(storage, "ensure_bucket", None)
     if ensure_bucket is not None:
         await ensure_bucket()
+    refresher = asyncio.create_task(metrics_refresher(get_settings().metrics_refresh_s))
     try:
         yield
     finally:
+        refresher.cancel()
+        with suppress(asyncio.CancelledError):
+            await refresher
         await close_rate_limiter()  # tự bắt lỗi, không làm hỏng việc tắt app
 
 
@@ -64,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(studio_router)
     app.include_router(health_router)
+    setup_metrics(app)
     return app
 
 
