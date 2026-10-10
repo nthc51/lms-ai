@@ -1226,7 +1226,7 @@ git add backend && git commit -m "feat(ops): Prometheus metrics for HTTP, jobs, 
 
 Ở production, trình duyệt gọi MinIO qua `https://files.<domain>` (Caddy), còn API gọi MinIO nội bộ qua `http://minio:9000`. Hai client phải có setting `secure` riêng.
 
-- [ ] **Step 1: Viết test hỏng trước**: thêm vào cuối `tests/test_storage.py`
+- [x] **Step 1: Viết test hỏng trước**: thêm vào cuối `tests/test_storage.py`
 
 ```python
 async def test_public_endpoint_can_use_https_while_internal_stays_http():
@@ -1242,12 +1242,12 @@ async def test_public_endpoint_can_use_https_while_internal_stays_http():
     assert urlsplit(url).scheme == "https" and urlsplit(url).netloc == "files.example.com"
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_storage.py -v`
 Expected: FAIL (`ValidationError` vì chưa có trường `minio_public_secure`, hoặc URL vẫn là `http`)
 
-- [ ] **Step 3: Sửa code**
+- [x] **Step 3: Sửa code**
   - `Settings`: thêm `minio_public_secure: bool = False` ngay dưới `minio_secure`.
   - `MinioStorage.__init__`: thay dòng tạo `self._public` bằng:
 
@@ -1258,12 +1258,12 @@ Expected: FAIL (`ValidationError` vì chưa có trường `minio_public_secure`,
 
   - `.env.example`: thêm dòng `MINIO_PUBLIC_SECURE=false` dưới `MINIO_PUBLIC_ENDPOINT`.
 
-- [ ] **Step 4: Chạy toàn bộ test**
+- [x] **Step 4: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
 Expected: PASS hết
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend && git commit -m "feat(storage): separate https setting for public presigned URLs"
