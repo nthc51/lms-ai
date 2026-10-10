@@ -958,14 +958,14 @@ git add backend && git commit -m "feat(ops): readiness endpoint checking db, red
 - Modify: `backend/pyproject.toml` (qua `uv add`), `backend/app/core/config.py`, `backend/app/main.py`
 - Test: `backend/tests/test_metrics.py`
 
-- [ ] **Step 1: Thêm thư viện**
+- [x] **Step 1: Thêm thư viện**
 
 Run: `uv add prometheus-fastapi-instrumentator`
 Expected: `pyproject.toml` và `uv.lock` được cập nhật (kéo theo `prometheus-client`).
 
 Thêm vào `Settings`: `metrics_refresh_s: int = 15`, và thêm dòng `METRICS_REFRESH_S=15` vào cuối `backend/.env.example` (`tests/test_config.py` bắt mọi setting phải có trong file này).
 
-- [ ] **Step 2: Viết test hỏng trước — `tests/test_metrics.py`**
+- [x] **Step 2: Viết test hỏng trước — `tests/test_metrics.py`**
 
 ```python
 import uuid
@@ -1048,12 +1048,12 @@ async def test_business_metrics_count_jobs_emails_and_ai_tokens(db):
     assert val("lms_ai_tokens_1h", op="tutor_answer", direction="out") == 25
 ```
 
-- [ ] **Step 3: Chạy test**
+- [x] **Step 3: Chạy test**
 
 Run: `uv run pytest tests/test_metrics.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'app.core.metrics'`
 
-- [ ] **Step 4: `app/core/metrics.py`**
+- [x] **Step 4: `app/core/metrics.py`**
 
 ```python
 """Metrics cho Prometheus (spec tầng S4).
@@ -1177,7 +1177,7 @@ async def metrics_refresher(interval_s: int) -> None:
         await asyncio.sleep(interval_s)
 ```
 
-- [ ] **Step 5: Gắn vào `app/main.py`**
+- [x] **Step 5: Gắn vào `app/main.py`**
   - Import: `import asyncio`, `from contextlib import suppress`, `from app.core.metrics import metrics_refresher, setup_metrics`
   - Thay hàm `lifespan` bằng (giữ `close_rate_limiter()` đã có):
 
@@ -1200,17 +1200,17 @@ async def lifespan(app: FastAPI):
 
   - Trong `create_app`, thêm `setup_metrics(app)` ngay trước dòng `return app`.
 
-- [ ] **Step 6: Chạy toàn bộ test**
+- [x] **Step 6: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
 Expected: PASS hết
 
-- [ ] **Step 7: Kiểm tra trên stack dev**
+- [x] **Step 7: Kiểm tra trên stack dev**
 
 Run: `docker compose up -d --build api` rồi mở http://localhost:8000/metrics
 Expected: thấy `http_requests_total`, `lms_jobs`, `lms_tutor_ttft_p95_ms`, `lms_email_outbox`, `lms_ai_tokens_1h`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend && git commit -m "feat(ops): Prometheus metrics for HTTP, jobs, tutor TTFT, email outbox and AI tokens"
