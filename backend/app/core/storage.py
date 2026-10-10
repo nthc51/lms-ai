@@ -66,7 +66,8 @@ class MinioStorage:
             "region": self.REGION,
         }
         self._internal = Minio(s.minio_endpoint, **kw)  # API và worker gọi trong mạng Docker
-        self._public = Minio(s.minio_public_endpoint, **kw)  # chỉ dùng để ký URL cho trình duyệt
+        # Trình duyệt đi qua Caddy (HTTPS ở production), API/worker gọi nội bộ (HTTP)
+        self._public = Minio(s.minio_public_endpoint, **{**kw, "secure": s.minio_public_secure})
         self._bucket = s.minio_bucket
 
     async def ensure_bucket(self) -> None:

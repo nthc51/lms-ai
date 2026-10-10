@@ -62,3 +62,20 @@ async def test_ensure_bucket_tolerates_concurrent_creation():
     s._internal = _RacingMinio("AccessDenied")
     with pytest.raises(S3Error):
         await s.ensure_bucket()
+
+
+async def test_public_endpoint_can_use_https_while_internal_stays_http():
+    from urllib.parse import urlsplit
+
+    from app.core.config import Settings
+    from app.core.storage import MinioStorage
+
+    s = Settings(
+        minio_endpoint="minio:9000",
+        minio_secure=False,
+        minio_public_endpoint="files.example.com",
+        minio_public_secure=True,
+    )
+    storage = MinioStorage(s)
+    url = await storage.presign_put("staging/pdf/u/a.pdf")
+    assert urlsplit(url).scheme == "https" and urlsplit(url).netloc == "files.example.com"

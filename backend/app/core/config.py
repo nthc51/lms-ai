@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     minio_secret_key: str = "minio12345"
     minio_bucket: str = "lms"
     minio_secure: bool = False
+    minio_public_secure: bool = False
 
     embed_provider: AIProvider = "fake"
     embed_model: str = "gemini-embedding-001"
