@@ -16,6 +16,12 @@ class InMemoryStorage:
         self.mimes[key] = mime
         return key
 
+    fail_ping = False
+
+    async def ping(self):
+        if self.fail_ping:
+            raise ConnectionError("minio giả bị tắt")
+
     async def presign_put(self, key, expires_s=900):
         return f"memory://put/{key}"
 

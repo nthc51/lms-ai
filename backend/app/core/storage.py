@@ -42,6 +42,7 @@ def download_headers(mime: str, download_name: str | None = None) -> dict[str, s
 
 
 class Storage(Protocol):
+    async def ping(self) -> None: ...
     async def presign_put(self, key: str, expires_s: int = 900) -> str: ...
     async def presign_get(
         self, key: str, mime: str, expires_s: int = 3600, download_name: str | None = None
@@ -79,6 +80,10 @@ class MinioStorage:
                     raise
 
         await asyncio.to_thread(run)
+
+    async def ping(self) -> None:
+        """Cho /ready: gọi MinIO thật (bucket_exists), lỗi mạng hoặc sai khóa sẽ ném exception."""
+        await asyncio.to_thread(self._internal.bucket_exists, self._bucket)
 
     async def presign_put(self, key: str, expires_s: int = 900) -> str:
         return await asyncio.to_thread(

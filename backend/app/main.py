@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
+from app.core.health import router as health_router
 from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, StrictCORSMiddleware
 from app.core.ratelimit import close_rate_limiter
 from app.core.storage import get_storage
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router)
     app.include_router(admin_router)
     app.include_router(studio_router)
+    app.include_router(health_router)
     return app
 
 
