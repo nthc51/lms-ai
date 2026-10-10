@@ -584,7 +584,7 @@ git add backend && git commit -m "feat(cache): versioned Redis JSON cache with f
 - Trang chi tiết cache **phần chung** của khóa (thông tin khóa và mục lục), **chỉ khi khóa đã publish**. Hai cờ `is_enrolled` và `is_owner` luôn được tính lại cho từng người, nên cùng một bản cache dùng được cho mọi người xem.
 - Mọi thao tác thay đổi khóa, chương hoặc bài học đều gọi `bump(COURSES_NS)`, **kể cả khi admin ẩn / hiện lại khóa**.
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_course_cache.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_course_cache.py`**
 
 ```python
 import uuid
@@ -686,12 +686,12 @@ async def test_admin_hide_and_unhide_take_effect_immediately(client, redis_cache
     assert await _titles(client) == ["Khóa vi phạm"]
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_course_cache.py -v`
 Expected: `test_catalog_served_from_cache_until_course_changes` FAIL (thấy "Đổi ngầm" vì chưa có cache). Riêng `test_admin_hide_and_unhide_take_effect_immediately` chỉ fail sau Step 3 nếu quên Step 4b. Các test còn lại có thể PASS ngay, vì chúng chỉ canh để không làm hỏng hành vi hiện có.
 
-- [ ] **Step 3: Sửa `app/modules/courses/service.py`**
+- [x] **Step 3: Sửa `app/modules/courses/service.py`**
 
 Thêm import ở đầu file:
 
@@ -771,9 +771,9 @@ async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> C
     return CourseDetail.model_validate({**base, "is_enrolled": enrolled, "is_owner": is_owner})
 ```
 
-- [ ] **Step 4: Router dùng bản có cache** (`app/modules/courses/router.py`): trong hàm `catalog`, đổi lời gọi `service.list_published(...)` thành `service.list_published_cached(...)`, giữ nguyên tham số.
+- [x] **Step 4: Router dùng bản có cache** (`app/modules/courses/router.py`): trong hàm `catalog`, đổi lời gọi `service.list_published(...)` thành `service.list_published_cached(...)`, giữ nguyên tham số.
 
-- [ ] **Step 4b: Admin ẩn / hiện lại khóa cũng xóa cache** (`app/modules/admin/service.py`)
+- [x] **Step 4b: Admin ẩn / hiện lại khóa cũng xóa cache** (`app/modules/admin/service.py`)
   - Import: `from app.modules.courses.service import invalidate_courses_cache` (đặt ngay dưới dòng import `app.modules.courses.models`).
   - Trong `hide_course` và `unhide_course`, thêm ngay **sau** `await db.commit()`:
 
@@ -781,12 +781,12 @@ async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> C
     await invalidate_courses_cache()  # khóa vào / ra khỏi catalog ngay, không chờ hết TTL
 ```
 
-- [ ] **Step 5: Chạy toàn bộ test**
+- [x] **Step 5: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
 Expected: PASS hết. Các test catalog cũ chạy với `NullCache` (vì `CACHE_ENABLED=false`) nên không bị cache giữa các test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend && git commit -m "perf(courses): cache catalog and course detail in Redis with version-bump invalidation"
