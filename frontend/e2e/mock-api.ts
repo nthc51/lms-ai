@@ -114,7 +114,8 @@ export async function mockApi(page: Page, opts: { user?: typeof student | typeof
     [`GET /lessons/${L2}`]: (r) => json(r, lesson(L2)),
     "GET /lessons/*/video": (r) => err(r, 404, "NOT_FOUND", "Video không tồn tại"),
     "PUT /lessons/*/progress": (r) => json(r, { status: "done", video_position_sec: 0, completed_at: "2026-10-01T00:00:00Z" }),
-    "GET /tutor/availability": (r) => json(r, { available: true, ready_chunks: 12, message: null }),
+    "GET /tutor/availability": (r) =>
+      json(r, { available: true, ready_chunks: 12, message: null, state: "ready", processing_docs: 0, can_queue: false }),
     "GET /tutor/sessions": (r) => json(r, { items: [], total: 0, page: 1, size: 20 }),
     "POST /tutor/sessions": (r) => json(r, { id: "s-1", course_id: COURSE_ID, lesson_id: L1, created_at: "2026-10-01T00:00:00Z" }, 201),
     "POST /tutor/sessions/s-1/messages": (r) => {
