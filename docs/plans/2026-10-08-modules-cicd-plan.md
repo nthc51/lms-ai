@@ -165,14 +165,14 @@ git commit -m "chore(api): enforce module boundaries with import-linter"
 - Move: `frontend/src/components/admin/feedback-list.tsx` → `frontend/src/components/tutor/feedback-list.tsx`
 - Modify: 5 file import hai component trên, `frontend/eslint.config.mjs`
 
-- [ ] **Bước 1: Chuyển file** (ở gốc repo)
+- [x] **Bước 1: Chuyển file** (ở gốc repo)
 
 ```bash
 git mv frontend/src/components/admin/filter-tabs.tsx frontend/src/components/ui/filter-tabs.tsx
 git mv frontend/src/components/admin/feedback-list.tsx frontend/src/components/tutor/feedback-list.tsx
 ```
 
-- [ ] **Bước 2: Sửa import** (nội dung hai file giữ nguyên, chỉ đổi đường dẫn ở nơi dùng)
+- [x] **Bước 2: Sửa import** (nội dung hai file giữ nguyên, chỉ đổi đường dẫn ở nơi dùng)
 
 | File | Dòng cũ → dòng mới |
 |---|---|
@@ -184,7 +184,7 @@ git mv frontend/src/components/admin/feedback-list.tsx frontend/src/components/t
 
 Kiểm tra không còn chỗ nào: `grep -rn "components/admin/filter-tabs\|components/admin/feedback-list" frontend/src frontend/e2e` → không in gì.
 
-- [ ] **Bước 3: Luật ESLint** (`eslint.config.mjs`): chèn khối dưới đây vào trong `defineConfig([...])`, ngay **sau** `...nextTs,` và **trước** dòng `// Override default ignores of eslint-config-next.`
+- [x] **Bước 3: Luật ESLint** (`eslint.config.mjs`): chèn khối dưới đây vào trong `defineConfig([...])`, ngay **sau** `...nextTs,` và **trước** dòng `// Override default ignores of eslint-config-next.`
 
 ```js
   // Ranh giới thư mục: phần dùng chung không được phụ thuộc một tính năng cụ thể,
@@ -243,7 +243,7 @@ Kiểm tra không còn chỗ nào: `grep -rn "components/admin/filter-tabs\|comp
 
 Hai khối cùng dùng rule `no-restricted-imports`: với file khớp cả hai khối thì khối sau ghi đè khối trước. Vì vậy khối thứ hai phải loại `lib`, `ui`, `app`, `content` ra (khối thứ nhất đã chặn rộng hơn cho các thư mục đó).
 
-- [ ] **Bước 4: Chạy** (trong `frontend/`)
+- [x] **Bước 4: Chạy** (trong `frontend/`)
 
 ```bash
 npx eslint src e2e && npx tsc --noEmit && npx vitest run
@@ -251,9 +251,9 @@ npx eslint src e2e && npx tsc --noEmit && npx vitest run
 
 Expected: sạch; 106 test pass.
 
-- [ ] **Bước 5: Thử vi phạm** (không commit): thêm vào `src/components/studio/study-tabs.tsx` dòng `import { UserTable as _U } from "@/components/admin/user-table";`, và vào cuối `src/lib/utils.ts` dòng `export { StudyTabs as _x } from "@/components/studio/study-tabs";`. Chạy `npx eslint src` → 2 lỗi `no-restricted-imports`. **Trả lại hai file** (`git checkout -- src/components/studio/study-tabs.tsx src/lib/utils.ts`).
+- [x] **Bước 5: Thử vi phạm** (không commit): thêm vào `src/components/studio/study-tabs.tsx` dòng `import { UserTable as _U } from "@/components/admin/user-table";`, và vào cuối `src/lib/utils.ts` dòng `export { StudyTabs as _x } from "@/components/studio/study-tabs";`. Chạy `npx eslint src` → 2 lỗi `no-restricted-imports`. **Trả lại hai file** (`git checkout -- src/components/studio/study-tabs.tsx src/lib/utils.ts`).
 
-- [ ] **Bước 6:** `npx playwright test` → 77 passed, 1 skipped. Commit:
+- [x] **Bước 6:** `npx playwright test` → 77 passed, 1 skipped. Commit:
 
 ```bash
 git add frontend && git commit -m "refactor(web): move shared filter tabs and tutor feedback list out of admin, enforce folder boundaries"
