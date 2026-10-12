@@ -1,5 +1,7 @@
 # Kiến trúc LMS-AI
 
+> Bản đồ các phần, quy tắc phụ thuộc và "sửa phần nào chạy gì": [modules.md](modules.md). ERD: [erd.md](erd.md).
+
 ## 1. Ngữ cảnh (C4 mức 1)
 
 ```mermaid
