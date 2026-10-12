@@ -151,3 +151,62 @@ def test_should_refuse():
     assert should_refuse(RetrievalResult([chunk], float("nan")), 0.3)
     assert should_refuse(RetrievalResult([chunk], None), 0.3)
     assert not should_refuse(RetrievalResult([chunk], 0.3), 0.3)
+
+
+# ---------- B2: hybrid (vector + full-text, RRF) ----------
+
+
+async def test_fulltext_finds_exact_term_that_vector_misses(db):
+    teacher = await make_user(db)
+    course, lesson, source = await _ready_lesson(db, teacher)
+    # 25 đoạn gần nghĩa hơn theo vector (che hết 20 ứng viên vector), đoạn chứa mã "QPSK-16" thì xa
+    for i in range(25):
+        await add_chunk(db, source, course, lesson, f"đoạn chung {i}", between(0, 1, 0.9 - i * 0.01))
+    target = await add_chunk(db, source, course, lesson, "Điều chế QPSK-16 dùng 4 pha", between(0, 2, 0.05))
+    emb = VectorEmbedder(unit_vector(0))
+    scope = SearchScope(course.id, lesson.id)
+
+    vector_only = await retrieve(db, emb, scope, "QPSK-16", top_k=6, mode="vector")
+    assert target.id not in [c.chunk_id for c in vector_only.chunks]
+    assert vector_only.has_fulltext_match is False
+
+    hybrid = await retrieve(db, emb, scope, "QPSK-16", top_k=6, mode="hybrid")
+    assert target.id in [c.chunk_id for c in hybrid.chunks] and hybrid.has_fulltext_match is True
+    assert len(hybrid.chunks) == 6
+
+
+async def test_fulltext_ignores_vietnamese_accents(db):
+    teacher = await make_user(db)
+    course, lesson, source = await _ready_lesson(db, teacher)
+    chunk = await add_chunk(db, source, course, lesson, "Định lý Nyquist về tốc độ lấy mẫu", unit_vector(5))
+    emb = VectorEmbedder(unit_vector(0))  # vector hoàn toàn khác: chỉ full-text tìm được
+    result = await retrieve(db, emb, SearchScope(course.id, lesson.id), "dinh ly nyquist", mode="hybrid")
+    assert [c.chunk_id for c in result.chunks] == [chunk.id] and result.has_fulltext_match is True
+    # similarity thấp nhưng có khớp full-text nên không bị chốt chặn từ chối
+    assert result.top_similarity < 0.3 and not should_refuse(result, 0.3)
+
+
+async def test_chunk_found_by_both_ranks_first(db):
+    teacher = await make_user(db)
+    course, lesson, source = await _ready_lesson(db, teacher)
+    vec_best = await add_chunk(db, source, course, lesson, "đoạn A", between(0, 1, 0.95))
+    both = await add_chunk(db, source, course, lesson, "mã hóa Huffman", between(0, 2, 0.9))
+    emb = VectorEmbedder(unit_vector(0))
+    result = await retrieve(db, emb, SearchScope(course.id, lesson.id), "Huffman", mode="hybrid")
+    assert [c.chunk_id for c in result.chunks] == [both.id, vec_best.id]
+    assert abs(result.top_similarity - 0.95) < 1e-5
+
+
+async def test_fulltext_respects_scope_and_ready_sources(db):
+    teacher = await make_user(db)
+    course, lesson, source = await _ready_lesson(db, teacher)
+    other_course, other_lesson, other_source = await _ready_lesson(db, teacher)
+    failed = await make_pdf_source(
+        db, InMemoryStorage(), teacher, lesson, b"%PDF-1.7", status=SourceStatus.failed
+    )
+    await add_chunk(db, other_source, other_course, other_lesson, "Huffman khóa khác", unit_vector(3))
+    await add_chunk(db, failed, course, lesson, "Huffman bản lỗi", unit_vector(3))
+    await add_chunk(db, source, course, lesson, "Huffman đúng", unit_vector(3))
+    emb = VectorEmbedder(unit_vector(0))
+    result = await retrieve(db, emb, SearchScope(course.id, lesson.id), "Huffman", mode="hybrid")
+    assert [c.content for c in result.chunks] == ["Huffman đúng"]

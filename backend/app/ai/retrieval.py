@@ -1,16 +1,19 @@
 """Tìm đoạn tài liệu cho AI Tutor.
 
-A5 (tuần 2): chỉ vector (cosine top-k). B2 (tuần 3) thay phần thân retrieve() bằng hybrid (vector top-20 +
-full-text top-20, gộp RRF, giữ top-6) mà không đổi chữ ký: caller chỉ dùng SearchScope, RetrievalResult
-và should_refuse; B2 điền thêm has_fulltext_match."""
+Hybrid (B2, spec 5.3 bước 2): vector top-20 (cosine) + full-text top-20 (`websearch_to_tsquery` trên cột `tsv`
+đã bỏ dấu), gộp bằng Reciprocal Rank Fusion: điểm = Σ 1/(60 + hạng), giữ top_k. Full-text bắt được thuật ngữ,
+mã số, tên riêng mà vector dễ bỏ sót; gõ không dấu vẫn khớp nhờ `immutable_unaccent`.
+RETRIEVAL_MODE=vector quay về chỉ vector (benchmark dùng để so sánh)."""
 
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 
 from sqlalchemy import ColumnElement, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.embedder import Embedder
+from app.core.config import get_settings
 from app.modules.courses.models import Course, CourseStatus, Lesson
 from app.modules.materials.models import Chunk, Source, SourceStatus
 
@@ -39,7 +42,7 @@ class RetrievedChunk:
 class RetrievalResult:
     chunks: list[RetrievedChunk]  # đã xếp hạng, tốt nhất trước
     top_similarity: float | None  # cosine cao nhất; None khi không có chunk nào
-    has_fulltext_match: bool = False  # A5 chỉ tìm vector nên luôn False; B2 điền giá trị thật
+    has_fulltext_match: bool = False  # có đoạn khớp full-text (chế độ vector: luôn False)
 
 
 def scope_filter(scope: SearchScope, embedding_model: str) -> list[ColumnElement[bool]]:
@@ -61,13 +64,61 @@ def scope_filter(scope: SearchScope, embedding_model: str) -> list[ColumnElement
     return conds
 
 
+CANDIDATES = 20  # số ứng viên lấy từ mỗi nhánh trước khi gộp
+RRF_K = 60
+RetrievalMode = Literal["hybrid", "vector"]
+
+
+def _scoped(stmt, scope: SearchScope, embedding_model: str):
+    return (
+        stmt.join(Source, Source.id == Chunk.source_id)
+        .join(Course, Course.id == Chunk.course_id)
+        .where(*scope_filter(scope, embedding_model))
+    )
+
+
+def _tsquery(query: str):
+    return func.websearch_to_tsquery(text("'simple'::regconfig"), func.immutable_unaccent(query))
+
+
 async def retrieve(
-    db: AsyncSession, embedder: Embedder, scope: SearchScope, query: str, *, top_k: int = 6
+    db: AsyncSession,
+    embedder: Embedder,
+    scope: SearchScope,
+    query: str,
+    *,
+    top_k: int = 6,
+    mode: RetrievalMode | None = None,
 ) -> RetrievalResult:
+    mode = mode or get_settings().retrieval_mode
     vector = await embedder.embed_query(query)
     distance = Chunk.embedding.cosine_distance(vector)
-    # pgvector ≥ 0.8: HNSW có lọc WHERE quét tiếp cho đủ top_k thay vì trả thiếu (ef_search mặc định 40)
+    # pgvector ≥ 0.8: HNSW có lọc WHERE quét tiếp cho đủ số ứng viên thay vì trả thiếu (ef_search mặc định 40)
     await db.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
+    vector_ids = list(
+        await db.scalars(
+            _scoped(select(Chunk.id), scope, embedder.model)
+            .order_by(distance, Chunk.id)
+            .limit(CANDIDATES if mode == "hybrid" else top_k)
+        )
+    )
+    text_ids: list = []
+    if mode == "hybrid":
+        tsq = _tsquery(query)
+        text_ids = list(
+            await db.scalars(
+                _scoped(select(Chunk.id), scope, embedder.model)
+                .where(Chunk.tsv.op("@@")(tsq))
+                .order_by(func.ts_rank_cd(Chunk.tsv, tsq).desc(), Chunk.id)
+                .limit(CANDIDATES)
+            )
+        )
+    scores: dict = {}
+    for ranked in (vector_ids, text_ids):
+        for rank, cid in enumerate(ranked, 1):
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (RRF_K + rank)
+    if not scores:
+        return RetrievalResult(chunks=[], top_similarity=None, has_fulltext_match=False)
     rows = (
         await db.execute(
             select(
@@ -80,12 +131,8 @@ async def retrieve(
                 Chunk.start_sec,
                 (1 - distance).label("similarity"),
             )
-            .join(Source, Source.id == Chunk.source_id)
-            .join(Course, Course.id == Chunk.course_id)
             .join(Lesson, Lesson.id == Chunk.lesson_id)
-            .where(*scope_filter(scope, embedder.model))
-            .order_by(distance)
-            .limit(top_k)
+            .where(Chunk.id.in_(list(scores)))
         )
     ).all()
     chunks = [
@@ -101,7 +148,14 @@ async def retrieve(
         )
         for r in rows
     ]
-    return RetrievalResult(chunks=chunks, top_similarity=chunks[0].similarity if chunks else None)
+    # RRF cao trước; bằng điểm thì gần nghĩa hơn trước
+    chunks.sort(key=lambda c: (-scores[c.chunk_id], -c.similarity))
+    chunks = chunks[:top_k]
+    return RetrievalResult(
+        chunks=chunks,
+        top_similarity=max((c.similarity for c in chunks), default=None),
+        has_fulltext_match=bool(text_ids),
+    )
 
 
 async def count_ready_chunks(db: AsyncSession, scope: SearchScope, embedding_model: str) -> int:
@@ -115,7 +169,7 @@ async def count_ready_chunks(db: AsyncSession, scope: SearchScope, embedding_mod
 
 def should_refuse(result: RetrievalResult, threshold: float) -> bool:
     """Chốt chặn trước LLM (spec 5.3 bước 3): không có chunk nào, hoặc similarity cao nhất < τ và không có
-    kết quả full-text. A5: has_fulltext_match luôn False nên chỉ còn điều kiện similarity.
+    kết quả full-text (full-text khớp nghĩa là mọi từ của câu hỏi đều có trong tài liệu).
     Viết dạng `not (x >= τ)` để similarity None hoặc NaN cũng bị từ chối."""
     if not result.chunks:
         return True

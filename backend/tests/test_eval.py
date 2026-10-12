@@ -114,6 +114,10 @@ def test_dataset_validation(tmp_path):
 def test_parse_grid():
     assert parse_grid("", 6, 700) == [Config(6, 700)]
     assert parse_grid("top_k=4,8;chunk=500", 6, 700) == [Config(4, 500), Config(8, 500)]
+    assert parse_grid("mode=hybrid,vector", 6, 700) == [Config(6, 700, "hybrid"), Config(6, 700, "vector")]
+    assert Config(6, 700, "vector").label == "top_k=6, chunk=700, mode=vector"
+    with pytest.raises(ValueError):
+        parse_grid("mode=bm25", 6, 700)
     with pytest.raises(ValueError, match="Lưới cấu hình sai"):
         parse_grid("topk=4", 6, 700)
 

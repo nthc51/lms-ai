@@ -2,7 +2,7 @@
 
     cd backend
     uv run python -m eval.run --pdf eval/datasets/giai-tich.pdf --dataset eval/datasets/giai-tich.jsonl \\
-        --grid "top_k=4,6,8;chunk=500,700" --rpm 12
+        --grid "top_k=4,6,8;chunk=500,700;mode=hybrid,vector" --rpm 12
 
 Dùng DB, provider AI và model trong .env (LLM_PROVIDER=gemini để chạy thật). Kết quả: eval/results/<thời điểm>/
 report.md, report.html, results.json. Kết quả từng câu được cache ở eval/results/cache.jsonl: chạy lại chỉ tốn
@@ -28,7 +28,7 @@ RESULTS = Path(__file__).parent / "results"
 async def main(args: argparse.Namespace) -> Path:
     s = get_settings()
     questions = load_dataset(args.dataset)
-    configs = parse_grid(args.grid, s.tutor_top_k, s.chunk_max_tokens)
+    configs = parse_grid(args.grid, s.tutor_top_k, s.chunk_max_tokens, s.retrieval_mode)
     judge_model = args.judge_model or s.llm_model
     runs = await run_grid(
         pdf=args.pdf,
@@ -63,7 +63,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--pdf", required=True)
     p.add_argument("--dataset", required=True)
     p.add_argument(
-        "--grid", default="", help='vd. "top_k=4,6,8;chunk=500,700" (bỏ trống = cấu hình hiện tại)'
+        "--grid",
+        default="",
+        help='vd. "top_k=4,6,8;chunk=500,700;mode=hybrid,vector" (bỏ trống = cấu hình hiện tại)',
     )
     p.add_argument(
         "--threshold", type=float, default=None, help="ngưỡng từ chối τ (mặc định TUTOR_REFUSE_THRESHOLD)"

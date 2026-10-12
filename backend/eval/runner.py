@@ -34,22 +34,32 @@ Sleep = Callable[[float], Awaitable[None]]
 class Config:
     top_k: int
     chunk_max_tokens: int
+    mode: str = "hybrid"  # cách tìm đoạn: hybrid | vector
 
     @property
     def label(self) -> str:
-        return f"top_k={self.top_k}, chunk={self.chunk_max_tokens}"
+        label = f"top_k={self.top_k}, chunk={self.chunk_max_tokens}"
+        return label if self.mode == "hybrid" else f"{label}, mode={self.mode}"
 
 
-def parse_grid(spec: str, default_top_k: int, default_chunk: int) -> list[Config]:
-    """ "top_k=4,6,8;chunk=500,700" → mọi tổ hợp. Thiếu khóa nào thì dùng giá trị hiện tại trong .env."""
-    values = {"top_k": [default_top_k], "chunk": [default_chunk]}
+def parse_grid(
+    spec: str, default_top_k: int, default_chunk: int, default_mode: str = "hybrid"
+) -> list[Config]:
+    """ "top_k=4,6,8;chunk=500,700;mode=hybrid,vector" → mọi tổ hợp. Thiếu khóa nào thì dùng giá trị trong .env."""
+    values: dict[str, list] = {"top_k": [default_top_k], "chunk": [default_chunk], "mode": [default_mode]}
     for part in filter(None, (p.strip() for p in spec.split(";"))):
         key, _, raw = part.partition("=")
         key = key.strip()
         if key not in values or not raw.strip():
-            raise ValueError(f"Lưới cấu hình sai ở '{part}' (chỉ nhận top_k=..., chunk=...)")
-        values[key] = [int(x) for x in raw.split(",") if x.strip()]
-    return [Config(k, c) for c in values["chunk"] for k in values["top_k"]]
+            raise ValueError(f"Lưới cấu hình sai ở '{part}' (chỉ nhận top_k=..., chunk=..., mode=...)")
+        items = [x.strip() for x in raw.split(",") if x.strip()]
+        if key == "mode":
+            if any(m not in ("hybrid", "vector") for m in items):
+                raise ValueError(f"mode chỉ nhận hybrid hoặc vector: '{part}'")
+            values[key] = items
+        else:
+            values[key] = [int(x) for x in items]
+    return [Config(k, c, m) for m in values["mode"] for c in values["chunk"] for k in values["top_k"]]
 
 
 class Verdict(BaseModel):
@@ -73,7 +83,7 @@ async def answer_once(
 ) -> tuple[QuestionResult, list[RetrievedChunk], str]:
     start = time.perf_counter()
     async with session_factory() as db:
-        found = await retrieve(db, embedder, corpus.scope, q.question, top_k=cfg.top_k)
+        found = await retrieve(db, embedder, corpus.scope, q.question, top_k=cfg.top_k, mode=cfg.mode)
     prompt = load_prompt("tutor_answer").render(
         course_title=corpus.course_title, context=format_context(found.chunks), question=q.question
     )
@@ -129,6 +139,7 @@ def cache_key(corpus: Corpus, q: EvalQuestion, cfg: Config, llm_model: str, judg
         q.model_dump_json(),
         str(cfg.top_k),
         str(cfg.chunk_max_tokens),
+        cfg.mode,
         llm_model,
         judge_model,
         load_prompt("tutor_answer").prompt_version,
