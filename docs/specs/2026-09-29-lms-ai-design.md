@@ -29,9 +29,9 @@
 
 ### Tầng B: mức "Khá" (tuần 3)
 
-- [ ] B1. Quiz nâng cao: tính giờ, xáo trộn, làm lại nhiều lần, autosave, cron chốt bài khi hết giờ
-- [ ] B2. Hybrid search (full-text + vector, RRF)
-- [ ] B3. AI giải thích câu học viên làm sai
+- [x] B1. Quiz nâng cao: tính giờ, xáo trộn, làm lại nhiều lần, autosave, cron chốt bài khi hết giờ (xáo thứ tự câu hỏi; chưa xáo phương án)
+- [x] B2. Hybrid search (full-text + vector, RRF)
+- [x] B3. AI giải thích câu học viên làm sai (dùng chung qua `llm_cache`, lưu ở `attempt_answers.ai_explanation`; không tạo bảng `explanation_cache`)
 - [ ] B4. Thảo luận theo bài học (2 cấp)
 - [ ] B5. Assignment + AI gợi ý chấm theo rubric, giáo viên xác nhận
 - [ ] B6. Thông báo realtime (SSE)
@@ -768,3 +768,4 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-12 | Thêm provider `openrouter` cho LLM, vision, embedding (API kiểu OpenAI); embedding gửi `dimensions`, cắt về `EMBED_DIM` rồi chuẩn hóa; script `reembed` (đổi model nhúng) và `check_openrouter` |
 | 2026-10-12 | AI Tutor: `availability` có `state` (ready/processing/model_mismatch/failed/empty/draft); lúc tài liệu đang xử lý vẫn gửi được câu hỏi (`waiting_for_docs`, tối đa 5 câu/phiên), job `tutor_waiting` sau `ingest_pdf` + cron 5 phút trả lời bằng đúng luồng Tutor, nhận câu bằng UPDATE có điều kiện, câu trả lời ghi `created_at` của câu hỏi |
 | 2026-10-12 | Trích PDF: chèn lại dấu cách bị mất ở PDF xuất từ slide (hai ký tự cách nhau > 10% cỡ chữ mà không có dấu cách); script `reprocess_pdfs` xử lý lại hàng loạt; `app.scripts.lock_user` khóa/mở khóa tài khoản bằng lệnh (kể cả admin, không khóa admin cuối cùng) |
+| 2026-10-12 | B1: `time_limit_sec` (60 giây – 4 giờ) và `shuffle` khi tạo/sửa quiz (null tường minh = bỏ giới hạn); `deadline_at` theo giờ DB, `server_now` trong bài làm để đồng hồ không lệch; quá `deadline_at + 5s` thì lưu/nộp bị từ chối và bài chốt `timed_out` với đáp án đã autosave; chốt khi có thao tác trên bài + cron mỗi phút. B2: hybrid vector top-20 + full-text top-20 gộp RRF (k=60), `RETRIEVAL_MODE=vector` để so sánh, benchmark có `mode=`. B3: `POST /attempts/{id}/answers/{qid}/explain` sau khi nộp, chỉ câu sai/bỏ trống, 30 lần/giờ/học viên, lỗi AI → 503 |
