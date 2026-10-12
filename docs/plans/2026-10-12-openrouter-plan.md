@@ -604,7 +604,7 @@ class OpenRouterEmbedder:
 - Modify: `backend/app/core/config.py`, `backend/.env.example`
 - Modify: `backend/app/ai/llm.py`, `vision.py`, `embedder.py`
 
-- [ ] **Bước 1: Cấu hình** (validator đổi tên thành `_require_provider_keys`, kiểm cả hai loại key)
+- [x] **Bước 1: Cấu hình** (validator đổi tên thành `_require_provider_keys`, kiểm cả hai loại key)
 
 ```diff
 --- a/backend/app/core/config.py
@@ -683,7 +683,7 @@ class OpenRouterEmbedder:
  LLM_CHEAP_MODEL=gemini-3.5-flash-lite
 ```
 
-- [ ] **Bước 2: Factory**
+- [x] **Bước 2: Factory**
 
 ```diff
 --- a/backend/app/ai/llm.py
