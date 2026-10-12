@@ -29,7 +29,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 - Modify: `backend/app/ingestion/extract.py`
 - Test: `backend/tests/test_spacing.py`
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 PDF thử dựng như slide: mỗi từ đặt ở một vị trí, cách nhau 2pt ở cỡ chữ 14 (MuPDF không tự chèn dấu cách ở khoảng này), xen chữ đậm. Test cuối chạy qua `extract_pages` để chắc chắn đường xử lý thật dùng bản đã sửa.
 
@@ -111,7 +111,7 @@ async def test_extract_pages_returns_spaced_text():
 
 Chạy: `cd backend; uv run pytest tests/test_spacing.py -q` → fail (ImportError).
 
-- [ ] **Bước 2: `app/ingestion/spacing.py`**
+- [x] **Bước 2: `app/ingestion/spacing.py`**
 
 ```python
 """Chèn lại dấu cách bị mất khi trích chữ PDF.
@@ -229,7 +229,7 @@ Ghi chú:
 - Chỉ thay **cả chuỗi dính** đứng riêng (`(?<!\w)` … `(?!\w)`): chữ "anh" thật ở chỗ khác không bị tách thành "an h" dù trang có cặp "an" + "h" dính (có test).
 - Chuẩn hóa Unicode NFC trước khi so khớp (có PDF lưu chữ có dấu dạng tổ hợp).
 
-- [ ] **Bước 3: Dùng trong `extract.py`**
+- [x] **Bước 3: Dùng trong `extract.py`**
 
 ```diff
 --- a/backend/app/ingestion/extract.py
@@ -259,7 +259,7 @@ Ghi chú:
  
 ```
 
-- [ ] **Bước 4: Chạy test**
+- [x] **Bước 4: Chạy test**
 
 ```powershell
 uv run pytest tests/test_spacing.py tests/test_extract.py tests/test_pipeline.py -q
@@ -268,7 +268,7 @@ uv run ruff check . ; uv run ruff format --check . ; uv run lint-imports
 
 Kỳ vọng: pass hết; sạch.
 
-- [ ] **Bước 5: Commit**
+- [x] **Bước 5: Commit**
 
 ```powershell
 git add backend
