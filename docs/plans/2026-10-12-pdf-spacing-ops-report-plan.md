@@ -531,7 +531,7 @@ git commit -m "feat(ops): lệnh khóa tài khoản và xử lý lại PDF hàng
 - Modify: `docs/specs/2026-09-29-lms-ai-design.md`
 - Add (đã có sẵn trong repo, chưa commit): `docs/report/**`
 
-- [ ] **Bước 1: Spec**
+- [x] **Bước 1: Spec**
 
 ```diff
 --- a/docs/specs/2026-09-29-lms-ai-design.md
@@ -579,7 +579,7 @@ git commit -m "feat(ops): lệnh khóa tài khoản và xử lý lại PDF hàng
 +| 2026-10-12 | Trích PDF: chèn lại dấu cách bị mất ở PDF xuất từ slide (hai ký tự cách nhau > 10% cỡ chữ mà không có dấu cách); script `reprocess_pdfs` xử lý lại hàng loạt; `app.scripts.lock_user` khóa/mở khóa tài khoản bằng lệnh (kể cả admin, không khóa admin cuối cùng) |
 ```
 
-- [ ] **Bước 2: Báo cáo.** Thư mục `docs/report/` đã được chép sẵn vào repo (chưa commit): `README.md`, `00-mo-dau.md` … `05-ket-luan.md`, `build/` (`build.py`, `numbering.lua`, `mermaid.json`), `figures/so-do-01.png` … `so-do-06.png`, `bao-cao-do-an.docx`. Không sửa nội dung; chỉ kiểm tra `git status` thấy đúng các file này rồi commit.
+- [x] **Bước 2: Báo cáo.** Thư mục `docs/report/` đã được chép sẵn vào repo (chưa commit): `README.md`, `00-mo-dau.md` … `05-ket-luan.md`, `build/` (`build.py`, `numbering.lua`, `mermaid.json`), `figures/so-do-01.png` … `so-do-06.png`, `bao-cao-do-an.docx`. Không sửa nội dung; chỉ kiểm tra `git status` thấy đúng các file này rồi commit.
 
 ```powershell
 git add docs
