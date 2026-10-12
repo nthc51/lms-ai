@@ -2555,7 +2555,7 @@ Seed dữ liệu trên production **chỉ khi chưa có ai dùng thật**: `./in
 **Files:**
 - Create: `docs/security/owasp-top10.md`
 
-- [ ] **Step 1: Viết `docs/security/owasp-top10.md`**
+- [x] **Step 1: Viết `docs/security/owasp-top10.md`**
 
 Trước khi viết, Claude Code phải **đối chiếu từng dòng với code thật** (dùng grep): mỗi ô "Ở đâu" phải trỏ đúng file hoặc test đang tồn tại. Chỗ nào chưa làm thì ghi "Chưa", không được ghi là đã làm.
 
@@ -2576,7 +2576,7 @@ Trước khi viết, Claude Code phải **đối chiếu từng dòng với code
 | A10 | Server-Side Request Forgery | Server không tải URL do người dùng nhập; chỉ gọi MinIO, Gemini và SMTP qua địa chỉ cấu hình sẵn | — | Không áp dụng |
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/security && git commit -m "docs(security): OWASP Top 10 review mapped to code and tests"
