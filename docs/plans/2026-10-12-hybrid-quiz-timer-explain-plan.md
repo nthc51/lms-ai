@@ -1890,8 +1890,8 @@ git commit -m "feat(web): đồng hồ làm quiz và tự nộp khi hết giờ,
      const confirm = page.getByRole("alertdialog");
 ```
 
-- [ ] Chạy `npx playwright test e2e/quiz.spec.ts e2e/teacher-quiz.spec.ts` rồi cả bộ `npx playwright test` → pass (88 lượt: 87 pass + 1 bỏ qua có chủ ý).
-- [ ] Commit: `git add frontend/e2e; git commit -m "test(e2e): quiz có giờ tự nộp, AI giải thích câu sai, cài đặt thời gian quiz"`.
+- [x] Chạy `npx playwright test e2e/quiz.spec.ts e2e/teacher-quiz.spec.ts` rồi cả bộ `npx playwright test` → pass (88 lượt: 87 pass + 1 bỏ qua có chủ ý).
+- [x] Commit: `git add frontend/e2e; git commit -m "test(e2e): quiz có giờ tự nộp, AI giải thích câu sai, cài đặt thời gian quiz"`.
 
 ---
 
