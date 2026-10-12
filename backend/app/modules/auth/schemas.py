@@ -40,6 +40,17 @@ class ResendVerificationIn(BaseModel):
     normalize_email = field_validator("email")(_lower)
 
 
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+    normalize_email = field_validator("email")(_lower)
+
+
+class ResetPasswordIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

@@ -58,12 +58,12 @@ class RefreshToken(IdMixin, TimestampMixin, Base):
 
 
 class EmailToken(IdMixin, TimestampMixin, Base):
-    """Token một lần gửi qua email (hiện chỉ dùng để xác nhận email). Chỉ lưu hash, giống refresh token."""
+    """Token một lần gửi qua email (xác nhận email, đặt lại mật khẩu). Chỉ lưu hash, giống refresh token."""
 
     __tablename__ = "email_tokens"
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    purpose: Mapped[str] = mapped_column(String(20))  # verify_email
+    purpose: Mapped[str] = mapped_column(String(20))  # verify_email | reset_password
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

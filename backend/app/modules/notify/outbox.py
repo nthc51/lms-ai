@@ -58,7 +58,7 @@ CLAIM_LEASE = timedelta(minutes=5)
 RETRY_BACKOFF = timedelta(minutes=1)  # lỗi lần n thì chờ n phút rồi thử lại
 REDACTED = "[Nội dung đã xóa sau khi gửi]"
 # Email chứa link một lần (token thật): xóa nội dung sau khi gửi để DB không giữ token dạng rõ.
-SECRET_TEMPLATES = frozenset({"verify_email"})
+SECRET_TEMPLATES = frozenset({"verify_email", "reset_password"})
 
 
 async def _claim(session_factory: async_sessionmaker) -> tuple[EmailOutbox, int] | None:

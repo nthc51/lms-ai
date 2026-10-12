@@ -9,9 +9,11 @@ from app.core.ratelimit import RateLimiter, get_rate_limiter
 from app.modules.auth import service
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
+    ForgotPasswordIn,
     LoginIn,
     RegisterIn,
     ResendVerificationIn,
+    ResetPasswordIn,
     TokenOut,
     UserOut,
     VerifyEmailIn,
@@ -40,6 +42,8 @@ def set_refresh_cookie(response: Response, raw: str) -> None:
 REGISTER_IP_LIMIT = 20  # mỗi IP tối đa 20 lần đăng ký / giờ (mỗi lần đăng ký gửi một email)
 RESEND_LIMIT = 3  # mỗi email tối đa 3 lần / giờ
 RESEND_IP_LIMIT = 10  # mỗi IP tối đa 10 lần / giờ (chặn spam nhiều email khác nhau)
+RESET_LIMIT = 3  # quên mật khẩu: mỗi email tối đa 3 lần / giờ
+RESET_IP_LIMIT = 10  # và mỗi IP tối đa 10 lần / giờ
 
 
 def _too_many(wait: int) -> AppError:
@@ -104,6 +108,34 @@ async def resend_verification(
     if await service.resend_verification(db, data.email):
         await kicker.kick()
     return {"status": "accepted"}
+
+
+@router.post("/auth/forgot-password", status_code=202)
+async def forgot_password(
+    data: ForgotPasswordIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+    kicker: MailKicker = Depends(get_mail_kicker),
+) -> dict:
+    """Gửi link đặt lại mật khẩu. Luôn 202 (không lộ email nào đã đăng ký). 429 RATE_LIMITED khi quá 3 lần/giờ
+    cho một email hoặc quá 10 lần/giờ từ một IP."""
+    await _limit(limiter, f"pwd-reset-ip:{_ip(request)}", RESET_IP_LIMIT)
+    await _limit(limiter, f"pwd-reset:{data.email}", RESET_LIMIT)
+    if await service.forgot_password(db, data.email):
+        await kicker.kick()
+    return {"status": "accepted"}
+
+
+@router.post("/auth/reset-password", response_model=UserOut)
+async def reset_password(
+    data: ResetPasswordIn, db: AsyncSession = Depends(get_db), kicker: MailKicker = Depends(get_mail_kicker)
+):
+    """Đặt mật khẩu mới. 400 INVALID_TOKEN (sai / đã dùng / đã thay bằng link mới) hoặc TOKEN_EXPIRED;
+    403 ACCOUNT_LOCKED. Thành công thì mọi phiên đăng nhập cũ bị thu hồi."""
+    user = await service.reset_password(db, data.token, data.password)
+    await kicker.kick()  # giảng viên chưa xác nhận email vừa xác nhận qua link này: báo admin
+    return user
 
 
 @router.post("/me/teacher-request", response_model=UserOut)

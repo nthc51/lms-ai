@@ -20,6 +20,7 @@ from app.modules.notify import templates
 from app.modules.notify.outbox import queue_email
 
 VERIFY = "verify_email"
+RESET = "reset_password"
 
 
 def _email_taken() -> AppError:
@@ -196,13 +197,20 @@ async def verify_email(db: AsyncSession, raw: str) -> User:
     if token.expires_at <= utcnow():
         raise AppError("TOKEN_EXPIRED", "Link xác nhận đã hết hạn, hãy gửi lại email xác nhận", 400)
     token.used_at = utcnow()
+    await _mark_email_verified(db, user)
+    await db.commit()
+    return user
+
+
+async def _mark_email_verified(db: AsyncSession, user: User) -> None:
+    """Đánh dấu email đã xác nhận (nếu chưa). Giảng viên đang chờ duyệt thì lúc này mới báo admin: chỉ báo khi
+    email đã thật; tắt bắt buộc xác nhận thì đã báo lúc đăng ký rồi."""
+    if user.email_verified_at is not None:
+        return
     user.email_verified_at = utcnow()
-    # chỉ báo admin khi email đã thật; tắt bắt buộc xác nhận thì đã báo lúc đăng ký rồi
     required = get_settings().email_verification_required
     if required and user.role == Role.teacher and user.teacher_status == TeacherStatus.pending:
         await notify_admins_pending_teacher(db, user)
-    await db.commit()
-    return user
 
 
 async def resend_verification(db: AsyncSession, email: str) -> bool:
@@ -213,6 +221,62 @@ async def resend_verification(db: AsyncSession, email: str) -> bool:
     await _issue_verify_token(db, user)
     await db.commit()
     return True
+
+
+async def forgot_password(db: AsyncSession, email: str) -> bool:
+    """Gửi link đặt lại mật khẩu. Trả True nếu có gửi; API luôn trả 202 để không lộ email nào đã đăng ký.
+    Tài khoản bị khóa không nhận link (đặt lại mật khẩu không mở khóa được)."""
+    user = await db.scalar(select(User).where(User.email == email.lower()))
+    if user is None or user.locked_at is not None:
+        return False
+    s = get_settings()
+    # link cũ chưa dùng hết hiệu lực ngay: chỉ link mới nhất dùng được
+    await db.execute(
+        update(EmailToken)
+        .where(EmailToken.user_id == user.id, EmailToken.purpose == RESET, EmailToken.used_at.is_(None))
+        .values(used_at=utcnow())
+    )
+    raw, hashed = new_refresh_token()
+    db.add(
+        EmailToken(
+            user_id=user.id,
+            purpose=RESET,
+            token_hash=hashed,
+            expires_at=utcnow() + timedelta(minutes=s.reset_token_minutes),
+        )
+    )
+    url = f"{s.app_base_url}/reset-password?token={raw}"
+    queue_email(db, user.email, RESET, templates.reset_password(user.full_name, url, s.reset_token_minutes))
+    await db.commit()
+    return True
+
+
+async def reset_password(db: AsyncSession, raw: str, password: str) -> User:
+    """Đặt mật khẩu mới bằng link trong email: link dùng một lần, thu hồi MỌI phiên đăng nhập cũ (ai đang giữ
+    phiên bằng mật khẩu cũ đều bị đăng xuất). Bấm link trong email cũng là đã chứng minh sở hữu hộp thư nên
+    email được coi là đã xác nhận."""
+    token = await db.scalar(
+        select(EmailToken)
+        .where(EmailToken.token_hash == hash_refresh_token(raw), EmailToken.purpose == RESET)
+        .with_for_update()
+    )
+    if token is None or token.used_at is not None:
+        raise AppError("INVALID_TOKEN", "Link đặt lại mật khẩu không hợp lệ hoặc đã được dùng", 400)
+    if token.expires_at <= utcnow():
+        raise AppError("TOKEN_EXPIRED", "Link đặt lại mật khẩu đã hết hạn, hãy yêu cầu link mới", 400)
+    user = await db.get(User, token.user_id)
+    if user is None or user.locked_at is not None:
+        raise AppError("ACCOUNT_LOCKED", "Tài khoản đã bị khóa", 403)
+    token.used_at = utcnow()
+    user.password_hash = hash_password(password)
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=utcnow())
+    )
+    await _mark_email_verified(db, user)
+    await db.commit()
+    return user
 
 
 async def request_teacher_review(db: AsyncSession, user: User) -> User:

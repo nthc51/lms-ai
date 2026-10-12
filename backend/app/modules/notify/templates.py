@@ -39,6 +39,24 @@ def verify_email(name: str, url: str, hours: int) -> Mail:
     return subject, text, html
 
 
+def reset_password(name: str, url: str, minutes: int) -> Mail:
+    subject = "Đặt lại mật khẩu LMS-AI"
+    text = (
+        f"Chào {name},\n\nBấm link sau để đặt mật khẩu mới (hiệu lực {minutes} phút, dùng được một lần):\n{url}\n\n"
+        "Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này: mật khẩu hiện tại vẫn giữ nguyên."
+    )
+    html = _html(
+        "Đặt lại mật khẩu",
+        [
+            f"Chào {escape(name)},",
+            f"Bấm nút dưới đây để đặt mật khẩu mới. Link có hiệu lực {minutes} phút và chỉ dùng được một lần.",
+            "Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này: mật khẩu hiện tại vẫn giữ nguyên.",
+        ],
+        ("Đặt mật khẩu mới", url),
+    )
+    return subject, text, html
+
+
 def teacher_approved(name: str, url: str) -> Mail:
     subject = "Tài khoản giảng viên đã được duyệt"
     text = f"Chào {name},\n\nTài khoản giảng viên của bạn đã được duyệt. Bạn có thể tạo khóa học ngay:\n{url}"

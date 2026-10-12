@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     # Bắt buộc bấm link xác nhận email trước khi đăng nhập được.
     email_verification_required: bool = True
     verify_token_hours: int = 24
+    reset_token_minutes: int = 60  # hiệu lực link đặt lại mật khẩu
     # SMTP. Mặc định trỏ vào Mailpit (docker compose) để dev không gửi mail thật; chạy thật thì dùng Brevo.
     smtp_host: str = "localhost"
     smtp_port: int = 1025
