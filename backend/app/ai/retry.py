@@ -1,4 +1,4 @@
-"""Retry dùng chung cho các lời gọi Gemini: chỉ thử lại khi 429, 5xx hoặc timeout."""
+"""Retry dùng chung cho các lời gọi AI (Gemini, OpenRouter): chỉ thử lại khi 429, 5xx hoặc timeout."""
 
 import asyncio
 import logging
@@ -21,7 +21,13 @@ MAX_RETRY_AFTER_S = 60.0
 def _status_code(exc: BaseException) -> int | None:
     from google.genai import errors
 
-    return exc.code if isinstance(exc, errors.APIError) else None
+    from app.ai.openrouter import OpenRouterError
+
+    if isinstance(exc, errors.APIError):
+        return exc.code
+    if isinstance(exc, OpenRouterError):
+        return exc.status_code
+    return None
 
 
 def is_retryable(exc: BaseException) -> bool:

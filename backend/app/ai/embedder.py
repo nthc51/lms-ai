@@ -160,9 +160,22 @@ def get_embedder(s: Settings) -> Embedder:
             batch_size=s.embed_batch_size,
             tpm_limit=s.embed_tpm_limit,
         )
+    if s.embed_provider == "openrouter":
+        from app.ai.openrouter import OpenRouterEmbedder
+
+        return OpenRouterEmbedder(
+            s.openrouter_api_key,
+            s.embed_model,
+            s.embed_dim,
+            s.openrouter_base_url,
+            timeout_s=s.embed_timeout_s,
+            batch_size=s.embed_batch_size,
+        )
     if s.embed_provider == "fake":
         return FakeEmbedder(s.embed_dim)
-    raise ValueError(f"EMBED_PROVIDER không hợp lệ: {s.embed_provider!r} (chỉ nhận fake | gemini)")
+    raise ValueError(
+        f"EMBED_PROVIDER không hợp lệ: {s.embed_provider!r} (chỉ nhận fake | gemini | openrouter)"
+    )
 
 
 @lru_cache

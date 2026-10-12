@@ -58,6 +58,14 @@ class GeminiVision:
 def get_vision(s: Settings) -> VisionExtractor:
     if s.vision_provider == "gemini":
         return GeminiVision(s.gemini_api_key, s.vision_model, timeout_s=s.vision_timeout_s)
+    if s.vision_provider == "openrouter":
+        from app.ai.openrouter import OpenRouterVision
+
+        return OpenRouterVision(
+            s.openrouter_api_key, s.vision_model, s.openrouter_base_url, timeout_s=s.vision_timeout_s
+        )
     if s.vision_provider == "fake":
         return FakeVision()
-    raise ValueError(f"VISION_PROVIDER không hợp lệ: {s.vision_provider!r} (chỉ nhận fake | gemini)")
+    raise ValueError(
+        f"VISION_PROVIDER không hợp lệ: {s.vision_provider!r} (chỉ nhận fake | gemini | openrouter)"
+    )

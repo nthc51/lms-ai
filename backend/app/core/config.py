@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Provider AI hợp lệ. Gõ sai (vd "gemni") thì app/worker không khởi động thay vì âm thầm chạy bản giả.
-AIProvider = Literal["fake", "gemini"]
+AIProvider = Literal["fake", "gemini", "openrouter"]
 
 
 class Settings(BaseSettings):
@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     vision_provider: AIProvider = "fake"
     vision_model: str = "gemini-3.5-flash"
     gemini_api_key: str = ""
+    # OpenRouter (provider = openrouter): trả tiền theo token, dùng thay Gemini. Tên model kiểu OpenRouter,
+    # vd. LLM_MODEL=google/gemini-3.6-flash, EMBED_MODEL=google/gemini-embedding-001.
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
     embed_timeout_s: float = 30.0
     # Số đoạn tối đa mỗi request embedding.
     embed_batch_size: int = 100
@@ -106,19 +110,20 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def _require_gemini_key(self) -> "Settings":
-        """Provider nào là gemini thì phải có GEMINI_API_KEY ngay lúc khởi động (không đợi tới lời gọi đầu tiên)."""
-        using = [
-            name
-            for name, value in (
-                ("LLM_PROVIDER", self.llm_provider),
-                ("EMBED_PROVIDER", self.embed_provider),
-                ("VISION_PROVIDER", self.vision_provider),
-            )
-            if value == "gemini"
-        ]
-        if using and not self.gemini_api_key.strip():
-            raise ValueError(f"GEMINI_API_KEY trống trong khi {', '.join(using)}=gemini")
+    def _require_provider_keys(self) -> "Settings":
+        """Provider nào được dùng thì phải có API key của nó ngay lúc khởi động (không đợi tới lời gọi đầu tiên)."""
+        providers = (
+            ("LLM_PROVIDER", self.llm_provider),
+            ("EMBED_PROVIDER", self.embed_provider),
+            ("VISION_PROVIDER", self.vision_provider),
+        )
+        for provider, key_name, key in (
+            ("gemini", "GEMINI_API_KEY", self.gemini_api_key),
+            ("openrouter", "OPENROUTER_API_KEY", self.openrouter_api_key),
+        ):
+            using = [name for name, value in providers if value == provider]
+            if using and not key.strip():
+                raise ValueError(f"{key_name} trống trong khi {', '.join(using)}={provider}")
         return self
 
 
