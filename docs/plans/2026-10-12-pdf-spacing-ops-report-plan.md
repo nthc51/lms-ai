@@ -285,7 +285,7 @@ git commit -m "fix(ingestion): chèn lại dấu cách bị mất khi trích ch�
 
 `lock_user` nằm trong `app/scripts/` (chạy được trong container `api` như `seed_admin`, `approve_teacher`); `reprocess_pdfs` nằm trong `backend/scripts/` (chạy từ máy bằng `uv run`, như `reembed`).
 
-- [ ] **Bước 1: Test**
+- [x] **Bước 1: Test**
 
 ```python
 """Lệnh vận hành: khóa tài khoản bằng lệnh, xử lý lại PDF hàng loạt."""
@@ -352,7 +352,7 @@ async def test_reprocess_queues_ready_and_failed_pdfs_only(db):
     assert len(list(await db.scalars(select(Job)))) == 2
 ```
 
-- [ ] **Bước 2: `app/scripts/lock_user.py`**
+- [x] **Bước 2: `app/scripts/lock_user.py`**
 
 ```python
 """Khóa / mở khóa một tài khoản bằng lệnh (kể cả quản trị viên, việc trang quản trị không cho làm).
@@ -422,7 +422,7 @@ if __name__ == "__main__":
     asyncio.run(main(a.email, a.unlock, a.reason))
 ```
 
-- [ ] **Bước 3: `scripts/reprocess_pdfs.py`**
+- [x] **Bước 3: `scripts/reprocess_pdfs.py`**
 
 ```python
 """Xử lý lại các tài liệu PDF đã tải lên (như bấm "Xử lý lại" cho từng tài liệu).
@@ -513,7 +513,7 @@ if __name__ == "__main__":
     asyncio.run(main(a.course, a.yes))
 ```
 
-- [ ] **Bước 4: Chạy test + commit**
+- [x] **Bước 4: Chạy test + commit**
 
 ```powershell
 uv run pytest tests/test_ops_scripts.py -q
