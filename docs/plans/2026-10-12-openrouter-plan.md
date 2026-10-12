@@ -965,7 +965,7 @@ async def test_reembed_moves_old_chunks_to_current_model(client, db):
     assert await reembed(SessionLocal, embedder) == 0  # chạy lại an toàn
 ```
 
-- [ ] **Chạy test**
+- [x] **Chạy test**
 
 ```powershell
 cd backend
@@ -975,7 +975,7 @@ uv run ruff check . ; uv run ruff format --check . ; uv run lint-imports
 
 Kỳ vọng: pass (12 test mới), sạch.
 
-- [ ] **Commit**
+- [x] **Commit**
 
 ```powershell
 git add backend
