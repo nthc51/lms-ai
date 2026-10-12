@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ErrorState, PageHeader } from "@/components/app/states";
-import { FeedbackList } from "@/components/admin/feedback-list";
+import { FeedbackList } from "@/components/tutor/feedback-list";
 import { Pagination } from "@/components/course/course-card";
 import { Skeleton } from "@/components/ui/misc";
 import { useAdminTutorFeedback } from "@/lib/admin-queries";

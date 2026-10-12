@@ -3,7 +3,7 @@
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { EmptyState, ErrorState, PageHeader } from "@/components/app/states";
-import { FeedbackList } from "@/components/admin/feedback-list";
+import { FeedbackList } from "@/components/tutor/feedback-list";
 import { Badge, Skeleton } from "@/components/ui/misc";
 import { useCourse } from "@/lib/queries";
 import { useCourseAnalytics, useCourseTutorFeedback } from "@/lib/quiz/queries";

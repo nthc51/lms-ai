@@ -5,7 +5,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
-import { FilterTabs } from "@/components/admin/filter-tabs";
+import { FilterTabs } from "@/components/ui/filter-tabs";
 import { errorMessage } from "@/lib/api/errors";
 import { KINDS, type Scope, type StudioItem, type StudioKind, useRequestArtifact, useStudioOverview } from "@/lib/studio/queries";
 import { ArtifactViewer } from "./artifact-viewer";

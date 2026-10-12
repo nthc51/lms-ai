@@ -4,7 +4,7 @@ import { Library, Search } from "lucide-react";
 import * as React from "react";
 import { EmptyState, ErrorState, PageHeader } from "@/components/app/states";
 import { CourseTable } from "@/components/admin/course-table";
-import { FilterTabs } from "@/components/admin/filter-tabs";
+import { FilterTabs } from "@/components/ui/filter-tabs";
 import { Pagination } from "@/components/course/course-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
