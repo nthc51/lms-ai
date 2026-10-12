@@ -710,7 +710,7 @@ git add infra/deploy && git commit -m "feat(ops): deploy rebuilds only the servi
 - Create: `docs/architecture/modules.md`
 - Modify: `docs/architecture/README.md` (tầng S Task 15), `CLAUDE.md` ở gốc repo nếu có
 
-- [ ] **Bước 1: `docs/architecture/modules.md`**: trước khi commit, **đối chiếu với code** (tên file test, tên bảng); chỗ nào lệch thì sửa theo code thật.
+- [x] **Bước 1: `docs/architecture/modules.md`**: trước khi commit, **đối chiếu với code** (tên file test, tên bảng); chỗ nào lệch thì sửa theo code thật.
 
 ````markdown
 # Các phần của hệ thống và cách sửa từng phần
@@ -799,7 +799,7 @@ Quy tắc (ESLint `no-restricted-imports` trong `eslint.config.mjs`):
 Trước khi push vẫn nên chạy đủ test của phía mình sửa (`uv run pytest -q` hoặc `npm test`), vì một module có thể bị module khác dùng lại.
 ````
 
-- [ ] **Bước 2: Liên kết**: thêm vào đầu `docs/architecture/README.md` (ngay dưới tiêu đề):
+- [x] **Bước 2: Liên kết**: thêm vào đầu `docs/architecture/README.md` (ngay dưới tiêu đề):
 
 ```markdown
 > Bản đồ các phần, quy tắc phụ thuộc và "sửa phần nào chạy gì": [modules.md](modules.md). ERD: [erd.md](erd.md).
@@ -807,7 +807,7 @@ Trước khi push vẫn nên chạy đủ test của phía mình sửa (`uv run 
 
 Nếu repo có `CLAUDE.md` (hướng dẫn cho Claude Code) thì thêm một dòng: `Trước khi sửa backend/frontend, đọc docs/architecture/modules.md; giữ uv run lint-imports và npx eslint sạch.`
 
-- [ ] **Bước 3: Commit**
+- [x] **Bước 3: Commit**
 
 ```bash
 git add docs
