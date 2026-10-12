@@ -217,8 +217,12 @@ async def save_answer(
     if attempt.status != AttemptStatus.in_progress:
         raise attempt_closed()
     if _overdue(attempt, await _db_now(db)):
-        await finalize_attempt(db, attempt.id, status=AttemptStatus.timed_out)
-        await db.commit()
+        # Nhả khóa FOR SHARE trước: lệnh UPDATE chốt bài phải là khóa đầu tiên trên dòng attempt, nếu không hai
+        # autosave trễ (hoặc autosave + cron) cùng giữ SHARE rồi cùng UPDATE sẽ deadlock.
+        attempt_pk = attempt.id
+        await db.rollback()
+        if await finalize_attempt(db, attempt_pk, status=AttemptStatus.timed_out):
+            await db.commit()
         raise attempt_closed(TIME_UP_MESSAGE)
     questions = await _questions(db, attempt.question_order)
     _check_choice(questions, attempt.question_order, str(question_id), data.selected_option_id)
