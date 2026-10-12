@@ -1694,8 +1694,8 @@ test("tài liệu đang xử lý: vẫn gửi được câu hỏi, AI trả lờ
 });
 ```
 
-- [ ] Chạy: `npx playwright test e2e/tutor-waiting.spec.ts e2e/student.spec.ts e2e/studio.spec.ts` → pass. Rồi chạy cả bộ `npx playwright test` một lần.
-- [ ] Commit: `git add frontend/e2e; git commit -m "test(e2e): hỏi AI lúc tài liệu đang xử lý"`.
+- [x] Chạy: `npx playwright test e2e/tutor-waiting.spec.ts e2e/student.spec.ts e2e/studio.spec.ts` → pass. Rồi chạy cả bộ `npx playwright test` một lần.
+- [x] Commit: `git add frontend/e2e; git commit -m "test(e2e): hỏi AI lúc tài liệu đang xử lý"`.
 
 ---
 
