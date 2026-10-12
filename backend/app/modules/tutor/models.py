@@ -41,6 +41,7 @@ class ChatMessage(IdMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_chat_messages_session_created", "session_id", "created_at"),
         CheckConstraint("feedback IN (1, -1)", name="ck_chat_messages_feedback"),
+        Index("ix_chat_messages_waiting", "created_at", postgresql_where=text("waiting_for_docs")),
     )
 
     session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chat_sessions.id", ondelete="CASCADE"))
@@ -58,3 +59,5 @@ class ChatMessage(IdMixin, TimestampMixin, Base):
     prompt_version: Mapped[str | None] = mapped_column(String(80))
     # 3 câu hỏi gợi ý tiếp theo (AI Studio S5), sinh lần đầu khi frontend xin rồi lưu lại. NULL = chưa sinh.
     followups: Mapped[list[str] | None] = mapped_column(JSONB)
+    # Câu hỏi (role user) gửi lúc tài liệu còn đang xử lý: worker trả lời khi xử lý xong rồi tắt cờ này
+    waiting_for_docs: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())

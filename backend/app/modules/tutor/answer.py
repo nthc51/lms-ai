@@ -13,6 +13,7 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import anyio
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -48,6 +49,10 @@ class AskContext:
     course_title: str
     question: str
     history: list[tuple[ChatRole, str]] = field(default_factory=list)  # ≤ 4 tin gần nhất, cũ → mới
+    # Câu trả lời muộn (câu hỏi gửi lúc tài liệu đang xử lý): ghi created_at bằng đúng created_at của câu hỏi,
+    # nên trong danh sách tin nhắn câu trả lời đứng ngay sau câu hỏi (cùng giờ thì user trước assistant).
+    # None = câu trả lời trực tiếp, created_at do DB đặt (sau câu hỏi).
+    answer_created_at: datetime | None = None
 
 
 class _Answer:
@@ -124,6 +129,8 @@ class _Answer:
             tokens_out=self.extra_tokens_out + (self.stream.tokens_out if self.stream else 0),
             prompt_version=self.prompt_version,
         )
+        if self.ctx.answer_created_at is not None:
+            message.created_at = self.ctx.answer_created_at
         async with self._session_factory() as db:
             db.add(message)
             await db.commit()

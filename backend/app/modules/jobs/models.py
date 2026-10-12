@@ -20,7 +20,7 @@ class JobStatus(str, enum.Enum):
 
 
 class Job(IdMixin, TimestampMixin, Base):
-    """type quyết định ref_id trỏ tới đâu: ingest_pdf/ingest_video → sources.id, quiz_gen → lessons.id,
+    """type quyết định ref_id trỏ tới đâu: ingest_pdf/ingest_video → sources.id, quiz_gen / tutor_waiting → lessons.id,
     grade_submission → submissions.id (ref_version = submissions.version).
 
     created_by: người tạo job (NULL = job hệ thống, vd. do cron tạo); GET /jobs/{id} chỉ trả cho người tạo

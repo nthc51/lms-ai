@@ -19,6 +19,7 @@ from app.modules.materials.models import Source, SourceStatus
 from app.modules.quiz.generation import QuizGenerationError, generate_questions_for_lesson
 from app.modules.quiz.schemas import QuizGenerateIn
 from app.modules.studio.jobs import run_notes_synth, run_source_guide, run_studio
+from app.modules.tutor.waiting import answer_waiting, has_waiting
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,12 @@ JOB_TIMEOUTS: dict[str, int] = {
     "source_guide": 300,
     "studio_gen": 900,
     "notes_synth": 300,
+    "tutor_waiting": 600,
 }
+# tutor_waiting dừng nhận câu hỏi mới khi còn chừng này giây trước hạn của handler (một câu trả lời có thể mất
+# vài chục giây); câu còn lại để job sau hoặc cron.
+TUTOR_WAITING_RESERVE_S = 120
+TUTOR_WAITING_CRON_BUDGET_S = 180
 # Handler bị hủy sớm hơn job_timeout của arq một khoảng này, để run_job kịp ghi job + source failed
 # ngay (arq hủy ở đúng job_timeout thì không còn cơ hội ghi, phải đợi sweeper).
 JOB_TIMEOUT_MARGIN_S = 30
@@ -131,6 +137,11 @@ async def ingest_pdf(ctx: dict, job_id: str) -> None:
 
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("ingest_pdf"))
     await _queue_source_guide(ctx, uuid.UUID(job_id), session_factory)
+    await _queue_waiting_answers(ctx, uuid.UUID(job_id), session_factory)
+
+
+def _queue_of(ctx: dict) -> JobQueue | None:
+    return ctx.get("queue") or (ArqQueue(pool=ctx["redis"]) if "redis" in ctx else None)
 
 
 async def _queue_source_guide(
@@ -138,7 +149,7 @@ async def _queue_source_guide(
 ) -> None:
     """Xử lý PDF xong (job done) thì xếp hàng job hướng dẫn tài liệu (AI Studio S1). Lỗi chỉ ghi log: hướng dẫn
     là phần phụ, không làm hỏng việc xử lý tài liệu."""
-    queue = ctx.get("queue") or (ArqQueue(pool=ctx["redis"]) if "redis" in ctx else None)
+    queue = _queue_of(ctx)
     if queue is None:  # test chạy job ingest đơn lẻ, không có hàng đợi
         return
     try:
@@ -149,6 +160,54 @@ async def _queue_source_guide(
             await create_and_enqueue(db, queue, "source_guide", job.ref_id, created_by=job.created_by)
     except Exception:
         logger.exception("Không xếp hàng được job hướng dẫn tài liệu cho job %s", ingest_job_id)
+
+
+async def _queue_waiting_answers(
+    ctx: dict, ingest_job_id: uuid.UUID, session_factory: async_sessionmaker
+) -> None:
+    """Xử lý PDF kết thúc (xong hoặc lỗi) mà bài có câu hỏi chờ thì xếp job tutor_waiting (ref_id = lessons.id).
+    Lỗi ở đây chỉ ghi log: cron answer_waiting_cron sẽ vét lại."""
+    queue = _queue_of(ctx)
+    if queue is None:
+        return
+    try:
+        async with session_factory() as db:
+            job = await db.get(Job, ingest_job_id)
+            if job is None or job.status not in (JobStatus.done, JobStatus.failed):
+                return
+            lesson_id = await db.scalar(select(Source.lesson_id).where(Source.id == job.ref_id))
+            if lesson_id is None or not await has_waiting(db, lesson_id):
+                return
+            await create_and_enqueue(db, queue, "tutor_waiting", lesson_id, created_by=None)
+    except Exception:
+        logger.exception("Không xếp hàng được job trả lời câu hỏi chờ cho job %s", ingest_job_id)
+
+
+async def tutor_waiting(ctx: dict, job_id: str) -> None:
+    """Trả lời câu hỏi chờ của một bài: ref_id = lessons.id."""
+    session_factory = ctx.get("session_factory", SessionLocal)
+    timeout_s = handler_timeout("tutor_waiting")
+
+    async def handler(lesson_id: uuid.UUID) -> None:
+        await answer_waiting(
+            ctx["llm"],
+            ctx["embedder"],
+            lesson_id=lesson_id,
+            session_factory=session_factory,
+            budget_s=timeout_s - TUTOR_WAITING_RESERVE_S,
+        )
+
+    await run_job(job_id, handler, session_factory, timeout_s=timeout_s)
+
+
+async def answer_waiting_cron(ctx: dict) -> int:
+    """Cron 5 phút: vét câu hỏi chờ mà job sau xử lý PDF bị lỡ (Redis mất job, tài liệu bị sweeper chốt lỗi...)."""
+    return await answer_waiting(
+        ctx["llm"],
+        ctx["embedder"],
+        session_factory=ctx.get("session_factory", SessionLocal),
+        budget_s=TUTOR_WAITING_CRON_BUDGET_S,
+    )
 
 
 async def source_guide(ctx: dict, job_id: str) -> None:

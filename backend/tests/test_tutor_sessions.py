@@ -83,14 +83,27 @@ async def test_availability_signals_when_no_ready_chunks(client, db):
     course, _, lesson, sv = await _enrolled(client, gv)
     params = {"course_id": course["id"], "lesson_id": lesson["id"]}
     r = await client.get(f"{API}/tutor/availability", params=params, headers=sv)
-    assert r.json() == {"available": False, "ready_chunks": 0, "message": "Tài liệu đang được xử lý"}
+    assert r.json() == {
+        "available": False,
+        "ready_chunks": 0,
+        "message": "Bài này chưa có tài liệu cho AI Tutor.",
+        "state": "empty",
+        "processing_docs": 0,
+        "can_queue": False,
+    }
     await seed_chunks(db, uuid.UUID(lesson["id"]), [BINARY_SEARCH], status=SourceStatus.processing)
-    assert (await client.get(f"{API}/tutor/availability", params=params, headers=sv)).json()[
-        "available"
-    ] is False
+    r = (await client.get(f"{API}/tutor/availability", params=params, headers=sv)).json()
+    assert (r["available"], r["state"], r["can_queue"]) == (False, "processing", True)
     await seed_chunks(db, uuid.UUID(lesson["id"]), [BINARY_SEARCH])
     r = await client.get(f"{API}/tutor/availability", params={"course_id": course["id"]}, headers=sv)
-    assert r.json() == {"available": True, "ready_chunks": 1, "message": None}
+    assert r.json() == {
+        "available": True,
+        "ready_chunks": 1,
+        "message": None,
+        "state": "ready",
+        "processing_docs": 1,
+        "can_queue": False,
+    }
 
 
 async def test_messages_order_is_deterministic_for_same_timestamp(client, db):
@@ -130,4 +143,7 @@ async def test_course_scope_availability_on_draft_course_has_its_own_message(cli
         "available": True,
         "ready_chunks": 1,
         "message": None,
+        "state": "ready",
+        "processing_docs": 0,
+        "can_queue": False,
     }

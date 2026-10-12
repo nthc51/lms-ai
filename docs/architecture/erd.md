@@ -60,6 +60,7 @@ erDiagram
         integer tokens_out
         string prompt_version
         jsonb followups
+        boolean waiting_for_docs
         uuid id PK
         datetime created_at
     }

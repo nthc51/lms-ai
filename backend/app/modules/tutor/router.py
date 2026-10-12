@@ -11,7 +11,7 @@ from app.core.deps import get_current_user
 from app.core.pagination import PageParams, page_params
 from app.core.ratelimit import RateLimiter, get_rate_limiter
 from app.modules.auth.models import User
-from app.modules.tutor import service
+from app.modules.tutor import service, waiting
 from app.modules.tutor.answer import answer_stream
 from app.modules.tutor.schemas import (
     AskIn,
@@ -104,6 +104,28 @@ async def ask(
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )
+
+
+@router.post(
+    "/tutor/sessions/{session_id}/questions",
+    response_model=MessageOut,
+    status_code=202,
+    responses={409: {"description": "TUTOR_READY | NOT_PROCESSING | TOO_MANY_WAITING"}},
+)
+async def queue_question(
+    session_id: uuid.UUID,
+    data: AskIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    embedder: Embedder = Depends(get_api_embedder),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+):
+    """Gửi câu hỏi lúc tài liệu còn đang xử lý (availability.can_queue): lưu câu hỏi với waiting_for_docs, AI trả
+    lời khi xử lý xong (worker). Frontend tải lại danh sách tin nhắn để thấy câu trả lời.
+
+    409 TUTOR_READY khi đã hỏi trực tiếp được; 409 NOT_PROCESSING khi không còn tài liệu nào đang xử lý (lý do
+    trong message); 409 TOO_MANY_WAITING khi phiên đã có 5 câu chờ; 429 như câu hỏi thường."""
+    return await waiting.queue_question(db, limiter, user, session_id, data.content, embedder.model)
 
 
 @router.post("/tutor/messages/{message_id}/feedback", response_model=MessageOut)

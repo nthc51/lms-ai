@@ -12,6 +12,7 @@ from app.core.storage import MinioStorage
 from app.modules.notify.mailer import SmtpMailer
 from app.worker.tasks import (
     JOB_TIMEOUTS,
+    answer_waiting_cron,
     ingest_pdf,
     notes_synth,
     quiz_gen,
@@ -19,6 +20,7 @@ from app.worker.tasks import (
     source_guide,
     studio_gen,
     sweep_stale_jobs,
+    tutor_waiting,
 )
 
 
@@ -42,6 +44,7 @@ class WorkerSettings:
         func(source_guide, name="source_guide", timeout=JOB_TIMEOUTS["source_guide"]),
         func(studio_gen, name="studio_gen", timeout=JOB_TIMEOUTS["studio_gen"]),
         func(notes_synth, name="notes_synth", timeout=JOB_TIMEOUTS["notes_synth"]),
+        func(tutor_waiting, name="tutor_waiting", timeout=JOB_TIMEOUTS["tutor_waiting"]),
     ]
     # 5 phút một lần: job processing quá timeout + 5 phút → failed "Worker bị gián đoạn";
     # job pending bị kẹt → enqueue lại một lần, vẫn kẹt → failed "Không đưa được job vào hàng đợi"
@@ -60,6 +63,13 @@ class WorkerSettings:
             minute=set(range(60)),
             run_at_startup=True,
             timeout=120,
+        ),
+        # Vét câu hỏi chờ tài liệu mà job tutor_waiting bị lỡ (lệch 2 phút so với sweeper)
+        cron(
+            answer_waiting_cron,
+            name="answer_waiting_cron",
+            minute=set(range(2, 60, 5)),
+            timeout=300,
         ),
     ]
     on_startup = startup

@@ -1,9 +1,10 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.retrieval import SearchScope, count_ready_chunks
+from app.ai.retrieval import SearchScope
 from app.core.config import get_settings
 from app.core.errors import AppError, not_found
 from app.core.pagination import PageParams, paginate
@@ -21,11 +22,8 @@ from app.modules.tutor.schemas import (
     SessionOut,
     SessionPage,
 )
+from app.modules.tutor.state import describe, scope_state
 
-NOT_READY_MESSAGE = "Tài liệu đang được xử lý"
-# Tìm tài liệu theo phạm vi cả khóa chỉ xét khóa đã publish; chủ khóa/admin mở được phiên trên khóa nháp nên cần
-# thông báo riêng thay vì "đang xử lý" (tài liệu có thể đã xong).
-DRAFT_COURSE_SCOPE_MESSAGE = "Hỏi cả khóa chỉ dùng được khi khóa đã xuất bản"
 HISTORY_LIMIT = 4  # số tin nhắn gần nhất dùng để viết lại câu hỏi (spec 5.3 bước 1)
 RATE_WINDOW_S = 3600
 
@@ -104,22 +102,26 @@ async def list_messages(db: AsyncSession, session: ChatSession, params: PagePara
 async def availability(
     db: AsyncSession, user: User, course_id: uuid.UUID, lesson_id: uuid.UUID | None, embedding_model: str
 ) -> AvailabilityOut:
+    """Hỏi được chưa, nếu chưa thì vì sao (xem tutor/state.py). Tìm theo cả khóa chỉ xét khóa đã publish; chủ
+    khóa/admin mở được phiên trên khóa nháp nên có trạng thái riêng 'draft'."""
     course, lesson = await resolve_scope(db, user, course_id, lesson_id)
-    n = await count_ready_chunks(db, SearchScope(course.id, lesson.id if lesson else None), embedding_model)
-    if lesson is None and course.status != CourseStatus.published:
-        return AvailabilityOut(available=False, ready_chunks=n, message=DRAFT_COURSE_SCOPE_MESSAGE)
-    return AvailabilityOut(available=n > 0, ready_chunks=n, message=None if n else NOT_READY_MESSAGE)
+    st = await scope_state(db, SearchScope(course.id, lesson.id if lesson else None), embedding_model)
+    return describe(st, draft_course_scope=lesson is None and course.status != CourseStatus.published)
 
 
 async def load_history(
-    db: AsyncSession, session_id: uuid.UUID, limit: int = HISTORY_LIMIT
+    db: AsyncSession, session_id: uuid.UUID, limit: int = HISTORY_LIMIT, *, before: datetime | None = None
 ) -> list[tuple[ChatRole, str]]:
     """Tối đa `limit` tin nhắn gần nhất (bỏ tin rỗng do lỗi), xếp cũ → mới theo đúng thứ tự của list_messages
-    (created_at, role, id): lấy theo thứ tự đảo ngược rồi đảo lại."""
+    (created_at, role, id): lấy theo thứ tự đảo ngược rồi đảo lại. before: chỉ lấy tin trước thời điểm này
+    (câu hỏi chờ trả lời muộn chỉ dùng lịch sử trước nó)."""
+    conds = [ChatMessage.session_id == session_id, ChatMessage.content != ""]
+    if before is not None:
+        conds.append(ChatMessage.created_at < before)
     rows = (
         await db.execute(
             select(ChatMessage.role, ChatMessage.content)
-            .where(ChatMessage.session_id == session_id, ChatMessage.content != "")
+            .where(*conds)
             .order_by(ChatMessage.created_at.desc(), ChatMessage.role.desc(), ChatMessage.id.desc())
             .limit(limit)
         )
