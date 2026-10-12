@@ -11,3 +11,6 @@ backend/eval/datasets/*.pdf
 
 # log cục bộ khi thử Gemini
 gemini-logs.txt
+.env.prod
+backups/
+.deploy/

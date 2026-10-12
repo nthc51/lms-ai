@@ -1,0 +1,52 @@
+{
+	email {$ACME_EMAIL}
+}
+
+(common) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+
+{$APP_DOMAIN} {
+	import common
+
+	# /metrics chỉ cho Prometheus trong mạng nội bộ
+	@internal path /metrics /metrics/*
+	respond @internal 404
+
+	# API đi thẳng tới FastAPI (không qua Next): SSE của AI Tutor không bị bộ đệm / proxyTimeout của Next,
+	# và uvicorn nhận đúng X-Forwarded-For để rate limit theo IP. Caddy tự flush khi Content-Type là text/event-stream.
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle /docs* {
+		reverse_proxy api:8000
+	}
+	handle /openapi.json {
+		reverse_proxy api:8000
+	}
+	# Còn lại là giao diện Next.js. API đã tự gắn security headers (kể cả CSP), nên chỉ gắn cho phần web.
+	handle {
+		header {
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		}
+		reverse_proxy web:3000
+	}
+}
+
+# Presigned URL được ký theo host này. Caddy giữ nguyên Host khi chuyển tiếp nên chữ ký vẫn khớp.
+{$FILES_DOMAIN} {
+	import common
+	reverse_proxy minio:9000
+}
+
+{$GRAFANA_DOMAIN} {
+	import common
+	reverse_proxy grafana:3000
+}
