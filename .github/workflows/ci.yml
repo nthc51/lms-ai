@@ -13,7 +13,36 @@ defaults:
     working-directory: backend
 
 jobs:
+  # Xem lần push này đổi phần nào. Job của phần không đổi bị bỏ qua (skipped vẫn tính là xanh).
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              # API đổi thì kiểu TypeScript sinh từ OpenAPI có thể lệch: chạy lại kiểm tra frontend
+              - 'backend/app/**'
+              - '.github/workflows/ci.yml'
+            infra:
+              - 'infra/**'
+              - 'docker-compose.prod.yml'
+              - '.env.prod.example'
+              - '.github/workflows/ci.yml'
+
   lint:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +52,13 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - name: Ranh giới module (backend/.importlinter)
+        run: uv run lint-imports
       - run: uv run python -m scripts.gen_erd --check
 
   test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     services:
       db:
@@ -62,6 +95,8 @@ jobs:
       - run: uv run pytest -q
 
   frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -92,11 +127,14 @@ jobs:
           retention-days: 7
 
   docker:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Build backend image (không push)
+        if: needs.changes.outputs.backend == 'true'
         uses: docker/build-push-action@v6
         with:
           context: backend
@@ -104,6 +142,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build frontend image (không push)
+        if: needs.changes.outputs.frontend == 'true'
         uses: docker/build-push-action@v6
         with:
           context: frontend
@@ -113,16 +152,46 @@ jobs:
           cache-to: type=gha,mode=max,scope=web
 
   audit:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+        if: needs.changes.outputs.backend == 'true'
         with:
           version: "0.12.20"
       - name: Xuất danh sách thư viện production
+        if: needs.changes.outputs.backend == 'true'
         run: uv export --frozen --no-dev --no-hashes --no-emit-project --format requirements-txt -o /tmp/req.txt
       - name: Quét lỗ hổng đã công bố (OSV/PyPI advisory)
+        if: needs.changes.outputs.backend == 'true'
         run: uvx pip-audit -r /tmp/req.txt
       - name: Quét lỗ hổng thư viện frontend (chỉ thư viện chạy production, mức high trở lên)
+        if: needs.changes.outputs.frontend == 'true'
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
+
+  infra:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kiểm tra script shell
+        run: shellcheck -S warning infra/prod.sh infra/deploy/*.sh infra/backup/*.sh
+      - name: deploy.sh chọn đúng service và rollback đúng
+        run: bash infra/deploy/test_deploy.sh
+      - name: docker-compose.prod.yml hợp lệ
+        run: |
+          cp .env.prod.example .env.prod
+          sed -i 's/^\([A-Z_]*\)=$/\1=ci-dummy/' .env.prod
+          docker compose -f docker-compose.prod.yml --env-file .env.prod config --quiet
+      - name: Caddyfile hợp lệ
+        run: >-
+          docker run --rm -v "$PWD/infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          -e APP_DOMAIN=localhost -e FILES_DOMAIN=files.localhost -e GRAFANA_DOMAIN=grafana.localhost
+          -e ACME_EMAIL=ci@example.com caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
