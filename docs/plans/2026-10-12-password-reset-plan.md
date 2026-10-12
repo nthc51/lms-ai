@@ -46,7 +46,7 @@ Token: 32 byte ngẫu nhiên, DB chỉ lưu sha256 (`email_tokens.purpose = "res
 - Modify: `backend/app/modules/notify/templates.py`, `outbox.py`
 - Test: `backend/tests/test_password_reset.py` (mới)
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 `backend/tests/test_password_reset.py`:
 
@@ -202,7 +202,7 @@ async def test_reset_mail_body_is_redacted_after_sending(client):
 
 Chạy: `cd backend; uv run pytest tests/test_password_reset.py -q` → fail (404 / ImportError).
 
-- [ ] **Bước 2: Cấu hình**
+- [x] **Bước 2: Cấu hình**
 
 ```diff
 --- a/backend/.env.example
@@ -230,7 +230,7 @@ Chạy: `cd backend; uv run pytest tests/test_password_reset.py -q` → fail (40
      smtp_port: int = 1025
 ```
 
-- [ ] **Bước 3: Schema, template email, outbox**
+- [x] **Bước 3: Schema, template email, outbox**
 
 `ForgotPasswordIn` hạ chữ thường email (khớp cách lưu lúc đăng ký). `reset_password` vào `SECRET_TEMPLATES`: gửi xong thì xóa nội dung (link) khỏi outbox.
 
@@ -321,7 +321,7 @@ Chạy: `cd backend; uv run pytest tests/test_password_reset.py -q` → fail (40
  async def _claim(session_factory: async_sessionmaker) -> tuple[EmailOutbox, int] | None:
 ```
 
-- [ ] **Bước 4: Service**
+- [x] **Bước 4: Service**
 
 Tách `_mark_email_verified` (dùng chung cho xác nhận email và đặt lại mật khẩu). `forgot_password` vô hiệu các link đặt lại cũ còn hạn trước khi tạo link mới. `reset_password` kiểm token theo thứ tự: không có / đã dùng → `INVALID_TOKEN`, hết hạn → `TOKEN_EXPIRED`, tài khoản khóa → `ACCOUNT_LOCKED`; rồi đổi mật khẩu, đánh dấu token đã dùng, **thu hồi mọi refresh token**, xác nhận email nếu chưa, commit một lần.
 
@@ -425,7 +425,7 @@ Tách `_mark_email_verified` (dùng chung cho xác nhận email và đặt lại
      if user.role != Role.teacher or user.teacher_status != TeacherStatus.rejected:
 ```
 
-- [ ] **Bước 5: Router**
+- [x] **Bước 5: Router**
 
 Rate limit theo IP trước, rồi theo email (key `pwd-reset-ip:<ip>`, `pwd-reset:<email>`). `kicker.kick()` để worker gửi email ngay.
 
@@ -490,7 +490,7 @@ Rate limit theo IP trước, rồi theo email (key `pwd-reset-ip:<ip>`, `pwd-res
      user: User = Depends(get_current_user),
 ```
 
-- [ ] **Bước 6: Chạy test**
+- [x] **Bước 6: Chạy test**
 
 ```powershell
 cd backend
@@ -501,7 +501,7 @@ uv run lint-imports
 
 Kỳ vọng: pass hết (7 test mới); ruff, lint-imports sạch.
 
-- [ ] **Bước 7: Commit**
+- [x] **Bước 7: Commit**
 
 ```powershell
 git add backend
