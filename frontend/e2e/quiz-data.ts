@@ -22,6 +22,8 @@ export const quiz = (over: Record<string, unknown> = {}) => ({
   title: "Kiểm tra đạo hàm cơ bản",
   max_attempts: 2,
   pass_score: 60,
+  time_limit_sec: null,
+  shuffle: false,
   status: "published",
   question_count: quizQuestions.length,
   created_at: "2026-10-01T00:00:00Z",
@@ -30,13 +32,15 @@ export const quiz = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-export const attempt = (answers: Record<string, string> = {}) => ({
+export const attempt = (answers: Record<string, string> = {}, over: Record<string, unknown> = {}) => ({
   id: ATTEMPT_ID,
   quiz_id: QUIZ_ID,
   attempt_no: 1,
   status: "in_progress",
   started_at: "2026-10-06T00:00:00Z",
   deadline_at: null,
+  server_now: new Date().toISOString(),
+  ...over,
   questions: quizQuestions.map(({ id, stem, options }) => ({ id, stem, options })),
   answers,
 });

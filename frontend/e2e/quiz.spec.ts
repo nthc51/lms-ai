@@ -24,6 +24,8 @@ test.describe("học viên làm quiz", () => {
           const answers = Object.fromEntries(submitted!.final_answers.map((a) => [a.question_id, a.selected_option_id]));
           return r.fulfill({ json: result(answers) });
         },
+        [`POST /attempts/${ATTEMPT_ID}/answers/*/explain`]: (r) =>
+          r.fulfill({ json: { text: "Bạn chọn x, nhưng theo quy tắc lũy thừa đạo hàm của x² là 2x [1].", source_page_no: 4 } }),
       },
     });
 
@@ -62,6 +64,11 @@ test.describe("học viên làm quiz", () => {
     await expect(page.getByText("Câu 2 · Sai")).toBeVisible();
     await expect(page.getByText('Giải thích cho câu "Đạo hàm của x² là gì?"')).toBeVisible(); // câu sai mở sẵn giải thích
     await expect(page.getByRole("link", { name: /Làm lại \(1 lượt còn lại\)/ })).toBeVisible();
+    // AI giải thích câu sai: nút ở câu sai và câu bỏ trống, không có ở câu đúng
+    await expect(page.getByRole("button", { name: "AI giải thích vì sao sai" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "AI giải thích đáp án" })).toHaveCount(1);
+    await page.getByRole("button", { name: "AI giải thích vì sao sai" }).click();
+    await expect(page.getByText("đạo hàm của x² là 2x (tài liệu, trang 4).")).toBeVisible();
     await expectAccessible(page);
     await expectNoHorizontalScroll(page);
 
@@ -93,5 +100,38 @@ test.describe("học viên làm quiz", () => {
     });
     await page.reload();
     await expect(page.getByText("Bạn đã dùng hết số lần làm quiz này.")).toBeVisible();
+  });
+
+  test("quiz có giờ: hiện đồng hồ đếm ngược, hết giờ thì tự nộp và mở kết quả", async ({ page }) => {
+    let submitted = false;
+    await mockApi(page, {
+      extra: {
+        "GET /quizzes": (r) => r.fulfill({ json: { items: [quiz({ time_limit_sec: 600 })], total: 1, page: 1, size: 50 } }),
+        [`GET /quizzes/${QUIZ_ID}`]: (r) => r.fulfill({ json: quiz({ time_limit_sec: 600 }) }),
+        [`POST /quizzes/${QUIZ_ID}/attempts`]: (r) => {
+          // giờ server lệch 1 giờ so với máy: đồng hồ vẫn đếm đúng 6 giây
+          const serverNow = Date.now() + 3_600_000;
+          return r.fulfill({
+            status: 201,
+            json: attempt({}, { server_now: new Date(serverNow).toISOString(), deadline_at: new Date(serverNow + 6000).toISOString() }),
+          });
+        },
+        [`PUT /attempts/${ATTEMPT_ID}/answers/*`]: (r, url) =>
+          r.fulfill({ json: { question_id: url.pathname.split("/").pop(), selected_option_id: "A", answered_at: "2026-10-06T00:01:00Z" } }),
+        [`POST /attempts/${ATTEMPT_ID}/submit`]: (r) => {
+          submitted = true;
+          return r.fulfill({ json: { ...result({ "q-1": "A" }), status: "timed_out" } });
+        },
+      },
+    });
+    await page.goto(`/learn/giai-tich-1/${L1}`);
+    await expect(page.getByText(/10 phút/)).toBeVisible();
+    await page.getByRole("link", { name: "Làm bài" }).click();
+    await expect(page.getByRole("timer")).toHaveText(/00:0[4-6]/);
+    await expectAccessible(page);
+    await page.getByRole("radio", { name: "0" }).check({ force: true });
+    await expect(page).toHaveURL(new RegExp(`/result/${ATTEMPT_ID}$`), { timeout: 15_000 });
+    expect(submitted).toBe(true);
+    await expect(page.getByText("Bài được tự nộp khi hết giờ.")).toBeVisible();
   });
 });

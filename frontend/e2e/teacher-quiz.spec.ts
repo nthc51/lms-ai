@@ -94,9 +94,12 @@ test.describe("giảng viên: câu hỏi, quiz, thống kê", () => {
     const dialog = page.getByRole("dialog", { name: "Tạo quiz" });
     await expect(dialog.getByText("Câu hỏi đã duyệt (0/2 được chọn)")).toBeVisible(); // câu chờ duyệt không được chọn
     await dialog.getByLabel("Tiêu đề").fill("Kiểm tra đạo hàm cơ bản");
-    for (const cb of await dialog.getByRole("checkbox").all()) await cb.check();
+    await dialog.getByLabel("Thời gian làm bài (phút)").fill("15");
+    for (const cb of await dialog.getByRole("checkbox").all()) await cb.check(); // gồm cả "Xáo thứ tự câu hỏi"
     await dialog.getByRole("button", { name: "Tạo quiz" }).click();
-    await expect.poll(() => created).toMatchObject({ lesson_id: L1, title: "Kiểm tra đạo hàm cơ bản", question_ids: ["c1", "c2"] });
+    await expect
+      .poll(() => created)
+      .toMatchObject({ lesson_id: L1, title: "Kiểm tra đạo hàm cơ bản", question_ids: ["c1", "c2"], time_limit_sec: 900, shuffle: true });
 
     await page.getByRole("button", { name: "Xuất bản" }).click();
     const confirm = page.getByRole("alertdialog");
