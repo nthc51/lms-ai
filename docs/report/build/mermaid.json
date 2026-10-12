@@ -1,0 +1,7 @@
+{
+  "theme": "neutral",
+  "themeVariables": { "fontSize": "22px", "fontFamily": "Arial" },
+  "flowchart": { "nodeSpacing": 30, "rankSpacing": 40, "useMaxWidth": false },
+  "sequence": { "messageFontSize": 20, "actorFontSize": 20, "noteFontSize": 18, "wrap": true, "width": 170, "messageMargin": 30, "useMaxWidth": false },
+  "er": { "fontSize": 18, "useMaxWidth": false }
+}

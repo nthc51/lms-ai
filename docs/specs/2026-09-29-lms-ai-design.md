@@ -80,10 +80,10 @@
 
 ### Báo cáo
 
-- [ ] R1. Chương 1–2: tổng quan, cơ sở lý thuyết
-- [ ] R2. Chương 3: phân tích thiết kế (use case, ERD, sơ đồ luồng)
-- [ ] R3. Chương 4: kết quả và đánh giá
-- [ ] R4. Chương 5: kết luận, hướng phát triển
+- [~] R1. Chương 1–2: tổng quan, cơ sở lý thuyết (bản nháp trong `docs/report/`)
+- [~] R2. Chương 3: phân tích thiết kế (use case, ERD, sơ đồ luồng) (bản nháp)
+- [~] R3. Chương 4: kết quả và đánh giá (bản nháp, chờ số liệu benchmark và đo tải)
+- [~] R4. Chương 5: kết luận, hướng phát triển (bản nháp)
 - [ ] R5. Slide bảo vệ + tập demo
 
 ### Mốc
@@ -450,7 +450,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | Job xử lý tài liệu thất bại | `sources.status = failed` kèm `error_msg`, giáo viên thấy nút "Xử lý lại" |
 | Worker chết hoặc bị kill giữa chừng | Cron arq 5 phút một lần: job `processing` quá `job_timeout + 5 phút` → `failed` với `error_msg = "Worker bị gián đoạn"`; source tương ứng, nếu vẫn còn `pending`/`processing`, cũng chuyển `failed` (cùng transaction) để giáo viên bấm "Xử lý lại" |
 | Job kẹt `pending` (Redis down lúc enqueue, mất job trong Redis) | Cùng cron: job `pending` quá `PENDING_JOB_REQUEUE_AFTER_MIN` (mặc định 10) phút và chưa `requeued_at` → enqueue lại **một lần** với cùng `_job_id` (arq tự bỏ qua nếu job còn), ghi `requeued_at` chỉ khi enqueue không lỗi (lỗi thì để lần sweep sau). Vẫn `pending` quá N phút sau `requeued_at` → `failed` với `error_msg = "Không đưa được job vào hàng đợi"`; source còn `pending`/`processing` cũng `failed`, cùng transaction |
-| Khóa học chưa có chunk nào ở trạng thái ready | Ẩn AI Tutor, hiện "Tài liệu đang được xử lý" |
+| Khóa học chưa có chunk nào ở trạng thái ready | Báo đúng lý do theo `availability.state`; còn tài liệu đang xử lý thì vẫn nhận câu hỏi chờ, AI trả lời khi xử lý xong (2026-10-12) |
 | Đang demo | Bật cache cho các câu demo và có sẵn video demo dự phòng |
 
 **Worker (đã làm ở tuần 1):**
@@ -498,7 +498,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | Khóa học | `GET /courses` · `GET /courses/{slug}` · `POST/PATCH/DELETE /courses` · `POST /courses/{id}/publish` · CRUD sections/lessons · `PATCH /courses/{id}/reorder` · `GET /teacher/courses?page=&size=` (khóa của giảng viên đang đăng nhập, phân trang) |
 | Học | `POST /courses/{id}/enroll` · `GET /me/courses?page=&size=` (phân trang) · `GET /lessons/{id}` (nội dung bài học) · `GET /lessons/{id}/video` (presigned GET) · `PUT /lessons/{id}/progress` |
 | Tài liệu | `POST /uploads/presign` · `POST /uploads/{id}/complete` · `POST /lessons/{id}/sources` → 202 · `GET /lessons/{id}/sources` · `GET /sources/{id}` · `POST /sources/{id}/reprocess` → 202 · `GET /sources/{id}/pages?page=&size=` (`size ≤ 100`, trả `{items, total, page, size}`) |
-| Tutor | `POST /tutor/sessions` · `GET /tutor/sessions?course_id=` (phiên của chính mình, phân trang) · `GET /tutor/availability?course_id=&lesson_id=` (`{available, ready_chunks, message}`) · `GET /tutor/sessions/{id}/messages` · `POST /tutor/sessions/{id}/messages` (SSE, frontend đọc bằng `fetch` + `ReadableStream`) · `POST /tutor/messages/{id}/feedback` |
+| Tutor | `POST /tutor/sessions` · `GET /tutor/sessions?course_id=` (phiên của chính mình, phân trang) · `GET /tutor/availability?course_id=&lesson_id=` (`{available, ready_chunks, message, state, processing_docs, can_queue}`) · `POST /tutor/sessions/{id}/questions` → 202 (câu hỏi chờ khi tài liệu đang xử lý) · `GET /tutor/sessions/{id}/messages` · `POST /tutor/sessions/{id}/messages` (SSE, frontend đọc bằng `fetch` + `ReadableStream`) · `POST /tutor/messages/{id}/feedback` |
 | Câu hỏi | `POST /lessons/{id}/questions/generate` → 202 · `GET /lessons/{id}/questions?review_status=` · `PATCH /questions/{id}` |
 | Quiz | `POST /quizzes` · `GET /quizzes?lesson_id=` (phân trang) · `GET/PATCH/DELETE /quizzes/{id}` · `POST /quizzes/{id}/publish` · `POST /quizzes/{id}/attempts` (**không trả đáp án**) · `PUT /attempts/{id}/answers/{qid}` · `POST /attempts/{id}/submit {final_answers?}` · `GET /attempts/{id}/result` (chỉ khi `completed` hoặc `timed_out`) · `POST /attempts/{id}/answers/{qid}/explain` |
 | Assignment | CRUD `/assignments` · `PUT /assignments/{id}/submission` · `GET /assignments/{id}/submissions` · `POST /submissions/{id}/grade` |
@@ -764,3 +764,7 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-07 | Khu quản trị: ẩn khóa dùng lại status=archived + hidden_at/hidden_reason; từ chối chỉ áp cho giảng viên đang chờ, vi phạm sau khi duyệt thì khóa; mọi thao tác ghi admin_actions; seed_admin từ chối email `.local`. |
 | 2026-10-07 | Email: xác nhận khi đăng ký (chặn đăng nhập tới khi xác nhận, gửi lại tối đa 3 lần/giờ, luôn 202); outbox ghi cùng transaction, worker gửi (kick + cron mỗi phút, SKIP LOCKED, thử lại 5 lần); dev dùng Mailpit, chạy thật dùng Brevo SMTP. Giảng viên chỉ vào hàng chờ khi đã xác nhận email. 👎 của AI Tutor: admin thấy tên học viên, giảng viên thì không. |
 | 2026-10-12 | Tầng S: cache có phiên bản (fail-open), rate limit đăng nhập 20/phút/IP (vì NAT ở trường), Caddy + sslip.io (web và API cùng tên miền, /api đi thẳng tới FastAPI), email qua Brevo, deploy bằng build trên VPS + rollback tự động theo /ready, backup pg_dump + tar MinIO giữ 7 ngày |
+| 2026-10-12 | Quên mật khẩu qua email: link 60 phút dùng một lần (token SHA-256 trong `email_tokens`, purpose `reset_password`), xin link mới thì link cũ vô hiệu, đặt mật khẩu mới thu hồi mọi phiên và xác nhận luôn email; luôn 202; 3 lần/giờ/email, 10 lần/giờ/IP; nội dung email bị xóa khỏi outbox sau khi gửi |
+| 2026-10-12 | Thêm provider `openrouter` cho LLM, vision, embedding (API kiểu OpenAI); embedding gửi `dimensions`, cắt về `EMBED_DIM` rồi chuẩn hóa; script `reembed` (đổi model nhúng) và `check_openrouter` |
+| 2026-10-12 | AI Tutor: `availability` có `state` (ready/processing/model_mismatch/failed/empty/draft); lúc tài liệu đang xử lý vẫn gửi được câu hỏi (`waiting_for_docs`, tối đa 5 câu/phiên), job `tutor_waiting` sau `ingest_pdf` + cron 5 phút trả lời bằng đúng luồng Tutor, nhận câu bằng UPDATE có điều kiện, câu trả lời ghi `created_at` của câu hỏi |
+| 2026-10-12 | Trích PDF: chèn lại dấu cách bị mất ở PDF xuất từ slide (hai ký tự cách nhau > 10% cỡ chữ mà không có dấu cách); script `reprocess_pdfs` xử lý lại hàng loạt; `app.scripts.lock_user` khóa/mở khóa tài khoản bằng lệnh (kể cả admin, không khóa admin cuối cùng) |
