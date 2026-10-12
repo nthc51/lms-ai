@@ -63,7 +63,7 @@ Ghi chú thiết kế:
 - Bằng điểm RRF thì đoạn gần nghĩa hơn đứng trước. Thứ tự vector có `Chunk.id` làm tiêu chí phụ để kết quả ổn định.
 - Benchmark: cache key có thêm `mode`, nên kết quả cũ (nếu có) không bị dùng lại nhầm.
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
 
 ```diff
 --- a/backend/tests/test_retrieval.py
@@ -149,7 +149,7 @@ Ghi chú thiết kế:
  
 ```
 
-- [ ] **Bước 2: Code**
+- [x] **Bước 2: Code**
 
 ```diff
 --- a/backend/app/ai/retrieval.py
@@ -415,7 +415,7 @@ Ghi chú thiết kế:
          "--threshold", type=float, default=None, help="ngưỡng từ chối τ (mặc định TUTOR_REFUSE_THRESHOLD)"
 ```
 
-- [ ] **Bước 3: Chạy test + commit**
+- [x] **Bước 3: Chạy test + commit**
 
 ```powershell
 cd backend
