@@ -2255,7 +2255,7 @@ git add docs/ops/runbook.md && git commit -m "docs(ops): VPS provisioning, CD se
 **Files:**
 - Create: `backend/scripts/perf_seed.py`, `perf/k6/catalog.js`, `perf/k6/learner.js`, `docs/perf/report.md`, `perf/results/.gitkeep`
 
-- [ ] **Step 1: `backend/scripts/perf_seed.py`**: tạo dữ liệu đo thẳng trong DB (nhanh, không dính rate limit đăng ký)
+- [x] **Step 1: `backend/scripts/perf_seed.py`**: tạo dữ liệu đo thẳng trong DB (nhanh, không dính rate limit đăng ký)
 
 ```python
 """Tạo dữ liệu cho load test: 1 giảng viên, 20 khóa đã publish (3 chương × 5 bài), 10 học viên đã đăng ký khóa đầu.
@@ -2361,7 +2361,7 @@ Run: `uv run python -m scripts.perf_seed` → `Đã tạo 20 khóa, 10 học vi�
 
 Thêm `perf/seed.json` vào `.gitignore` (file chứa mật khẩu test).
 
-- [ ] **Step 2: `perf/k6/catalog.js`**: người xem chưa đăng nhập duyệt catalog và trang chi tiết
+- [x] **Step 2: `perf/k6/catalog.js`**: người xem chưa đăng nhập duyệt catalog và trang chi tiết
 
 ```javascript
 import http from "k6/http";
@@ -2404,7 +2404,7 @@ export default function (data) {
 }
 ```
 
-- [ ] **Step 3: `perf/k6/learner.js`**: học viên đã đăng nhập xem khóa của mình và đọc bài
+- [x] **Step 3: `perf/k6/learner.js`**: học viên đã đăng nhập xem khóa của mình và đọc bài
 
 ```javascript
 import http from "k6/http";
@@ -2455,7 +2455,7 @@ export default function (data) {
 }
 ```
 
-- [ ] **Step 4: Chạy đo trên stack dev**
+- [ ] (hoãn: đo) **Step 4: Chạy đo trên stack dev**
 
 Chạy k6 bằng Docker, gắn vào mạng của compose dev, nên không cần cài k6 lên Windows:
 
@@ -2485,7 +2485,7 @@ Expected: mỗi lần chạy in bảng tổng kết k6. Các threshold xanh, ho�
 
 Nếu báo `network lms-ai_default not found`, chạy `docker network ls` để xem tên mạng thật của compose dev.
 
-- [ ] **Step 5: `docs/perf/report.md`**: điền **số đo thật** từ các file trong `perf/results/`
+- [ ] (hoãn: đo) **Step 5: `docs/perf/report.md`**: điền **số đo thật** từ các file trong `perf/results/`
 
 ```markdown
 # Báo cáo hiệu năng
@@ -2531,14 +2531,14 @@ tỉ lệ trúng cache (TTL 60 giây). Nêu giới hạn: đo trên một máy, 
 
 (Phần 4 để bạn tự viết sau khi xem số liệu. Đây là nội dung của báo cáo, không phải code.)
 
-- [ ] **Step 6: Commit**
+- [ ] (hoãn: đo) **Step 6: Commit**
 
 ```bash
 git add backend/scripts/perf_seed.py perf/k6 perf/results docs/perf .gitignore
 git commit -m "perf: k6 load tests, seed script and before/after cache measurements"
 ```
 
-- [ ] **Step 7 (tuần 5): đo lại trên VPS**
+- [ ] (hoãn: đo) **Step 7 (tuần 5): đo lại trên VPS**
 
 Trên VPS, chạy k6 cùng mạng nội bộ của stack production:
 
