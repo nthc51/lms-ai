@@ -1180,9 +1180,9 @@ git commit -m "feat(tutor): hỏi lúc tài liệu đang xử lý (câu chờ, w
 - Modify: `frontend/src/components/tutor/tutor-panel.tsx`
 - Test: `frontend/src/lib/tutor/use-tutor-chat-waiting.test.tsx` (mới)
 
-- [ ] **Bước 1:** `cd frontend; npm run gen:api` (kỳ vọng: `AvailabilityOut` có `state`, `processing_docs`, `can_queue`; có path `/questions`).
+- [x] **Bước 1:** `cd frontend; npm run gen:api` (kỳ vọng: `AvailabilityOut` có `state`, `processing_docs`, `can_queue`; có path `/questions`).
 
-- [ ] **Bước 2: Test (sẽ fail)**
+- [x] **Bước 2: Test (sẽ fail)**
 
 ```tsx
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -1347,7 +1347,7 @@ describe("TutorPanel: trạng thái tài liệu", () => {
 });
 ```
 
-- [ ] **Bước 3: Kiểu + hook**
+- [x] **Bước 3: Kiểu + hook**
 
 - `send`: availability chưa sẵn sàng mà `can_queue` → gửi câu chờ (`POST /questions`), không mở stream. 409 thì tải lại availability; lỗi hiện ngay dưới câu hỏi.
 - availability tự hỏi lại mỗi 5 giây khi `state = "processing"`.
@@ -1500,7 +1500,7 @@ describe("TutorPanel: trạng thái tài liệu", () => {
  
 ```
 
-- [ ] **Bước 4: Panel**
+- [x] **Bước 4: Panel**
 
 ```diff
 --- a/frontend/src/components/tutor/tutor-panel.tsx
@@ -1596,7 +1596,7 @@ describe("TutorPanel: trạng thái tài liệu", () => {
    m,
 ```
 
-- [ ] **Bước 5: Kiểm tra + commit**
+- [x] **Bước 5: Kiểm tra + commit**
 
 ```powershell
 npx tsc --noEmit ; npx eslint .
