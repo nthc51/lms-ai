@@ -1333,9 +1333,9 @@ git commit -m "feat(quiz): tính giờ, xáo trộn câu hỏi, chốt bài khi 
 - Modify: `frontend/src/components/teach/quiz-manager.tsx`, `frontend/src/components/lesson/lesson-quizzes.tsx`
 - Modify: `frontend/src/lib/quiz/queries.ts`
 
-- [ ] **Bước 1:** `cd frontend; npm run gen:api` (kỳ vọng: `QuizOut` có `time_limit_sec`, `shuffle`; `AttemptOut` có `server_now`; có path `.../explain`).
+- [x] **Bước 1:** `cd frontend; npm run gen:api` (kỳ vọng: `QuizOut` có `time_limit_sec`, `shuffle`; `AttemptOut` có `server_now`; có path `.../explain`).
 
-- [ ] **Bước 2: Đồng hồ đếm ngược.** Chênh lệch giờ server và giờ máy tính một lần lúc mở bài; trình đọc màn hình chỉ được báo ở các mốc 5 phút / 1 phút / 10 giây; còn dưới 1 phút thì đổi màu (kèm chữ, không chỉ màu).
+- [x] **Bước 2: Đồng hồ đếm ngược.** Chênh lệch giờ server và giờ máy tính một lần lúc mở bài; trình đọc màn hình chỉ được báo ở các mốc 5 phút / 1 phút / 10 giây; còn dưới 1 phút thì đổi màu (kèm chữ, không chỉ màu).
 
 ```tsx
 "use client";
@@ -1398,7 +1398,7 @@ export function QuizTimer({ remainingMs }: { remainingMs: number }) {
 }
 ```
 
-- [ ] **Bước 3: Trang làm bài.** Hết giờ thì tự nộp đúng một lần (đóng hộp xác nhận nếu đang mở); server đã chốt (409) thì vẫn mở kết quả và báo hết giờ; lỗi mạng thì cho bấm nộp lại.
+- [x] **Bước 3: Trang làm bài.** Hết giờ thì tự nộp đúng một lần (đóng hộp xác nhận nếu đang mở); server đã chốt (409) thì vẫn mở kết quả và báo hết giờ; lỗi mạng thì cho bấm nộp lại.
 
 ```diff
 --- a/frontend/src/components/quiz/quiz-player.tsx
@@ -1573,7 +1573,7 @@ export function QuizTimer({ remainingMs }: { remainingMs: number }) {
 +});
 ```
 
-- [ ] **Bước 4: AI giải thích ở trang kết quả**
+- [x] **Bước 4: AI giải thích ở trang kết quả**
 
 ```diff
 --- a/frontend/src/lib/quiz/queries.ts
@@ -1681,7 +1681,7 @@ export function QuizTimer({ remainingMs }: { remainingMs: number }) {
  }
 ```
 
-- [ ] **Bước 5: Cài đặt quiz cho giảng viên, hiển thị thời gian cho học viên**
+- [x] **Bước 5: Cài đặt quiz cho giảng viên, hiển thị thời gian cho học viên**
 
 ```diff
 --- a/frontend/src/components/teach/quiz-manager.tsx
@@ -1760,7 +1760,7 @@ export function QuizTimer({ remainingMs }: { remainingMs: number }) {
                </div>
 ```
 
-- [ ] **Bước 6: Kiểm tra + commit**
+- [x] **Bước 6: Kiểm tra + commit**
 
 ```powershell
 npx tsc --noEmit ; npx eslint .
