@@ -56,6 +56,11 @@ export function LoginForm() {
         <Field id="password" label="Mật khẩu" error={errors.password?.message}>
           <Input type="password" autoComplete="current-password" {...form.register("password")} />
         </Field>
+        <p className="-mt-2 text-right text-sm">
+          <Link href="/forgot-password" className="text-primary underline underline-offset-4">
+            Quên mật khẩu?
+          </Link>
+        </p>
         {unverified ? (
           <div role="alert" className="space-y-3 rounded-md border border-accent/60 p-3 text-sm">
             <p>Bạn cần xác nhận email trước khi đăng nhập. Mở email chúng tôi đã gửi tới {unverified} và bấm link xác nhận.</p>
