@@ -519,7 +519,7 @@ git commit -m "feat(auth): quên mật khẩu qua email (link 60 phút, thu hồ
 - Modify: `frontend/src/app/(auth)/login/login-form.tsx`
 - Regenerate: `frontend/openapi.json`, `frontend/src/lib/api/schema.d.ts`
 
-- [ ] **Bước 1: Sinh lại kiểu API** (backend Task 1 phải xong)
+- [x] **Bước 1: Sinh lại kiểu API** (backend Task 1 phải xong)
 
 ```powershell
 cd frontend
@@ -528,7 +528,7 @@ npm run gen:api
 
 Kỳ vọng: `schema.d.ts` có `"/api/v1/auth/forgot-password"`, `"/api/v1/auth/reset-password"`, `ForgotPasswordIn`, `ResetPasswordIn`.
 
-- [ ] **Bước 2: Hook + test**
+- [x] **Bước 2: Hook + test**
 
 ```ts
 "use client";
@@ -584,7 +584,7 @@ describe("password reset helpers", () => {
 });
 ```
 
-- [ ] **Bước 3: Trang "Quên mật khẩu"**
+- [x] **Bước 3: Trang "Quên mật khẩu"**
 
 Gửi xong thì chuyển sang trạng thái "Kiểm tra hộp thư" (tiêu đề nhận focus cho trình đọc màn hình), có nút "Gửi lại hoặc dùng email khác". 429 báo ngay dưới ô email.
 
@@ -685,7 +685,7 @@ export function ForgotPasswordForm() {
 }
 ```
 
-- [ ] **Bước 4: Trang "Đặt lại mật khẩu"**
+- [x] **Bước 4: Trang "Đặt lại mật khẩu"**
 
 Ba trạng thái: `form` → `done` ("Đã đặt mật khẩu mới" + link Đăng nhập) hoặc `dead` (link sai / đã dùng / hết hạn: "Link không dùng được" + link "Gửi link mới"). Thiếu `?token` thì vào thẳng `dead`.
 
@@ -803,7 +803,7 @@ export function ResetPasswordForm() {
 }
 ```
 
-- [ ] **Bước 5: Link trên trang đăng nhập**
+- [x] **Bước 5: Link trên trang đăng nhập**
 
 ```diff
 --- a/frontend/src/app/(auth)/login/login-form.tsx
@@ -822,7 +822,7 @@ export function ResetPasswordForm() {
              <p>Bạn cần xác nhận email trước khi đăng nhập. Mở email chúng tôi đã gửi tới {unverified} và bấm link xác nhận.</p>
 ```
 
-- [ ] **Bước 6: Kiểm tra**
+- [x] **Bước 6: Kiểm tra**
 
 ```powershell
 npx tsc --noEmit ; npx eslint .
@@ -831,7 +831,7 @@ npx vitest run src/lib/auth
 
 Kỳ vọng: sạch; test `password-reset` pass.
 
-- [ ] **Bước 7: Commit**
+- [x] **Bước 7: Commit**
 
 ```powershell
 git add frontend
