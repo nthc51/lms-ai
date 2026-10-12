@@ -2591,7 +2591,7 @@ git add docs/security && git commit -m "docs(security): OWASP Top 10 review mapp
 - Modify: `.github/workflows/ci.yml`
 - Test: `backend/tests/test_gen_erd.py`
 
-- [ ] **Step 1: Viết test hỏng trước — `tests/test_gen_erd.py`**
+- [x] **Step 1: Viết test hỏng trước — `tests/test_gen_erd.py`**
 
 ```python
 from scripts.gen_erd import render
@@ -2618,12 +2618,12 @@ def test_erd_lists_core_tables_and_relationships():
     assert "uuid id PK" in md
 ```
 
-- [ ] **Step 2: Chạy test**
+- [x] **Step 2: Chạy test**
 
 Run: `uv run pytest tests/test_gen_erd.py -v`
 Expected: FAIL với `ModuleNotFoundError: No module named 'scripts.gen_erd'`
 
-- [ ] **Step 3: `backend/scripts/gen_erd.py`**
+- [x] **Step 3: `backend/scripts/gen_erd.py`**
 
 ```python
 """Sinh ERD dạng Mermaid từ SQLAlchemy metadata để sơ đồ luôn khớp với schema thật.
@@ -2693,20 +2693,20 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-- [ ] **Step 4: Chạy test và sinh file**
+- [x] **Step 4: Chạy test và sinh file**
 
 Run: `uv run pytest tests/test_gen_erd.py -v`, Expected: PASS
 Run: `uv run python -m scripts.gen_erd`, Expected: `Đã ghi ...docs/architecture/erd.md`
 
 Mở `erd.md` bằng VS Code (cài extension "Markdown Preview Mermaid Support") hoặc xem trên GitHub, để chắc sơ đồ hiển thị được.
 
-- [ ] **Step 5: CI kiểm tra ERD luôn mới**: thêm vào cuối các step của job `lint` trong `ci.yml`:
+- [x] **Step 5: CI kiểm tra ERD luôn mới**: thêm vào cuối các step của job `lint` trong `ci.yml`:
 
 ```yaml
       - run: uv run python -m scripts.gen_erd --check
 ```
 
-- [ ] **Step 6: `docs/architecture/README.md`**
+- [x] **Step 6: `docs/architecture/README.md`**
 
 Trước khi commit, Claude Code **đối chiếu với code**: tên service trong compose, các endpoint, và luồng thật trong `app/modules/*`. Sửa sơ đồ nếu có chỗ lệch.
 
@@ -2899,12 +2899,12 @@ sequenceDiagram
 ```
 ````
 
-- [ ] **Step 7: Chạy toàn bộ test**
+- [x] **Step 7: Chạy toàn bộ test**
 
 Run: `uv run pytest -q`
 Expected: PASS hết
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/scripts/gen_erd.py backend/tests/test_gen_erd.py docs/architecture .github/workflows/ci.yml
