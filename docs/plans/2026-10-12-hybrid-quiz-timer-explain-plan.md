@@ -443,7 +443,7 @@ Ghi chú thiết kế (B1):
 - Lưu đáp án quá hạn: đang giữ `FOR SHARE` trên dòng attempt rồi chính transaction đó `UPDATE` (nâng khóa trong cùng transaction, không deadlock với chính nó).
 - Cron chạy mỗi phút, mỗi bài một transaction.
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
 
 ```diff
 --- a/backend/tests/helpers.py
@@ -741,7 +741,7 @@ async def test_ai_error_is_503_and_rate_limit_is_429(client, db, llm, monkeypatc
     assert r.status_code == 429 and "Retry-After" in r.headers
 ```
 
-- [ ] **Bước 2: Cấu hình, schema**
+- [x] **Bước 2: Cấu hình, schema**
 
 ```diff
 --- a/backend/app/core/config.py
@@ -821,7 +821,7 @@ async def test_ai_error_is_503_and_rate_limit_is_429(client, db, llm, monkeypatc
 +    source_page_no: int | None  # trang của đoạn nguồn (None: câu viết tay / không có nguồn)
 ```
 
-- [ ] **Bước 3: Cài đặt quiz (`quizzes.py`)**
+- [x] **Bước 3: Cài đặt quiz (`quizzes.py`)**
 
 ```diff
 --- a/backend/app/modules/quiz/quizzes.py
@@ -873,7 +873,7 @@ async def test_ai_error_is_503_and_rate_limit_is_429(client, db, llm, monkeypatc
  
 ```
 
-- [ ] **Bước 4: Bài làm có giờ (`attempts.py`) + cron**
+- [x] **Bước 4: Bài làm có giờ (`attempts.py`) + cron**
 
 ```diff
 --- a/backend/app/modules/quiz/attempts.py
@@ -1093,7 +1093,7 @@ async def test_ai_error_is_503_and_rate_limit_is_429(client, db, llm, monkeypatc
              answer_waiting_cron,
 ```
 
-- [ ] **Bước 5: AI giải thích (B3)**
+- [x] **Bước 5: AI giải thích (B3)**
 
 ```markdown
 ---
@@ -1312,7 +1312,7 @@ async def explain_answer(
              {"questions": ["Câu hỏi tiếp 1?", "Câu hỏi tiếp 2?", "Câu hỏi tiếp 3?"]}, ensure_ascii=False
 ```
 
-- [ ] **Bước 6: Chạy test + commit**
+- [x] **Bước 6: Chạy test + commit**
 
 ```powershell
 uv run pytest tests/test_quiz_timing.py tests/test_quiz_explain.py tests/test_attempts_api.py tests/test_submit_api.py tests/test_quizzes_api.py tests/test_prompts.py tests/test_worker.py -q
