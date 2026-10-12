@@ -1891,7 +1891,7 @@ git commit -m "feat(ops): production compose with web, Caddy HTTPS, Prometheus, 
 **Files:**
 - Create: `infra/backup/backup-loop.sh`, `infra/backup/backup.sh`, `infra/backup/restore-check.sh`
 
-- [ ] **Step 1: `infra/backup/backup.sh`**
+- [x] **Step 1: `infra/backup/backup.sh`**
 
 ```sh
 #!/bin/sh
@@ -1915,7 +1915,7 @@ find /backups -name 'files-*.tar.gz' -mtime +"$BACKUP_KEEP_DAYS" -delete
 echo "[backup] $ts xong: db $(du -h "/backups/db-$ts.dump" | cut -f1)"
 ```
 
-- [ ] **Step 2: `infra/backup/backup-loop.sh`**
+- [x] **Step 2: `infra/backup/backup-loop.sh`**
 
 ```sh
 #!/bin/sh
@@ -1928,7 +1928,7 @@ while true; do
 done
 ```
 
-- [ ] **Step 3: `infra/backup/restore-check.sh`**
+- [x] **Step 3: `infra/backup/restore-check.sh`**
 
 ```sh
 #!/bin/sh
@@ -1958,11 +1958,11 @@ echo "Thời gian khôi phục: $((end - start)) giây"
 [ "$status" -eq 0 ] && echo "KẾT QUẢ: khớp" || { echo "KẾT QUẢ: LỆCH số dòng" >&2; exit 1; }
 ```
 
-- [ ] **Step 4: Đánh dấu file chạy được**
+- [x] **Step 4: Đánh dấu file chạy được**
 
 Run: `git update-index --chmod=+x infra/backup/*.sh`
 
-- [ ] **Step 5: Diễn tập trên stack production ở máy**
+- [ ] (hoãn: diễn tập) **Step 5: Diễn tập trên stack production ở máy**
 
 Run:
 ```bash
@@ -1976,7 +1976,7 @@ Expected:
 - Thư mục `backups/` có một file `db-*.dump` và một file `files-*.tar.gz`.
 - `restore-check` in ra `KẾT QUẢ: khớp` và thời gian khôi phục.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add infra/backup && git commit -m "feat(ops): daily Postgres and MinIO backups with restore verification script"
