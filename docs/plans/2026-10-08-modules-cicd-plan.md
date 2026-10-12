@@ -508,7 +508,7 @@ git add .github/workflows/ci.yml && git commit -m "ci: run jobs only for the par
 
 Rollback dùng **đúng danh sách service đó** ở commit cũ. Migration vẫn chạy trong lệnh khởi động `api` như trước.
 
-- [ ] **Bước 1: `infra/deploy/deploy.sh`**
+- [x] **Bước 1: `infra/deploy/deploy.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -609,7 +609,7 @@ wait_ready() {
 main "$@"
 ```
 
-- [ ] **Bước 2: `infra/deploy/test_deploy.sh`**: dựng repo git tạm, thay `prod.sh` bằng bản giả ghi lại lệnh, deploy từng loại thay đổi.
+- [x] **Bước 2: `infra/deploy/test_deploy.sh`**: dựng repo git tạm, thay `prod.sh` bằng bản giả ghi lại lệnh, deploy từng loại thay đổi.
 
 ```bash
 #!/usr/bin/env bash
@@ -685,7 +685,7 @@ fi
 echo "Tất cả đều đúng"
 ```
 
-- [ ] **Bước 3: Chạy** (Git Bash, ở gốc repo)
+- [x] **Bước 3: Chạy** (Git Bash, ở gốc repo)
 
 ```bash
 git update-index --chmod=+x infra/deploy/test_deploy.sh
@@ -694,9 +694,9 @@ bash infra/deploy/test_deploy.sh
 
 Expected: 7 dòng `OK`, cuối cùng `Tất cả đều đúng`.
 
-- [ ] **Bước 4: Thử làm sai** (không commit): trong `deploy.sh` đổi `out="$out web"` thành `out="$out api web"`, chạy lại → `FAIL đổi frontend: web …` và `1 trường hợp sai`. Trả lại: `git checkout -- infra/deploy/deploy.sh`.
+- [x] **Bước 4: Thử làm sai** (không commit): trong `deploy.sh` đổi `out="$out web"` thành `out="$out api web"`, chạy lại → `FAIL đổi frontend: web …` và `1 trường hợp sai`. Trả lại: `git checkout -- infra/deploy/deploy.sh`.
 
-- [ ] **Bước 5: Commit**
+- [x] **Bước 5: Commit**
 
 ```bash
 git add infra/deploy && git commit -m "feat(ops): deploy rebuilds only the services that changed, with a local test"
