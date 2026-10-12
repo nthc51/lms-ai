@@ -29,7 +29,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 - Modify: `backend/app/ai/retry.py`
 - Test: `backend/tests/test_openrouter.py` (mới; một test của file này dùng script ở Task 3, chạy hết ở Task 3)
 
-- [ ] **Bước 1: Viết test**
+- [x] **Bước 1: Viết test**
 
 ```python
 """Provider OpenRouter: gọi đúng API kiểu OpenAI, đổi lỗi để retry đúng, stream SSE, đọc ảnh, embedding.
@@ -285,7 +285,7 @@ async def test_check_script_reports_each_step():
     assert await run_checks(_settings(), llm, FakeVision(), FakeEmbedder(get_settings().embed_dim))
 ```
 
-- [ ] **Bước 2: `app/ai/openrouter.py`**
+- [x] **Bước 2: `app/ai/openrouter.py`**
 
 Ghi chú thiết kế:
 
@@ -568,7 +568,7 @@ class OpenRouterEmbedder:
         return (await self.embed_documents([text]))[0]
 ```
 
-- [ ] **Bước 3: Retry nhận `OpenRouterError`**
+- [x] **Bước 3: Retry nhận `OpenRouterError`**
 
 ```diff
 --- a/backend/app/ai/retry.py
