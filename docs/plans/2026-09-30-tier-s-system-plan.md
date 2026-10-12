@@ -1281,7 +1281,7 @@ Stack gồm cả giao diện web (`web`, build từ `frontend/Dockerfile`). Cadd
 
 Tên project compose là `lms-ai-prod`, khác project dev (`lms-ai`), nên hai stack **không dùng chung volume**. Diễn tập stack production trên máy không làm mất dữ liệu dev.
 
-- [ ] **Step 1: `.gitignore`**: thêm các dòng:
+- [x] **Step 1: `.gitignore`**: thêm các dòng:
 
 ```
 .env.prod
@@ -1289,7 +1289,7 @@ backups/
 .deploy/
 ```
 
-- [ ] **Step 2: `infra/prod.sh`**
+- [x] **Step 2: `infra/prod.sh`**
 
 ```bash
 #!/usr/bin/env bash
@@ -1301,7 +1301,7 @@ exec docker compose -f docker-compose.prod.yml --env-file .env.prod "$@"
 
 Run: `git update-index --chmod=+x infra/prod.sh` (trên Windows đây là cách đánh dấu file chạy được trong git).
 
-- [ ] **Step 3: `.env.prod.example`**
+- [x] **Step 3: `.env.prod.example`**
 
 ```
 # Copy thành .env.prod (KHÔNG commit). Sinh mật khẩu: openssl rand -hex 32 (KHÔNG dùng -base64: ký tự / làm hỏng URL)
@@ -1340,7 +1340,7 @@ SMTP_PASSWORD=
 MAIL_FROM=LMS-AI <no-reply@ten-mien-cua-ban>
 ```
 
-- [ ] **Step 4: `docker-compose.prod.yml`**
+- [x] **Step 4: `docker-compose.prod.yml`**
 
 ```yaml
 name: lms-ai-prod
@@ -1514,7 +1514,7 @@ volumes:
   grafanadata:
 ```
 
-- [ ] **Step 5: `infra/caddy/Caddyfile`**
+- [x] **Step 5: `infra/caddy/Caddyfile`**
 
 ```
 {
@@ -1571,7 +1571,7 @@ volumes:
 }
 ```
 
-- [ ] **Step 6: Prometheus và Grafana**
+- [x] **Step 6: Prometheus và Grafana**
 
 `infra/prometheus/prometheus.yml`:
 
@@ -1824,7 +1824,7 @@ providers:
 
 (p95 toàn hệ thống dùng `http_request_duration_highr_seconds`, vì histogram này có nhiều bucket hơn nên kết quả chính xác hơn. Histogram có nhãn `handler` chỉ có 3 bucket (0.1, 0.5 và 1 giây) nên không dùng để tính p95.)
 
-- [ ] **Step 7: Kiểm tra cú pháp**
+- [x] **Step 7: Kiểm tra cú pháp**
 
 Run (Git Bash, ở gốc repo):
 ```bash
@@ -1842,7 +1842,7 @@ Mở `.env.prod` và điền để diễn tập trên máy:
 Run: `./infra/prod.sh config --quiet`
 Expected: không in lỗi. Nếu báo `Đặt ... trong .env.prod` thì điền biến còn thiếu.
 
-- [ ] **Step 8: Diễn tập toàn stack trên máy**
+- [ ] (hoãn: diễn tập) **Step 8: Diễn tập toàn stack trên máy**
 
 Dừng stack dev trước để trống cổng: `docker compose stop`
 
@@ -1869,13 +1869,13 @@ Mở `https://localhost` bằng trình duyệt (chấp nhận chứng chỉ nộ
 
 Mở `https://grafana.localhost`, đăng nhập `admin` với `GRAFANA_ADMIN_PASSWORD`. Vào thư mục **LMS-AI** và mở dashboard "LMS-AI — Tổng quan": các panel phải có dữ liệu sau khoảng 30 giây.
 
-- [ ] **Step 9: Ghim phiên bản image**
+- [ ] (hoãn: diễn tập) **Step 9: Ghim phiên bản image**
 
 Run: `docker image inspect prom/prometheus:latest grafana/grafana-oss:latest --format '{{index .RepoTags 0}} {{index .Config.Labels "org.opencontainers.image.version"}}'`
 
 Thay `latest` trong `docker-compose.prod.yml` bằng đúng phiên bản vừa in ra (ví dụ `prom/prometheus:v3.x.y`), để lúc demo và lúc bảo vệ chạy đúng một bản.
 
-- [ ] **Step 10: Dừng stack diễn tập và commit**
+- [x] **Step 10: Dừng stack diễn tập và commit**
 
 ```bash
 ./infra/prod.sh down        # giữ volume; thêm -v nếu muốn xóa sạch dữ liệu diễn tập
