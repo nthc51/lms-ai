@@ -2918,7 +2918,7 @@ git commit -m "docs(architecture): generated ERD with CI freshness check, C4 and
 **Files:**
 - Modify: `docs/specs/2026-09-29-lms-ai-design.md`
 
-- [ ] **Step 1: Chạy kiểm tra đầy đủ**
+- [x] **Step 1: Chạy kiểm tra đầy đủ**
 
 Run (từ `backend/`):
 ```bash
@@ -2928,7 +2928,7 @@ uv run python -m scripts.gen_erd --check
 ```
 Expected: tất cả đều xanh (backend **706 passed** nếu chưa thêm test nào khác). Sau khi push, CI phải xanh cả 5 job (`lint`, `test`, `frontend`, `docker`, `audit`).
 
-- [ ] **Step 2: Cập nhật spec**
+- [x] **Step 2: Cập nhật spec**
   - **Bảng tiến độ (mục 0):**
     - Đánh dấu S1–S7 là `[x]` nếu đã làm đủ.
     - S2/S3 chỉ đánh `[x]` khi CD đã chạy thật trên VPS (Task 12 Step 3). Nếu chưa có VPS thì để `[~]`.
@@ -2939,7 +2939,7 @@ Expected: tất cả đều xanh (backend **706 passed** nếu chưa thêm test 
   - **Mục 13 (nhật ký quyết định):** thêm dòng:
     `2026-xx-xx | Tầng S: cache có phiên bản (fail-open), rate limit đăng nhập 20/phút/IP (vì NAT ở trường), Caddy + sslip.io (web và API cùng tên miền, /api đi thẳng tới FastAPI), email qua Brevo, deploy bằng build trên VPS + rollback tự động theo /ready, backup pg_dump + tar MinIO giữ 7 ngày`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/specs && git commit -m "docs: update spec progress after tier S"
