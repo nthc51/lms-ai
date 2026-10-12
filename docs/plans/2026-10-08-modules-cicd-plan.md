@@ -277,7 +277,7 @@ Job `changes` dùng `dorny/paths-filter` xem lần push đổi phần nào; job 
 | `ci.yml` | tất cả |
 | chỉ `docs/`, `*.md` ở gốc | chỉ `changes` |
 
-- [ ] **Bước 1: `.github/workflows/ci.yml`**
+- [x] **Bước 1: `.github/workflows/ci.yml`**
 
 ```yaml
 name: CI
@@ -479,9 +479,9 @@ jobs:
           -e ACME_EMAIL=ci@example.com caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
-- [ ] **Bước 2: Kiểm cú pháp (tùy chọn):** nếu có Docker: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest` → không in lỗi.
+- [x] **Bước 2: Kiểm cú pháp (tùy chọn):** nếu có Docker: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest` → không in lỗi.
 
-- [ ] **Bước 3: Commit** (push ở Task 6)
+- [x] **Bước 3: Commit** (push ở Task 6)
 
 ```bash
 git add .github/workflows/ci.yml && git commit -m "ci: run jobs only for the parts that changed"
