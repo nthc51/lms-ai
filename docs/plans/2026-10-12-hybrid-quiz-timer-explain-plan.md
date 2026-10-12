@@ -1920,7 +1920,7 @@ git commit -m "feat(web): đồng hồ làm quiz và tự nộp khi hết giờ,
 +| 2026-10-12 | B1: `time_limit_sec` (60 giây – 4 giờ) và `shuffle` khi tạo/sửa quiz (null tường minh = bỏ giới hạn); `deadline_at` theo giờ DB, `server_now` trong bài làm để đồng hồ không lệch; quá `deadline_at + 5s` thì lưu/nộp bị từ chối và bài chốt `timed_out` với đáp án đã autosave; chốt khi có thao tác trên bài + cron mỗi phút. B2: hybrid vector top-20 + full-text top-20 gộp RRF (k=60), `RETRIEVAL_MODE=vector` để so sánh, benchmark có `mode=`. B3: `POST /attempts/{id}/answers/{qid}/explain` sau khi nộp, chỉ câu sai/bỏ trống, 30 lần/giờ/học viên, lỗi AI → 503 |
 ```
 
-- [ ] Commit: `git add docs; git commit -m "docs: spec B1, B2, B3 xong"`.
+- [x] Commit: `git add docs; git commit -m "docs: spec B1, B2, B3 xong"`.
 
 ---
 
