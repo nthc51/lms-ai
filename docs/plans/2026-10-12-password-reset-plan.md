@@ -930,8 +930,8 @@ test.describe("quên mật khẩu", () => {
 });
 ```
 
-- [ ] Chạy: `npx playwright test e2e/auth-password.spec.ts e2e/auth-email.spec.ts e2e/student.spec.ts` → pass (cả 375px và 1280px).
-- [ ] Commit: `git commit -am "test(e2e): quên mật khẩu"` (nhớ `git add` file mới).
+- [x] Chạy: `npx playwright test e2e/auth-password.spec.ts e2e/auth-email.spec.ts e2e/student.spec.ts` → pass (cả 375px và 1280px).
+- [x] Commit: `git commit -am "test(e2e): quên mật khẩu"` (nhớ `git add` file mới).
 
 ---
 
