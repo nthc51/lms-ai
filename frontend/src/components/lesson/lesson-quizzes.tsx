@@ -37,6 +37,7 @@ export function LessonQuizzes({ slug, lessonId, isStudent }: { slug: string; les
                 <p className="font-medium">{q.title}</p>
                 <p className="text-sm text-muted-foreground">
                   {q.question_count} câu · đạt từ {q.pass_score}%
+                  {q.time_limit_sec ? ` · ${Math.round(q.time_limit_sec / 60)} phút` : ""}
                   {isStudent ? ` · đã làm ${used}/${q.max_attempts} lượt` : ""}
                 </p>
               </div>

@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, CircleSlash, RotateCcw, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleSlash, RotateCcw, Sparkles, XCircle } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Badge, Skeleton } from "@/components/ui/misc";
-import { useAttemptResult, useQuiz } from "@/lib/quiz/queries";
+import { errorMessage } from "@/lib/api/errors";
+import { useAttemptResult, useExplainAnswer, useQuiz } from "@/lib/quiz/queries";
 import type { AttemptResult } from "@/lib/quiz/types";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +62,7 @@ export function QuizResult({ slug, lessonId, quizId, attemptId }: { slug: string
             </div>
             <ol className="mt-6 space-y-4">
               {result.data.questions.map((q, i) =>
-                onlyWrong && q.is_correct ? null : <ResultItem key={q.id} q={q} n={i + 1} />,
+                onlyWrong && q.is_correct ? null : <ResultItem key={q.id} q={q} n={i + 1} attemptId={attemptId} />,
               )}
             </ol>
           </>
@@ -92,7 +93,7 @@ function Summary({ r }: { r: AttemptResult }) {
   );
 }
 
-function ResultItem({ q, n }: { q: AttemptResult["questions"][number]; n: number }) {
+function ResultItem({ q, n, attemptId }: { q: AttemptResult["questions"][number]; n: number; attemptId: string }) {
   const unanswered = q.selected_option_id == null;
   return (
     <li className="rounded-lg border bg-surface p-4">
@@ -146,9 +147,39 @@ function ResultItem({ q, n }: { q: AttemptResult["questions"][number]; n: number
               <p className="reader mt-2 text-muted-foreground [--reader-size:15px]">{q.explanation}</p>
             </details>
           ) : null}
+          {!q.is_correct ? <AiExplanation attemptId={attemptId} questionId={q.id} unanswered={unanswered} /> : null}
         </div>
       </div>
     </li>
+  );
+}
+
+/** Nút "AI giải thích" dưới câu sai / bỏ trống; [1] trong lời giải thích = đoạn tài liệu nguồn (ghi số trang). */
+function AiExplanation({ attemptId, questionId, unanswered }: { attemptId: string; questionId: string; unanswered: boolean }) {
+  const explain = useExplainAnswer(attemptId, questionId);
+  if (explain.data) {
+    const page = explain.data.source_page_no;
+    const text = explain.data.text.replace(/\[1\]/g, page != null ? `(tài liệu, trang ${page})` : "");
+    return (
+      <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+        <p className="mb-1 flex items-center gap-1 text-sm font-medium">
+          <Sparkles className="size-4" aria-hidden /> AI giải thích
+        </p>
+        <p className="reader text-[15px] [--reader-size:15px]">{text}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3">
+      <Button variant="outline" size="sm" loading={explain.isPending} loadingText="AI đang giải thích…" onClick={() => explain.mutate()}>
+        <Sparkles /> {unanswered ? "AI giải thích đáp án" : "AI giải thích vì sao sai"}
+      </Button>
+      {explain.isError ? (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {errorMessage(explain.error)}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

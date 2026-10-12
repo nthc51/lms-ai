@@ -3013,6 +3013,71 @@
         }
       }
     },
+    "/api/v1/attempts/{attempt_id}/answers/{question_id}/explain": {
+      "post": {
+        "tags": [
+          "quiz"
+        ],
+        "summary": "Explain Answer",
+        "description": "AI giải thích câu làm sai / bỏ trống của bài đã nộp (2–4 câu, trích [1] = đoạn tài liệu nguồn). Lần sau trả\nlại bản đã lưu. Học viên: tối đa QUIZ_EXPLAIN_RATE_LIMIT_PER_HOUR lần gọi AI / giờ (429 + Retry-After).",
+        "operationId": "explain_answer_api_v1_attempts__attempt_id__answers__question_id__explain_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attempt Id"
+            }
+          },
+          {
+            "name": "question_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Question Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_STATE: chưa nộp bài / câu đã làm đúng"
+          },
+          "503": {
+            "description": "AI_UNAVAILABLE"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/courses/{course_id}/analytics": {
       "get": {
         "tags": [
@@ -5531,6 +5596,11 @@
             ],
             "title": "Deadline At"
           },
+          "server_now": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Server Now"
+          },
           "questions": {
             "items": {
               "$ref": "#/components/schemas/AttemptQuestion"
@@ -5554,6 +5624,7 @@
           "status",
           "started_at",
           "deadline_at",
+          "server_now",
           "questions",
           "answers"
         ],
@@ -6317,6 +6388,31 @@
           "enrolled_at"
         ],
         "title": "EnrollmentOut"
+      },
+      "ExplainOut": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "source_page_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Page No"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "source_page_no"
+        ],
+        "title": "ExplainOut"
       },
       "ExtractionMethod": {
         "type": "string",
@@ -7763,6 +7859,24 @@
             "type": "array",
             "maxItems": 100,
             "title": "Question Ids"
+          },
+          "time_limit_sec": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 14400.0,
+                "minimum": 60.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Sec"
+          },
+          "shuffle": {
+            "type": "boolean",
+            "title": "Shuffle",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -7815,6 +7929,21 @@
             "type": "number",
             "title": "Pass Score"
           },
+          "time_limit_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Sec"
+          },
+          "shuffle": {
+            "type": "boolean",
+            "title": "Shuffle"
+          },
           "status": {
             "$ref": "#/components/schemas/QuizStatus"
           },
@@ -7860,6 +7989,8 @@
           "title",
           "max_attempts",
           "pass_score",
+          "time_limit_sec",
+          "shuffle",
           "status",
           "question_count",
           "created_at"
@@ -8024,6 +8155,30 @@
               }
             ],
             "title": "Question Ids"
+          },
+          "time_limit_sec": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 14400.0,
+                "minimum": 60.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Sec"
+          },
+          "shuffle": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shuffle"
           }
         },
         "additionalProperties": false,

@@ -16,6 +16,9 @@ import { lastAttempt } from "@/lib/quiz/attempt-store";
 import { useQuiz } from "@/lib/quiz/queries";
 import { useQuizAttempt } from "@/lib/quiz/use-quiz-attempt";
 import { cn } from "@/lib/utils";
+import { QuizTimer, useRemainingMs } from "./quiz-timer";
+
+const TIME_UP = "Đã hết giờ. Bài đã được nộp với các đáp án đã lưu. Đang mở kết quả…";
 
 /**
  * Làm quiz (design-system §5.3, phần Quiz): từng câu một, chọn đáp án bằng thẻ cả dòng (radio, ≥ 48px),
@@ -43,11 +46,29 @@ export function QuizPlayer({ slug, lessonId, quizId }: { slug: string; lessonId:
     [router, lessonHref, quizId],
   );
 
+  // Quiz có giới hạn thời gian: đếm ngược theo giờ server, hết giờ thì tự nộp (kèm mọi đáp án đã chọn)
+  const remaining = useRemainingMs(attempt.data?.deadline_at, attempt.data?.server_now);
+  const timeUp = remaining === 0;
+  const autoSubmitted = React.useRef(false);
+  React.useEffect(() => {
+    if (!timeUp || autoSubmitted.current || navigated.current || !attemptId) return;
+    autoSubmitted.current = true;
+    setConfirmOpen(false);
+    setSubmitting(true);
+    submit()
+      .then((result) => goToResult(result.attempt_id, "Hết giờ: bài đã được nộp tự động"))
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.code === "ATTEMPT_CLOSED") return goToResult(attemptId, TIME_UP);
+        toast.error(errorMessage(err));
+        setSubmitting(false); // lỗi mạng: để học viên bấm Nộp bài lại (server vẫn nhận trong vài giây bù trễ)
+      });
+  }, [timeUp, attemptId, submit, goToResult]);
+
   React.useEffect(() => {
     if (closed && attemptId) {
-      goToResult(attemptId, "Bài làm này đã được nộp ở nơi khác. Đang mở kết quả…");
+      goToResult(attemptId, timeUp ? TIME_UP : "Bài làm này đã được nộp ở nơi khác. Đang mở kết quả…");
     }
-  }, [closed, attemptId, goToResult]);
+  }, [closed, attemptId, goToResult, timeUp]);
 
   if (attempt.isError) {
     const err = attempt.error;
@@ -108,7 +129,7 @@ export function QuizPlayer({ slug, lessonId, quizId }: { slug: string; lessonId:
     } catch (err) {
       if (err instanceof ApiError && err.code === "ATTEMPT_CLOSED" && attemptId) {
         setConfirmOpen(false);
-        goToResult(attemptId, "Bài làm này đã được nộp ở nơi khác. Đang mở kết quả…");
+        goToResult(attemptId, err.message.includes("hết giờ") ? TIME_UP : "Bài làm này đã được nộp ở nơi khác. Đang mở kết quả…");
         return;
       }
       toast.error(errorMessage(err));
@@ -118,7 +139,11 @@ export function QuizPlayer({ slug, lessonId, quizId }: { slug: string; lessonId:
   }
 
   return (
-    <Shell title={quiz.data?.title} lessonHref={lessonHref}>
+    <Shell
+      title={quiz.data?.title}
+      lessonHref={lessonHref}
+      aside={remaining !== null ? <QuizTimer remainingMs={remaining} /> : null}
+    >
       <div className="grid gap-8 lg:grid-cols-[1fr_220px]">
         <section aria-labelledby="q-stem">
           <div className="mb-4 flex items-center justify-between gap-3 text-sm text-muted-foreground">
@@ -254,7 +279,17 @@ function SaveBadge({ state, closed }: { state: SaveState | undefined; closed: bo
   );
 }
 
-function Shell({ title, lessonHref, children }: { title?: string; lessonHref: string; children: React.ReactNode }) {
+function Shell({
+  title,
+  lessonHref,
+  aside,
+  children,
+}: {
+  title?: string;
+  lessonHref: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-2 backdrop-blur md:px-4">
@@ -264,6 +299,7 @@ function Shell({ title, lessonHref, children }: { title?: string; lessonHref: st
           </Link>
         </Button>
         <h1 className="min-w-0 flex-1 truncate font-semibold">{title ?? "Quiz"}</h1>
+        {aside}
       </header>
       <main id="main" className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 md:px-8">
         {children}

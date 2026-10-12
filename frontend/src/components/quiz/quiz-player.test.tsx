@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/errors";
 import { QuizPlayer } from "./quiz-player";
 
@@ -135,5 +135,64 @@ describe("QuizPlayer", () => {
     setHook({ closed: true });
     rerender(<QuizPlayer slug="toan" lessonId="l1" quizId="qz1" />);
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+});
+
+describe("QuizPlayer: quiz có giới hạn thời gian", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  function timed(secondsLeft: number, over: Record<string, unknown> = {}) {
+    // giờ máy lệch 1 giờ so với server: đồng hồ vẫn phải đếm theo giờ server
+    const serverNow = new Date(Date.now() + 3_600_000);
+    setHook({
+      attempt: {
+        isError: false,
+        isPending: false,
+        data: {
+          ...attemptData,
+          server_now: serverNow.toISOString(),
+          deadline_at: new Date(serverNow.getTime() + secondsLeft * 1000).toISOString(),
+        },
+      },
+      ...over,
+    });
+  }
+
+  it("hiện đồng hồ đếm ngược theo giờ server", async () => {
+    timed(125);
+    renderPlayer();
+    await act(() => vi.advanceTimersByTimeAsync(10));
+    expect(screen.getByRole("timer")).toHaveTextContent(/02:0[45]/);
+  });
+
+  it("hết giờ: tự nộp (không hỏi xác nhận) rồi mở kết quả", async () => {
+    const submit = vi.fn().mockResolvedValue({ attempt_id: "a1" });
+    timed(2, { submit });
+    renderPlayer();
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(RESULT_URL));
+    expect(toastInfo).toHaveBeenCalledWith(expect.stringContaining("Hết giờ"));
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(submit).toHaveBeenCalledTimes(1);
+  });
+
+  it("hết giờ mà server đã chốt bài: vẫn mở kết quả, báo hết giờ", async () => {
+    const submit = vi.fn().mockRejectedValue(new ApiError(409, "ATTEMPT_CLOSED", "Đã hết giờ làm bài"));
+    timed(1, { submit });
+    renderPlayer();
+    await act(() => vi.advanceTimersByTimeAsync(2000));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(RESULT_URL));
+    expect(toastInfo).toHaveBeenCalledWith(expect.stringContaining("Đã hết giờ"));
+  });
+
+  it("quiz không giới hạn: không có đồng hồ", () => {
+    setHook();
+    renderPlayer();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 });

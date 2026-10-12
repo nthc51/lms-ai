@@ -859,6 +859,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attempts/{attempt_id}/answers/{question_id}/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain Answer
+         * @description AI giải thích câu làm sai / bỏ trống của bài đã nộp (2–4 câu, trích [1] = đoạn tài liệu nguồn). Lần sau trả
+         *     lại bản đã lưu. Học viên: tối đa QUIZ_EXPLAIN_RATE_LIMIT_PER_HOUR lần gọi AI / giờ (429 + Retry-After).
+         */
+        post: operations["explain_answer_api_v1_attempts__attempt_id__answers__question_id__explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courses/{course_id}/analytics": {
         parameters: {
             query?: never;
@@ -1660,6 +1681,11 @@ export interface components {
             started_at: string;
             /** Deadline At */
             deadline_at: string | null;
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
             /** Questions */
             questions: components["schemas"]["AttemptQuestion"][];
             /** Answers */
@@ -1998,6 +2024,13 @@ export interface components {
              * Format: date-time
              */
             enrolled_at: string;
+        };
+        /** ExplainOut */
+        ExplainOut: {
+            /** Text */
+            text: string;
+            /** Source Page No */
+            source_page_no: number | null;
         };
         /**
          * ExtractionMethod
@@ -2554,6 +2587,13 @@ export interface components {
             pass_score: number;
             /** Question Ids */
             question_ids?: string[];
+            /** Time Limit Sec */
+            time_limit_sec?: number | null;
+            /**
+             * Shuffle
+             * @default false
+             */
+            shuffle: boolean;
         };
         /**
          * QuizGenerateIn
@@ -2586,6 +2626,10 @@ export interface components {
             max_attempts: number;
             /** Pass Score */
             pass_score: number;
+            /** Time Limit Sec */
+            time_limit_sec: number | null;
+            /** Shuffle */
+            shuffle: boolean;
             status: components["schemas"]["QuizStatus"];
             /** Question Count */
             question_count: number;
@@ -2649,6 +2693,10 @@ export interface components {
             pass_score?: number | null;
             /** Question Ids */
             question_ids?: string[] | null;
+            /** Time Limit Sec */
+            time_limit_sec?: number | null;
+            /** Shuffle */
+            shuffle?: boolean | null;
         };
         /**
          * ReasonIn
@@ -4964,6 +5012,52 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    explain_answer_api_v1_attempts__attempt_id__answers__question_id__explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplainOut"];
+                };
+            };
+            /** @description INVALID_STATE: chưa nộp bài / câu đã làm đúng */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description AI_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

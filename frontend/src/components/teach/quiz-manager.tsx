@@ -50,6 +50,8 @@ export function QuizManager({ lessonId }: { lessonId: string }) {
                 <p className="font-medium">{q.title}</p>
                 <p className="text-sm text-muted-foreground">
                   {q.question_count} câu · tối đa {q.max_attempts} lượt · đạt từ {q.pass_score}%
+                  {q.time_limit_sec ? ` · ${Math.round(q.time_limit_sec / 60)} phút` : ""}
+                  {q.shuffle ? " · xáo câu hỏi" : ""}
                 </p>
               </div>
               {q.status === "published" ? <Badge tone="success">Đã xuất bản</Badge> : <Badge>Nháp</Badge>}
@@ -145,6 +147,9 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
   const [title, setTitle] = React.useState(quiz?.title ?? "");
   const [maxAttempts, setMaxAttempts] = React.useState(quiz?.max_attempts ?? 1);
   const [passScore, setPassScore] = React.useState(quiz?.pass_score ?? 50);
+  // Giới hạn thời gian nhập theo phút; để trống = không giới hạn
+  const [minutes, setMinutes] = React.useState(quiz?.time_limit_sec ? String(Math.round(quiz.time_limit_sec / 60)) : "");
+  const [shuffle, setShuffle] = React.useState(quiz?.shuffle ?? false);
   const [selected, setSelected] = React.useState<Set<string> | null>(quiz ? null : new Set());
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -165,9 +170,19 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return setError("Nhập tiêu đề quiz");
+    const mins = minutes.trim() ? Number(minutes) : null;
+    if (mins !== null && (!Number.isInteger(mins) || mins < 1 || mins > 240))
+      return setError("Thời gian làm bài là số phút từ 1 đến 240, hoặc để trống nếu không giới hạn");
     setPending(true);
     setError(null);
-    const body = { title: title.trim(), max_attempts: maxAttempts, pass_score: passScore, question_ids: [...chosen] };
+    const body = {
+      title: title.trim(),
+      max_attempts: maxAttempts,
+      pass_score: passScore,
+      question_ids: [...chosen],
+      time_limit_sec: mins === null ? null : mins * 60,
+      shuffle,
+    };
     try {
       if (quiz) await mut.update.mutateAsync({ id: quiz.id, body });
       else await mut.create.mutateAsync({ lesson_id: lessonId, ...body });
@@ -197,6 +212,18 @@ function QuizDialog({ lessonId, quiz, onClose }: { lessonId: string; quiz: Quiz 
             <Field id="quiz-pass" label="Điểm đạt (%)" hint="0–100">
               <Input type="number" min={0} max={100} step={5} value={passScore} onChange={(e) => setPassScore(Number(e.target.value))} />
             </Field>
+            <Field id="quiz-minutes" label="Thời gian làm bài (phút)" hint="Để trống nếu không giới hạn">
+              <Input type="number" min={1} max={240} value={minutes} placeholder="Không giới hạn" onChange={(e) => setMinutes(e.target.value)} />
+            </Field>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 self-end rounded-md px-1 text-sm">
+              <input
+                type="checkbox"
+                checked={shuffle}
+                onChange={(e) => setShuffle(e.target.checked)}
+                className="size-4 accent-[var(--primary)]"
+              />
+              Xáo thứ tự câu hỏi cho mỗi lượt làm
+            </label>
           </div>
           <fieldset>
             <legend className="mb-2 text-sm font-medium">

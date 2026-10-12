@@ -132,6 +132,18 @@ export function useAttemptResult(attemptId: string) {
   });
 }
 
+/** AI giải thích một câu làm sai / bỏ trống của bài đã nộp. */
+export function useExplainAnswer(attemptId: string, questionId: string) {
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.POST("/api/v1/attempts/{attempt_id}/answers/{question_id}/explain", {
+          params: { path: { attempt_id: attemptId, question_id: questionId } },
+        }),
+      ),
+  });
+}
+
 /** Câu trả lời AI Tutor bị chê trong khóa (giảng viên; không có tên học viên). */
 export function useCourseTutorFeedback(courseId: string | undefined) {
   return useQuery({
