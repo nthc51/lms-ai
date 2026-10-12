@@ -1989,7 +1989,7 @@ git add infra/backup && git commit -m "feat(ops): daily Postgres and MinIO backu
 **Files:**
 - Create: `infra/deploy/deploy.sh`, `.github/workflows/deploy.yml`
 
-- [ ] **Step 1: `infra/deploy/deploy.sh`** (chạy trên VPS)
+- [x] **Step 1: `infra/deploy/deploy.sh`** (chạy trên VPS)
 
 ```bash
 #!/usr/bin/env bash
@@ -2050,7 +2050,7 @@ main "$@"
 
 Run: `git update-index --chmod=+x infra/deploy/deploy.sh`
 
-- [ ] **Step 2: `.github/workflows/deploy.yml`**
+- [x] **Step 2: `.github/workflows/deploy.yml`**
 
 ```yaml
 name: Deploy
@@ -2085,12 +2085,12 @@ jobs:
         run: curl -fsS --retry 10 --retry-delay 3 --retry-all-errors "https://${{ vars.APP_DOMAIN }}/api/v1/ready"
 ```
 
-- [ ] **Step 3: Kiểm tra cú pháp shell**
+- [x] **Step 3: Kiểm tra cú pháp shell**
 
 Run (Git Bash): `bash -n infra/deploy/deploy.sh && bash -n infra/prod.sh && echo OK`
 Expected: `OK`
 
-- [ ] **Step 4: Commit** (chưa push lên `main` cho đến khi xong Task 12. Nếu lỡ push trước, workflow chỉ lỗi ở bước SSH vì chưa có secrets, không hỏng gì.)
+- [x] **Step 4: Commit** (chưa push lên `main` cho đến khi xong Task 12. Nếu lỡ push trước, workflow chỉ lỗi ở bước SSH vì chưa có secrets, không hỏng gì.)
 
 ```bash
 git add infra/deploy .github/workflows/deploy.yml
