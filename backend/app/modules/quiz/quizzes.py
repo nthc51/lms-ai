@@ -137,6 +137,8 @@ async def _to_outs(
             title=q.title,
             max_attempts=q.max_attempts,
             pass_score=q.pass_score,
+            time_limit_sec=q.time_limit_sec,
+            shuffle=q.shuffle,
             status=q.status,
             question_count=counts.get(q.id, 0),
             created_at=q.created_at,
@@ -156,6 +158,8 @@ async def create_quiz(db: AsyncSession, user: User, data: QuizCreate) -> QuizOut
         title=data.title,
         max_attempts=data.max_attempts,
         pass_score=data.pass_score,
+        time_limit_sec=data.time_limit_sec,
+        shuffle=data.shuffle,
         status=QuizStatus.draft,
     )
     db.add(quiz)
@@ -169,18 +173,23 @@ async def update_quiz(db: AsyncSession, user: User, quiz: Quiz, data: QuizUpdate
     await _lock_quiz(db, quiz)
     if quiz.status == QuizStatus.published:
         # Quiz đã xuất bản bất biến: chỉ đổi được tiêu đề (cài đặt gửi lại đúng giá trị cũ thì bỏ qua)
-        changes_settings = (data.max_attempts is not None and data.max_attempts != quiz.max_attempts) or (
-            data.pass_score is not None and data.pass_score != quiz.pass_score
+        changes_settings = (
+            (data.max_attempts is not None and data.max_attempts != quiz.max_attempts)
+            or (data.pass_score is not None and data.pass_score != quiz.pass_score)
+            or ("time_limit_sec" in data.model_fields_set and data.time_limit_sec != quiz.time_limit_sec)
+            or (data.shuffle is not None and data.shuffle != quiz.shuffle)
         )
         if data.question_ids is not None or changes_settings:
             raise AppError("INVALID_STATE", "Quiz đã xuất bản, chỉ đổi được tiêu đề", 409)
     elif data.question_ids is not None:
         await _validate_question_ids(db, quiz.lesson_id, data.question_ids)
         await _set_questions(db, quiz.id, data.question_ids)
-    for field in ("title", "max_attempts", "pass_score"):
+    for field in ("title", "max_attempts", "pass_score", "shuffle"):
         value = getattr(data, field)
         if value is not None:
             setattr(quiz, field, value)
+    if "time_limit_sec" in data.model_fields_set:
+        quiz.time_limit_sec = data.time_limit_sec
     await db.commit()
     return (await _to_outs(db, [quiz], user, True, with_questions=True))[0]
 

@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     # Cách tìm đoạn tài liệu: hybrid (vector + full-text, gộp RRF) hoặc vector (chỉ vector, để so sánh)
     retrieval_mode: Literal["hybrid", "vector"] = "hybrid"
     tutor_rate_limit_per_hour: int = 30  # số câu hỏi Tutor mỗi học viên mỗi giờ (spec 5.3 bước 7)
+    quiz_explain_rate_limit_per_hour: int = 30  # số lần bấm "AI giải thích" câu sai mỗi học viên mỗi giờ
     # Đếm cả lần sai mật khẩu. Rộng tay vì cả lớp dùng chung một IP khi ở WiFi trường (NAT)
     login_rate_limit_per_min: int = 20
     cache_enabled: bool = True

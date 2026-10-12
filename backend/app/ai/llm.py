@@ -132,6 +132,11 @@ def default_reply(call: FakeCall) -> str:
         return json.dumps({"cards": cards}, ensure_ascii=False)
     if call.op.startswith("studio_"):
         return "## Nội dung mô phỏng\n\n- Ý thứ nhất [1]\n- Ý thứ hai [1]\n\n(chế độ giả lập, không gọi AI)"
+    if call.op == "quiz_explain":
+        return (
+            "Bạn chọn một phương án chưa đúng. Theo tài liệu [1], đáp án đúng phù hợp với nội dung của đoạn nguồn. "
+            "(Giải thích mô phỏng, chế độ giả lập, không gọi AI.)"
+        )
     if call.op == "tutor_followups":
         return json.dumps(
             {"questions": ["Câu hỏi tiếp 1?", "Câu hỏi tiếp 2?", "Câu hỏi tiếp 3?"]}, ensure_ascii=False

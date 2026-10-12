@@ -16,6 +16,7 @@ from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.queue import ArqQueue, JobQueue
 from app.modules.jobs.service import create_and_enqueue, finish_job
 from app.modules.materials.models import Source, SourceStatus
+from app.modules.quiz.attempts import finalize_overdue_attempts
 from app.modules.quiz.generation import QuizGenerationError, generate_questions_for_lesson
 from app.modules.quiz.schemas import QuizGenerateIn
 from app.modules.studio.jobs import run_notes_synth, run_source_guide, run_studio
@@ -374,6 +375,11 @@ async def sweep_stale_jobs(ctx: dict) -> int:
     if requeued:
         logger.warning("Đã enqueue lại %d job pending bị kẹt", requeued)
     return swept
+
+
+async def finalize_overdue_quiz_attempts(ctx: dict) -> int:
+    """Cron mỗi phút: chốt các bài quiz đã hết giờ mà học viên bỏ dở (B1)."""
+    return await finalize_overdue_attempts(ctx.get("session_factory", SessionLocal))
 
 
 async def send_pending_emails(ctx: dict) -> int:

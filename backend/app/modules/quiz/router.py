@@ -3,19 +3,22 @@ import uuid
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.llm_client import LLMClient, get_llm_client
 from app.core.db import get_db
 from app.core.deps import get_current_user, require_role, require_staff
 from app.core.pagination import PageParams, page_params
+from app.core.ratelimit import RateLimiter, get_rate_limiter
 from app.modules.auth.models import Role, User
 from app.modules.jobs.queue import JobQueue, get_queue
 from app.modules.materials.schemas import JobRef
-from app.modules.quiz import attempts, questions, quizzes
+from app.modules.quiz import attempts, explain, questions, quizzes
 from app.modules.quiz.models import ReviewStatus
 from app.modules.quiz.schemas import (
     AnswerIn,
     AnswerOut,
     AttemptOut,
     AttemptResult,
+    ExplainOut,
     QuestionOut,
     QuestionPage,
     QuestionReview,
@@ -155,3 +158,24 @@ async def attempt_result(
     attempt_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     return await attempts.get_result(db, user, attempt_id)
+
+
+@router.post(
+    "/attempts/{attempt_id}/answers/{question_id}/explain",
+    response_model=ExplainOut,
+    responses={
+        409: {"description": "INVALID_STATE: chưa nộp bài / câu đã làm đúng"},
+        503: {"description": "AI_UNAVAILABLE"},
+    },
+)
+async def explain_answer(
+    attempt_id: uuid.UUID,
+    question_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    llm: LLMClient = Depends(get_llm_client),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+):
+    """AI giải thích câu làm sai / bỏ trống của bài đã nộp (2–4 câu, trích [1] = đoạn tài liệu nguồn). Lần sau trả
+    lại bản đã lưu. Học viên: tối đa QUIZ_EXPLAIN_RATE_LIMIT_PER_HOUR lần gọi AI / giờ (429 + Retry-After)."""
+    return await explain.explain_answer(db, llm, limiter, user, attempt_id, question_id)

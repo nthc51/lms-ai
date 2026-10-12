@@ -9,6 +9,7 @@ EXPECTED_VARS = {
     "tutor_rewrite": {"history", "question"},
     "quiz_generate": {"count", "difficulties", "heading", "source", "avoid", "feedback"},
     "quiz_self_check": {"source", "stem", "options"},
+    "quiz_explain": {"stem", "options", "chosen", "correct", "explanation", "source"},
     # AI Studio
     "source_guide": {"document"},
     "studio_study_guide": {"scope", "context"},

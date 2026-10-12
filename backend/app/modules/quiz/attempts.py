@@ -1,5 +1,10 @@
-"""Học viên làm quiz — phần A7 (spec 4.3, 6.5): bắt đầu, autosave, nộp, chấm, xem kết quả.
-Tính giờ/deadline, xáo trộn câu hỏi và cron chốt bài khi hết giờ là B1 (tuần 3).
+"""Học viên làm quiz (spec 4.3, 6.5): bắt đầu, autosave, nộp, chấm, xem kết quả.
+
+Tính giờ (B1): quiz có time_limit_sec thì bài làm có deadline_at = lúc bắt đầu + time_limit_sec (giờ DB). Đáp án
+và lần nộp đến muộn quá LATE_GRACE (bù độ trễ mạng) bị từ chối và bài được chốt `timed_out` với các đáp án đã
+autosave. Bài quá hạn được chốt theo 2 đường: ngay khi có thao tác trên bài đó (lưu đáp án, nộp, bắt đầu lại, xem
+kết quả), và cron mỗi phút (finalize_overdue_attempts) cho bài bị bỏ dở. Xáo trộn (B1): quiz có shuffle thì mỗi
+lượt làm có thứ tự câu hỏi ngẫu nhiên riêng (lưu trong question_order nên mở lại vẫn giữ thứ tự).
 
 Hợp đồng khóa giữa autosave và chốt bài (Task 19 / cron B1 phải tuân theo):
 - autosave: `SELECT ... FOR SHARE` dòng quiz_attempts, kiểm tra status = in_progress, rồi upsert
@@ -9,12 +14,15 @@ Hợp đồng khóa giữa autosave và chốt bài (Task 19 / cron B1 phải tu
 Nhờ đó autosave đang chạy làm lệnh chốt phải đợi, autosave đến sau thấy status mới và nhận 409; hai bên đều
 khóa dòng attempt trước rồi mới đụng attempt_answers nên không deadlock."""
 
+import logging
+import random
 import uuid
 from collections.abc import Sequence
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.errors import AppError, not_found
 from app.modules.auth.models import User
@@ -40,11 +48,23 @@ from app.modules.quiz.schemas import (
     SubmitIn,
 )
 
+logger = logging.getLogger(__name__)
+
 FINISHED = (AttemptStatus.completed, AttemptStatus.timed_out)
+LATE_GRACE = timedelta(seconds=5)  # spec 6.5: từ chối đáp án đến sau deadline_at + 5 giây
+TIME_UP_MESSAGE = "Đã hết giờ làm bài. Bài đã được nộp với các đáp án đã lưu"
 
 
-def attempt_closed() -> AppError:
-    return AppError("ATTEMPT_CLOSED", "Bài làm đã được nộp, không thay đổi được nữa", 409)
+def attempt_closed(message: str = "Bài làm đã được nộp, không thay đổi được nữa") -> AppError:
+    return AppError("ATTEMPT_CLOSED", message, 409)
+
+
+async def _db_now(db: AsyncSession) -> datetime:
+    return await db.scalar(select(func.clock_timestamp()))
+
+
+def _overdue(attempt: QuizAttempt, now: datetime) -> bool:
+    return attempt.deadline_at is not None and now > attempt.deadline_at + LATE_GRACE
 
 
 def _invalid(message: str) -> AppError:
@@ -97,6 +117,7 @@ async def attempt_view(db: AsyncSession, attempt: QuizAttempt) -> AttemptOut:
         status=attempt.status,
         started_at=attempt.started_at,
         deadline_at=attempt.deadline_at,
+        server_now=await _db_now(db),
         questions=[
             AttemptQuestion(id=q.id, stem=q.stem, options=q.options)
             for qid in attempt.question_order
@@ -140,6 +161,7 @@ async def start_attempt(db: AsyncSession, user: User, quiz_id: uuid.UUID) -> tup
     await ensure_lesson_access(db, quiz.lesson_id, user)
     # đọc trước: rollback bên dưới làm hết hạn mọi object trong session (kể cả user)
     user_id, qid, max_attempts = user.id, quiz.id, quiz.max_attempts
+    time_limit, shuffle = quiz.time_limit_sec, quiz.shuffle
     order = [
         str(x)
         for x in await db.scalars(
@@ -148,8 +170,19 @@ async def start_attempt(db: AsyncSession, user: User, quiz_id: uuid.UUID) -> tup
             .order_by(QuizQuestion.position)
         )
     ]
+    if shuffle:
+        order = random.sample(order, len(order))
     for _ in range(3):
-        decision = _decide(await _user_attempts(db, qid, user_id), max_attempts)
+        rows = await _user_attempts(db, qid, user_id)
+        now = await _db_now(db)
+        overdue = [a.id for a in rows if a.status == AttemptStatus.in_progress and _overdue(a, now)]
+        if overdue:
+            # Bài dở đã hết giờ: chốt timed_out (tính là một lượt) rồi quyết định lại
+            for aid in overdue:
+                await finalize_attempt(db, aid, status=AttemptStatus.timed_out)
+            await db.commit()
+            rows = await _user_attempts(db, qid, user_id)
+        decision = _decide(rows, max_attempts)
         if isinstance(decision, QuizAttempt):
             return await attempt_view(db, decision), False
         new_id = await db.scalar(
@@ -161,6 +194,7 @@ async def start_attempt(db: AsyncSession, user: User, quiz_id: uuid.UUID) -> tup
                 attempt_no=decision,
                 question_order=order,
                 status=AttemptStatus.in_progress,
+                deadline_at=(func.clock_timestamp() + timedelta(seconds=time_limit)) if time_limit else None,
             )
             .on_conflict_do_nothing(constraint="uq_quiz_attempts_quiz_user_no")
             .returning(QuizAttempt.id)
@@ -182,6 +216,10 @@ async def save_answer(
     attempt = await _own_attempt(db, attempt_id, user, lock_share=True)
     if attempt.status != AttemptStatus.in_progress:
         raise attempt_closed()
+    if _overdue(attempt, await _db_now(db)):
+        await finalize_attempt(db, attempt.id, status=AttemptStatus.timed_out)
+        await db.commit()
+        raise attempt_closed(TIME_UP_MESSAGE)
     questions = await _questions(db, attempt.question_order)
     _check_choice(questions, attempt.question_order, str(question_id), data.selected_option_id)
     stmt = pg_insert(AttemptAnswer).values(
@@ -271,6 +309,11 @@ async def submit_attempt(
     attempt = await _own_attempt(db, attempt_id, user)
     if attempt.status != AttemptStatus.in_progress:
         raise attempt_closed()
+    if _overdue(attempt, await _db_now(db)):
+        # Nộp quá hạn: không nhận final_answers, chốt với các đáp án đã autosave
+        if await finalize_attempt(db, attempt.id, status=AttemptStatus.timed_out):
+            await db.commit()
+        raise attempt_closed(TIME_UP_MESSAGE)
     final = data.final_answers or []
     if final:
         if len({a.question_id for a in final}) != len(final):
@@ -339,5 +382,34 @@ async def _result(db: AsyncSession, user_id: uuid.UUID, attempt_id: uuid.UUID) -
 
 
 async def get_result(db: AsyncSession, user: User, attempt_id: uuid.UUID) -> AttemptResult:
-    """Chỉ khi bài đã completed/timed_out (spec 6.4); chưa nộp → 409 INVALID_STATE; bài người khác → 404."""
+    """Chỉ khi bài đã completed/timed_out (spec 6.4); chưa nộp → 409 INVALID_STATE; bài người khác → 404.
+    Bài còn mở nhưng đã quá hạn thì chốt timed_out ngay rồi trả kết quả."""
+    attempt = await _own_attempt(db, attempt_id, user)
+    overdue = attempt.status == AttemptStatus.in_progress and _overdue(attempt, await _db_now(db))
+    if overdue and await finalize_attempt(db, attempt.id, status=AttemptStatus.timed_out):
+        await db.commit()
     return await _result(db, user.id, attempt_id)
+
+
+async def finalize_overdue_attempts(session_factory: async_sessionmaker) -> int:
+    """Cron mỗi phút: chốt timed_out mọi bài còn mở đã quá deadline_at + LATE_GRACE (học viên đóng trình duyệt
+    giữa chừng). Mỗi bài một transaction; bài vừa được nộp ở nơi khác thì finalize_attempt bỏ qua."""
+    async with session_factory() as db:
+        ids = list(
+            await db.scalars(
+                select(QuizAttempt.id).where(
+                    QuizAttempt.status == AttemptStatus.in_progress,
+                    QuizAttempt.deadline_at.is_not(None),
+                    QuizAttempt.deadline_at + LATE_GRACE < func.clock_timestamp(),
+                )
+            )
+        )
+    done = 0
+    for aid in ids:
+        async with session_factory() as db:
+            if await finalize_attempt(db, aid, status=AttemptStatus.timed_out):
+                await db.commit()
+                done += 1
+    if done:
+        logger.info("Đã chốt %d bài làm quá giờ", done)
+    return done

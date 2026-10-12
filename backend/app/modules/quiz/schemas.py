@@ -91,6 +91,8 @@ class QuizCreate(BaseModel):
     max_attempts: int = Field(1, ge=1, le=20)
     pass_score: float = Field(50, ge=0, le=100)  # phần trăm
     question_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+    time_limit_sec: int | None = Field(None, ge=60, le=14400)  # None = không giới hạn (1 phút – 4 giờ)
+    shuffle: bool = False  # xáo thứ tự câu hỏi cho mỗi lượt làm
 
 
 class QuizUpdate(BaseModel):
@@ -100,6 +102,9 @@ class QuizUpdate(BaseModel):
     max_attempts: int | None = Field(None, ge=1, le=20)
     pass_score: float | None = Field(None, ge=0, le=100)
     question_ids: list[uuid.UUID] | None = Field(None, max_length=100)  # chỉ đổi được khi quiz còn nháp
+    # Gửi null tường minh = bỏ giới hạn thời gian; không gửi = giữ nguyên
+    time_limit_sec: int | None = Field(None, ge=60, le=14400)
+    shuffle: bool | None = None
 
 
 class QuizOut(BaseModel):
@@ -108,6 +113,8 @@ class QuizOut(BaseModel):
     title: str
     max_attempts: int
     pass_score: float
+    time_limit_sec: int | None
+    shuffle: bool
     status: QuizStatus
     question_count: int
     created_at: datetime
@@ -133,7 +140,8 @@ class AttemptOut(BaseModel):
     attempt_no: int
     status: AttemptStatus
     started_at: datetime
-    deadline_at: datetime | None  # B1 (tuần 3): luôn None ở A7
+    deadline_at: datetime | None  # hạn nộp (quiz có giới hạn thời gian); None = không giới hạn
+    server_now: datetime  # giờ của server, để đồng hồ đếm ngược phía trình duyệt không lệch theo giờ máy
     questions: list[AttemptQuestion]
     answers: dict[str, str]  # question_id → selected_option_id đã autosave
 
@@ -186,3 +194,8 @@ class AttemptResult(BaseModel):
     total: int
     submitted_at: datetime | None
     questions: list[ResultQuestion]
+
+
+class ExplainOut(BaseModel):
+    text: str  # 2–4 câu, có thể có [1] = đoạn tài liệu nguồn của câu hỏi
+    source_page_no: int | None  # trang của đoạn nguồn (None: câu viết tay / không có nguồn)

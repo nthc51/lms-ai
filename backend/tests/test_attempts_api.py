@@ -37,7 +37,7 @@ async def test_start_attempt_hides_answers_and_resumes(client, db):
     assert again.status_code == 200 and again.json()["id"] == attempt["id"]
     stored = await db.scalar(select(QuizAttempt).where(QuizAttempt.id == uuid.UUID(attempt["id"])))
     assert stored.question_order == [str(q.id) for q in qs]
-    assert stored.deadline_at is None  # B1 chưa áp dụng
+    assert stored.deadline_at is None  # quiz không giới hạn thời gian
 
 
 async def test_two_tabs_starting_at_once_get_the_same_attempt(client, db):

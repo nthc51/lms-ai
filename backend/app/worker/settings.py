@@ -13,6 +13,7 @@ from app.modules.notify.mailer import SmtpMailer
 from app.worker.tasks import (
     JOB_TIMEOUTS,
     answer_waiting_cron,
+    finalize_overdue_quiz_attempts,
     ingest_pdf,
     notes_synth,
     quiz_gen,
@@ -63,6 +64,14 @@ class WorkerSettings:
             minute=set(range(60)),
             run_at_startup=True,
             timeout=120,
+        ),
+        # Chốt bài quiz hết giờ mà học viên bỏ dở (B1)
+        cron(
+            finalize_overdue_quiz_attempts,
+            name="finalize_overdue_quiz_attempts",
+            minute=set(range(60)),
+            run_at_startup=True,
+            timeout=60,
         ),
         # Vét câu hỏi chờ tài liệu mà job tutor_waiting bị lỡ (lệch 2 phút so với sweeper)
         cron(

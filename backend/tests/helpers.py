@@ -130,9 +130,10 @@ def keys_in(obj) -> set[str]:
     return set()
 
 
-async def make_published_quiz(client, db, *, max_attempts: int = 1, n_questions: int = 3):
+async def make_published_quiz(client, db, *, max_attempts: int = 1, n_questions: int = 3, **quiz_fields):
     """Giảng viên có khóa đã publish, n câu đã duyệt (đáp án đúng luôn là "A"), một quiz đã xuất bản;
-    một học viên đã đăng ký khóa. Trả về (gv_headers, sv_headers, course, quiz, questions)."""
+    một học viên đã đăng ký khóa. Trả về (gv_headers, sv_headers, course, quiz, questions).
+    quiz_fields: thêm vào body tạo quiz (vd. time_limit_sec, shuffle)."""
     from tests.factories import make_question
 
     _, gv = await make_teacher(client)
@@ -147,6 +148,7 @@ async def make_published_quiz(client, db, *, max_attempts: int = 1, n_questions:
         "title": "Quiz tìm kiếm nhị phân",
         "max_attempts": max_attempts,
         "question_ids": [str(q.id) for q in qs],
+        **quiz_fields,
     }
     r = await client.post(f"{API}/quizzes", json=body, headers=gv)
     assert r.status_code == 201, r.text
