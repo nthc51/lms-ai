@@ -1,6 +1,6 @@
 "use client";
 
-import { BookmarkPlus, MessageCircleQuestion, RotateCcw, SendHorizontal, Sparkles, Square, ThumbsDown, ThumbsUp } from "lucide-react";
+import { BookmarkPlus, Clock, MessageCircleQuestion, RotateCcw, SendHorizontal, Sparkles, Square, ThumbsDown, ThumbsUp } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Markdown } from "@/components/content/markdown";
@@ -33,6 +33,10 @@ export function TutorPanel({
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const countdown = useCountdown(chat.retryAt, chat.clearRetry);
   const unavailable = chat.availability && !chat.availability.available;
+  // Tài liệu đang xử lý: vẫn cho gửi câu hỏi, AI trả lời khi xử lý xong
+  const canQueue = !!unavailable && !!chat.availability?.can_queue;
+  const blocked = !!unavailable && !canQueue;
+  const stillProcessing = !unavailable ? (chat.availability?.processing_docs ?? 0) : 0;
 
   React.useEffect(() => {
     inputRef.current?.focus();
@@ -70,9 +74,7 @@ export function TutorPanel({
         ) : (
           chat.messages.map((m, i) =>
             m.role === "user" ? (
-              <div key={m.id} className="ml-auto max-w-[85%] rounded-lg bg-muted px-3 py-2 whitespace-pre-wrap">
-                {m.content}
-              </div>
+              <UserMessage key={m.id} m={m} />
             ) : (
               <AssistantMessage
                 key={m.id}
@@ -102,6 +104,10 @@ export function TutorPanel({
       <form onSubmit={submit} className="border-t p-3">
         {unavailable ? (
           <p className="mb-2 text-sm text-muted-foreground">{chat.availability?.message ?? "AI Tutor chưa sẵn sàng cho bài này."}</p>
+        ) : stillProcessing > 0 ? (
+          <p className="mb-2 text-xs text-muted-foreground">
+            Còn {stillProcessing} tài liệu đang xử lý; câu trả lời lúc này chỉ dựa trên tài liệu đã xử lý xong.
+          </p>
         ) : null}
         <div className="flex items-end gap-2">
           <label htmlFor="tutor-input" className="sr-only">
@@ -117,8 +123,12 @@ export function TutorPanel({
             }}
             rows={2}
             maxLength={2000}
-            disabled={!!unavailable || chat.loadingHistory}
-            placeholder="Nhập câu hỏi… (Enter để gửi, Shift+Enter xuống dòng)"
+            disabled={blocked || chat.loadingHistory}
+            placeholder={
+              canQueue
+                ? "Nhập câu hỏi… AI sẽ trả lời khi tài liệu xử lý xong"
+                : "Nhập câu hỏi… (Enter để gửi, Shift+Enter xuống dòng)"
+            }
             className="max-h-40 min-h-11 flex-1 resize-none rounded-md border bg-surface px-3 py-2 text-base md:text-sm"
           />
           {chat.busy ? (
@@ -126,12 +136,29 @@ export function TutorPanel({
               <Square /> Dừng
             </Button>
           ) : (
-            <Button type="submit" disabled={!draft.trim() || countdown > 0 || !!unavailable || chat.loadingHistory}>
+            <Button type="submit" disabled={!draft.trim() || countdown > 0 || blocked || chat.loadingHistory}>
               <SendHorizontal /> {countdown > 0 ? `${countdown}s` : "Gửi"}
             </Button>
           )}
         </div>
       </form>
+    </div>
+  );
+}
+
+function UserMessage({ m }: { m: ChatMessage }) {
+  return (
+    <div className="ml-auto flex max-w-[85%] flex-col items-end gap-1">
+      <div className="rounded-lg bg-muted px-3 py-2 whitespace-pre-wrap">{m.content}</div>
+      {m.status === "waiting" ? (
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="size-3.5" aria-hidden /> Đang chờ tài liệu xử lý xong, AI sẽ trả lời ngay sau đó
+        </p>
+      ) : m.status === "error" ? (
+        <p role="alert" className="text-xs text-destructive">
+          {m.error}
+        </p>
+      ) : null}
     </div>
   );
 }

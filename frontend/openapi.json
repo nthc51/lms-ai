@@ -2146,6 +2146,68 @@
         }
       }
     },
+    "/api/v1/tutor/sessions/{session_id}/questions": {
+      "post": {
+        "tags": [
+          "tutor"
+        ],
+        "summary": "Queue Question",
+        "description": "Gửi câu hỏi lúc tài liệu còn đang xử lý (availability.can_queue): lưu câu hỏi với waiting_for_docs, AI trả\nlời khi xử lý xong (worker). Frontend tải lại danh sách tin nhắn để thấy câu trả lời.\n\n409 TUTOR_READY khi đã hỏi trực tiếp được; 409 NOT_PROCESSING khi không còn tài liệu nào đang xử lý (lý do\ntrong message); 409 TOO_MANY_WAITING khi phiên đã có 5 câu chờ; 429 như câu hỏi thường.",
+        "operationId": "queue_question_api_v1_tutor_sessions__session_id__questions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "TUTOR_READY | NOT_PROCESSING | TOO_MANY_WAITING"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tutor/messages/{message_id}/feedback": {
       "post": {
         "tags": [
@@ -5624,13 +5686,36 @@
               }
             ],
             "title": "Message"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "processing",
+              "model_mismatch",
+              "failed",
+              "empty",
+              "draft"
+            ],
+            "title": "State"
+          },
+          "processing_docs": {
+            "type": "integer",
+            "title": "Processing Docs"
+          },
+          "can_queue": {
+            "type": "boolean",
+            "title": "Can Queue"
           }
         },
         "type": "object",
         "required": [
           "available",
           "ready_chunks",
-          "message"
+          "message",
+          "state",
+          "processing_docs",
+          "can_queue"
         ],
         "title": "AvailabilityOut"
       },
@@ -6782,6 +6867,11 @@
               }
             ],
             "title": "Feedback"
+          },
+          "waiting_for_docs": {
+            "type": "boolean",
+            "title": "Waiting For Docs",
+            "default": false
           },
           "created_at": {
             "type": "string",

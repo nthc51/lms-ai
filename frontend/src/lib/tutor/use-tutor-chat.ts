@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
+import { toast } from "sonner";
 import { api, apiBase, authFetch, unwrap } from "@/lib/api/client";
 import { ApiError, errorMessage, toApiError } from "@/lib/api/errors";
 import { readSse } from "@/lib/api/sse";
@@ -10,6 +11,8 @@ import type { ChatMessage, Citation, Source } from "./types";
 type Scope = { courseId: string; lessonId: string | null };
 
 const AI_ERROR = "AI Tutor tạm thời không trả lời được. Câu hỏi của bạn đã được lưu, bấm Thử lại sau ít phút.";
+/** Chu kỳ hỏi lại server khi tài liệu đang xử lý / còn câu hỏi chờ trả lời. */
+export const WAIT_POLL_MS = 5000;
 
 function fromServer(m: {
   id: string;
@@ -19,8 +22,10 @@ function fromServer(m: {
   refused: boolean;
   truncated: boolean;
   feedback: number | null;
+  waiting_for_docs?: boolean;
 }): ChatMessage {
-  return { ...m, sources: [], status: m.truncated ? "stopped" : "done" };
+  const { waiting_for_docs, ...rest } = m;
+  return { ...rest, sources: [], status: waiting_for_docs ? "waiting" : m.truncated ? "stopped" : "done" };
 }
 
 /**
@@ -72,6 +77,8 @@ export function useTutorChat({ courseId, lessonId }: Scope, enabled = true) {
         }),
       ),
     enabled,
+    // Tài liệu đang xử lý: hỏi lại định kỳ để mở ô hỏi trực tiếp ngay khi xong
+    refetchInterval: (q) => (q.state.data?.state === "processing" ? WAIT_POLL_MS : false),
   });
 
   const history = useQuery({
@@ -113,10 +120,45 @@ export function useTutorChat({ courseId, lessonId }: Scope, enabled = true) {
     return s.id;
   };
 
+  /** Tài liệu đang xử lý: gửi câu hỏi chờ (POST /questions), AI trả lời khi xử lý xong. */
+  const queue = async (text: string) => {
+    setBusy(true);
+    const localId = `local-w-${Date.now()}`;
+    setMessages((ms) => [
+      ...ms,
+      { id: localId, role: "user", content: text, citations: [], sources: [], refused: false, truncated: false, feedback: null, status: "waiting" },
+    ]);
+    const patch = (fn: (m: ChatMessage) => ChatMessage) =>
+      setMessages((ms) => ms.map((m) => (m.id === localId ? fn(m) : m)));
+    const isCurrent = () => true;
+    try {
+      const sid = await ensureSession(isCurrent);
+      const saved = await unwrap(
+        api.POST("/api/v1/tutor/sessions/{session_id}/questions", {
+          params: { path: { session_id: sid } },
+          body: { content: text },
+        }),
+      );
+      patch((m) => ({ ...m, id: saved.id }));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429 && err.retryAfter) setRetryAt(Date.now() + err.retryAfter * 1000);
+      // 409: trạng thái đã đổi (vừa xử lý xong, hoặc lỗi) → tải lại availability để ô nhập theo đúng trạng thái
+      if (err instanceof ApiError && err.status === 409) void availability.refetch();
+      patch((m) => ({ ...m, status: "error", error: errorMessage(err) }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const send = React.useCallback(
     async (content: string) => {
       const text = content.trim();
       if (!text || busy) return;
+      const avail = availability.data;
+      if (avail && !avail.available) {
+        if (avail.can_queue) await queue(text);
+        return;
+      }
       setBusy(true);
       const now = Date.now();
       setMessages((ms) => [
@@ -185,8 +227,40 @@ export function useTutorChat({ courseId, lessonId }: Scope, enabled = true) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [busy, sessionId, courseId, lessonId],
+    [busy, sessionId, courseId, lessonId, availability.data],
   );
+
+  // Còn câu hỏi chờ: hỏi lại danh sách tin nhắn định kỳ (khi không có stream nào đang chạy); có câu vừa được
+  // trả lời thì thay bằng dữ liệu server và báo cho học viên.
+  const waitingCount = messages.filter((m) => m.status === "waiting" && !m.id.startsWith("local-")).length;
+  React.useEffect(() => {
+    if (!enabled || !sessionId || busy || waitingCount === 0) return;
+    let cancelled = false;
+    const id = window.setInterval(async () => {
+      try {
+        const page = await unwrap(
+          api.GET("/api/v1/tutor/sessions/{session_id}/messages", {
+            params: { path: { session_id: sessionId }, query: { size: 100 } },
+          }),
+        );
+        if (cancelled) return;
+        const fresh = page.items.map(fromServer);
+        const stillWaiting = fresh.filter((m) => m.status === "waiting").length;
+        if (stillWaiting < waitingCount) {
+          setMessages(fresh);
+          void availability.refetch();
+          toast.success("AI đã trả lời câu hỏi bạn gửi lúc tài liệu đang xử lý");
+        }
+      } catch {
+        // lỗi mạng tạm thời: lần sau hỏi lại
+      }
+    }, WAIT_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, sessionId, busy, waitingCount]);
 
   const clearRetry = React.useCallback(() => setRetryAt(null), []);
   const stop = React.useCallback(() => abortRef.current?.abort(), []);

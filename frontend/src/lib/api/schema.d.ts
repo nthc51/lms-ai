@@ -645,6 +645,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tutor/sessions/{session_id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue Question
+         * @description Gửi câu hỏi lúc tài liệu còn đang xử lý (availability.can_queue): lưu câu hỏi với waiting_for_docs, AI trả
+         *     lời khi xử lý xong (worker). Frontend tải lại danh sách tin nhắn để thấy câu trả lời.
+         *
+         *     409 TUTOR_READY khi đã hỏi trực tiếp được; 409 NOT_PROCESSING khi không còn tài liệu nào đang xử lý (lý do
+         *     trong message); 409 TOO_MANY_WAITING khi phiên đã có 5 câu chờ; 429 như câu hỏi thường.
+         */
+        post: operations["queue_question_api_v1_tutor_sessions__session_id__questions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tutor/messages/{message_id}/feedback": {
         parameters: {
             query?: never;
@@ -1699,6 +1723,15 @@ export interface components {
             ready_chunks: number;
             /** Message */
             message: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "processing" | "model_mismatch" | "failed" | "empty" | "draft";
+            /** Processing Docs */
+            processing_docs: number;
+            /** Can Queue */
+            can_queue: boolean;
         };
         /** Card */
         Card: {
@@ -2178,6 +2211,11 @@ export interface components {
             truncated: boolean;
             /** Feedback */
             feedback: number | null;
+            /**
+             * Waiting For Docs
+             * @default false
+             */
+            waiting_for_docs: boolean;
             /**
              * Created At
              * Format: date-time
@@ -4419,6 +4457,48 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    queue_question_api_v1_tutor_sessions__session_id__questions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description TUTOR_READY | NOT_PROCESSING | TOO_MANY_WAITING */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

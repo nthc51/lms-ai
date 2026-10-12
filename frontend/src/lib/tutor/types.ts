@@ -5,7 +5,8 @@ export type Citation = components["schemas"]["Citation"];
 /** Một nguồn trong event `sources` (có thêm phần hiển thị so với Citation). */
 export type Source = Citation & { lesson_title: string; heading_path: string; snippet: string };
 
-export type ChatStatus = "streaming" | "done" | "error" | "stopped";
+/** waiting: câu hỏi (role user) gửi lúc tài liệu đang xử lý, AI sẽ trả lời khi xử lý xong. */
+export type ChatStatus = "streaming" | "done" | "error" | "stopped" | "waiting";
 
 export type ChatMessage = {
   id: string; // id tạm "local-…" cho tới khi nhận `done`
