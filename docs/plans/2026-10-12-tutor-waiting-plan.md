@@ -51,7 +51,7 @@ Job mới `tutor_waiting` (ref_id = `lessons.id`, timeout 600 giây, dừng nh�
 - Modify: `backend/app/worker/tasks.py`, `backend/app/worker/settings.py`
 - Test: `backend/tests/test_tutor_waiting.py` (mới), `backend/tests/test_tutor_sessions.py` (sửa)
 
-- [ ] **Bước 1: Viết test (sẽ fail)**
+- [x] **Bước 1: Viết test (sẽ fail)**
 
 ```python
 """Hỏi AI Tutor lúc tài liệu đang xử lý: trạng thái availability, gửi câu hỏi chờ, worker trả lời khi xong."""
@@ -395,7 +395,7 @@ Test cũ: không có tài liệu nào giờ là `empty` (trước đây báo nh�
      }
 ```
 
-- [ ] **Bước 2: Migration + model**
+- [x] **Bước 2: Migration + model**
 
 ```python
 """chat_messages.waiting_for_docs: câu hỏi gửi lúc tài liệu đang xử lý, AI trả lời khi xử lý xong
@@ -479,7 +479,7 @@ uv run alembic check          # "No new upgrade operations detected"
 uv run alembic downgrade -1 ; uv run alembic upgrade head
 ```
 
-- [ ] **Bước 3: Schema**
+- [x] **Bước 3: Schema**
 
 ```diff
 --- a/backend/app/modules/tutor/schemas.py
@@ -514,7 +514,7 @@ uv run alembic downgrade -1 ; uv run alembic upgrade head
 +    can_queue: bool  # gửi câu hỏi chờ được (POST /tutor/sessions/{id}/questions)
 ```
 
-- [ ] **Bước 4: `tutor/state.py`** (đếm tài liệu theo trạng thái trong phạm vi bài / cả khóa; phạm vi cả khóa đi qua `Lesson → Section`)
+- [x] **Bước 4: `tutor/state.py`** (đếm tài liệu theo trạng thái trong phạm vi bài / cả khóa; phạm vi cả khóa đi qua `Lesson → Section`)
 
 ```python
 """Trạng thái tài liệu trong phạm vi hỏi của AI Tutor: hỏi được chưa, nếu chưa thì vì sao.
@@ -617,7 +617,7 @@ def describe(st: ScopeState, *, draft_course_scope: bool) -> AvailabilityOut:
     return AvailabilityOut(available=False, message=message, state=state, can_queue=False, **base)
 ```
 
-- [ ] **Bước 5: `answer.py` và `service.py`**
+- [x] **Bước 5: `answer.py` và `service.py`**
 
 `AskContext.answer_created_at` (mặc định `None`, luồng hỏi trực tiếp không đổi). `availability` dùng `state.py`; `load_history` nhận thêm `before`. Hằng `NOT_READY_MESSAGE` bỏ, `DRAFT_COURSE_SCOPE_MESSAGE` chuyển sang `state.py` (grep thấy không còn chỗ nào khác dùng).
 
@@ -718,7 +718,7 @@ def describe(st: ScopeState, *, draft_course_scope: bool) -> AvailabilityOut:
          )
 ```
 
-- [ ] **Bước 6: `tutor/waiting.py`**
+- [x] **Bước 6: `tutor/waiting.py`**
 
 ```python
 """Câu hỏi chờ tài liệu: học viên hỏi lúc tài liệu còn đang xử lý, AI trả lời ngay khi xử lý xong.
@@ -960,7 +960,7 @@ async def answer_waiting(
     return done
 ```
 
-- [ ] **Bước 7: Endpoint**
+- [x] **Bước 7: Endpoint**
 
 ```diff
 --- a/backend/app/modules/tutor/router.py
@@ -1005,7 +1005,7 @@ async def answer_waiting(
      message_id: uuid.UUID,
 ```
 
-- [ ] **Bước 8: Worker**
+- [x] **Bước 8: Worker**
 
 Sau `ingest_pdf` (xong **hoặc** lỗi) mà bài có câu chờ thì xếp `tutor_waiting`. Dùng `create_and_enqueue` nên trùng job đang chạy cho cùng bài thì không tạo thêm (index `uq_active_job`), và sweeper đã có sẵn dọn job treo.
 
@@ -1154,7 +1154,7 @@ Sau `ingest_pdf` (xong **hoặc** lỗi) mà bài có câu chờ thì xếp `tut
      redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
 ```
 
-- [ ] **Bước 9: Chạy test**
+- [x] **Bước 9: Chạy test**
 
 ```powershell
 uv run pytest tests/test_tutor_waiting.py tests/test_tutor_sessions.py tests/test_tutor_answer.py tests/test_tutor_api.py tests/test_worker.py tests/test_studio.py -q
@@ -1163,7 +1163,7 @@ uv run ruff check . ; uv run ruff format --check . ; uv run lint-imports
 
 Kỳ vọng: pass hết; 5 hợp đồng KEPT.
 
-- [ ] **Bước 10: Commit**
+- [x] **Bước 10: Commit**
 
 ```powershell
 git add backend
