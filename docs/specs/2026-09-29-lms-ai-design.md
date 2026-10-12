@@ -40,23 +40,25 @@
 
 ### Tầng S: chất lượng hệ thống (rải từ tuần 1 đến tuần 4, trước tầng C)
 
-- [~] **S1. CI:** GitHub Actions chạy ruff, pytest (có service Postgres pgvector) và build image Docker cho mỗi lần push và PR.
-- [ ] **S2. Deploy production:** VPS với Caddy (HTTPS tự động) và file `docker-compose.prod.yml`, gồm healthcheck, `restart: unless-stopped`, secrets lấy từ `.env` trên server. Backup `pg_dump` hằng ngày, giữ bản của 7 ngày gần nhất, và **đã thử khôi phục** ít nhất một lần.
-- [ ] **S3. CD:** push lên `main` và CI xanh thì tự deploy lên VPS (qua SSH action), chạy `alembic upgrade head` trước khi khởi động lại API.
-- [ ] **S4. Giám sát:**
+- [x] **S1. CI:** GitHub Actions chạy ruff, pytest (có service Postgres pgvector) và build image Docker cho mỗi lần push và PR.
+- [~] **S2. Deploy production:** VPS với Caddy (HTTPS tự động) và file `docker-compose.prod.yml`, gồm healthcheck, `restart: unless-stopped`, secrets lấy từ `.env` trên server. Backup `pg_dump` hằng ngày, giữ bản của 7 ngày gần nhất, và **đã thử khôi phục** ít nhất một lần.
+  - *Tiến độ 2026-10-12:* đã có `docker-compose.prod.yml`, Caddy, Prometheus, Grafana, script backup và `restore-check.sh`; chưa diễn tập trên máy, chưa có VPS, chưa thử khôi phục.
+- [~] **S3. CD:** push lên `main` và CI xanh thì tự deploy lên VPS (qua SSH action), chạy `alembic upgrade head` trước khi khởi động lại API.
+  - *Tiến độ 2026-10-12:* đã viết `infra/deploy/deploy.sh` (rollback theo `/ready`) và workflow `deploy.yml`; chưa chạy thật vì chưa có VPS.
+- [x] **S4. Giám sát:** (dashboard chưa chạy thử trên stack production: hoãn diễn tập)
   - `/health` (tiến trình còn sống) và `/ready` (DB, Redis, MinIO đều kết nối được).
   - Thu metrics Prometheus (`prometheus-fastapi-instrumentator`, cộng metric riêng cho số job trong hàng đợi và số job lỗi).
   - Dashboard Grafana gồm: số request/giây, độ trễ p50/p95, tỉ lệ lỗi 5xx, job đang chờ và job lỗi, thời gian tới token đầu tiên (TTFT) của AI Tutor.
-- [ ] **S5. Hiệu năng:**
+- [~] **S5. Hiệu năng:** (đã có cache có phiên bản, `perf_seed` và kịch bản k6 catalog + học viên; chưa đo, chưa có kịch bản làm quiz)
   - Viết kịch bản load test k6 cho catalog, trang chi tiết khóa học, đọc bài học và làm quiz.
   - Báo cáo p95 và throughput ở mức 50 người dùng ảo.
   - Cache catalog và trang chi tiết khóa học bằng Redis (TTL 60 giây, xóa cache khi publish hoặc sửa khóa). So sánh số liệu trước và sau khi cache.
-- [ ] **S6. Bảo mật:**
+- [x] **S6. Bảo mật:** (rate limit đăng nhập 20/phút/IP; CSP mới có cho API, trang web chưa: xem `docs/security/owasp-top10.md`)
   - Rate limit cho `/auth/login` và `/auth/register` (ví dụ 10 lần/phút/IP).
   - Cấu hình CORS cho đúng origin của frontend.
   - Security headers: HSTS, X-Content-Type-Options, CSP cơ bản.
   - Rà theo checklist OWASP Top 10. Mỗi mục ghi rõ "đã xử lý ở đâu" hoặc "chưa xử lý, lý do".
-- [ ] **S7. Tài liệu kiến trúc:** sơ đồ C4 (mức Context, Container, Component), ERD, sequence diagram cho 4 luồng: upload + xử lý tài liệu, hỏi AI Tutor, làm quiz, nộp + chấm bài.
+- [x] **S7. Tài liệu kiến trúc:** sơ đồ C4 (mức Context, Container, Component), ERD, sequence diagram cho 4 luồng: upload + xử lý tài liệu, hỏi AI Tutor, làm quiz, nộp + chấm bài.
 
 Ước lượng khoảng 6–7 ngày. S1 làm sớm, ngay sau khi backend tuần 1 xong, vì làm sớm thì phát huy tác dụng lâu nhất. D2 (deploy có domain và HTTPS) được làm như một phần của S2.
 
@@ -502,6 +504,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | Assignment | CRUD `/assignments` · `PUT /assignments/{id}/submission` · `GET /assignments/{id}/submissions` · `POST /submissions/{id}/grade` |
 | Thảo luận | `GET/POST /lessons/{id}/comments` · `DELETE /comments/{id}` |
 | Thông báo | `GET /notifications` · `POST /notifications/read` · `GET /notifications/stream-token` (sống 60 giây) · `GET /notifications/stream?t=` (dùng `EventSource`) |
+| Vận hành | `GET /api/v1/health` (tiến trình còn sống) · `GET /api/v1/ready` (DB, Redis, MinIO; `503` khi có phần lỗi) · `GET /metrics` (Prometheus, chỉ trong mạng nội bộ, Caddy không chuyển ra ngoài) |
 | Khác | `GET /jobs/{id}` (chỉ người tạo job hoặc admin; người khác nhận `404`) · `GET /courses/{id}/analytics` (giảng viên sở hữu hoặc admin) · `GET /me/certificates` · `GET /certificates/verify/{code}` (công khai) |
 | Admin | `GET/PATCH /admin/users` · `GET/PATCH /admin/courses` |
 
@@ -566,6 +569,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 - Middleware gắn `request_id` cho mỗi request. Log dạng JSON.
 - `HTTPException` của Starlette/FastAPI (route không tồn tại, sai method...) cũng trả đúng định dạng thống nhất.
 - Exception không bắt được → `500 INTERNAL_ERROR`; body **không bao giờ** chứa traceback hay nội dung exception; traceback được log kèm `request_id`. Response 500 vẫn có header `x-request-id` và header CORS.
+- `RATE_LIMITED` áp dụng cho `/auth/login` (20 lần / phút / IP), cùng với giới hạn đăng ký (20 / giờ / IP) và gửi lại email xác nhận (10 / giờ / IP, 3 / giờ / email) đã có.
 - Đăng ký trùng email chạy đồng thời: request thua vấp unique constraint → rollback, `409 EMAIL_TAKEN` (không 500).
 - **Chỉ đẩy job sau khi transaction đã commit.**
 
@@ -690,6 +694,7 @@ Tầng C làm sau tầng S trong tuần 4. Nếu tuần 4 không kịp thì C1 (
 | PDF xấu (scan, công thức) | Fallback vision. Tài liệu dùng khi demo nên là PDF có text |
 | Tên model của provider bị đổi hoặc ngừng hỗ trợ | Kiểm tra tên model hiện hành khi cài đặt, và đặt tên model trong `.env` |
 | Nở phạm vi | Mốc chốt tính năng M2 là cứng, tuân thủ luật cắt giảm ở mục 10 |
+| Deploy lỗi phải rollback | Rollback chỉ quay lại code, không hạ migration. Migration phải tương thích ngược |
 
 ---
 
@@ -758,3 +763,4 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-06 | FE-2: tự lưu đáp án bằng hàng đợi tuần tự, nộp bài luôn kèm final_answers; loại câu hỏi có Hoàn tác 5 giây (gửi trễ thay vì gọi API khôi phục); bài làm gần nhất lưu ở localStorage vì chưa có API danh sách bài làm (để B1 bổ sung `GET /quizzes/{id}/attempts/me`). |
 | 2026-10-07 | Khu quản trị: ẩn khóa dùng lại status=archived + hidden_at/hidden_reason; từ chối chỉ áp cho giảng viên đang chờ, vi phạm sau khi duyệt thì khóa; mọi thao tác ghi admin_actions; seed_admin từ chối email `.local`. |
 | 2026-10-07 | Email: xác nhận khi đăng ký (chặn đăng nhập tới khi xác nhận, gửi lại tối đa 3 lần/giờ, luôn 202); outbox ghi cùng transaction, worker gửi (kick + cron mỗi phút, SKIP LOCKED, thử lại 5 lần); dev dùng Mailpit, chạy thật dùng Brevo SMTP. Giảng viên chỉ vào hàng chờ khi đã xác nhận email. 👎 của AI Tutor: admin thấy tên học viên, giảng viên thì không. |
+| 2026-10-12 | Tầng S: cache có phiên bản (fail-open), rate limit đăng nhập 20/phút/IP (vì NAT ở trường), Caddy + sslip.io (web và API cùng tên miền, /api đi thẳng tới FastAPI), email qua Brevo, deploy bằng build trên VPS + rollback tự động theo /ready, backup pg_dump + tar MinIO giữ 7 ngày |
