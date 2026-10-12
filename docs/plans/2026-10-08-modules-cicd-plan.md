@@ -53,9 +53,9 @@ Frontend có 2 component dùng chung nhưng đang nằm trong thư mục `admin`
 - Create: `backend/.importlinter`
 - Modify: `backend/pyproject.toml`, `backend/uv.lock` (qua `uv add`)
 
-- [ ] **Bước 1: Thêm thư viện** (trong `backend/`): `uv add --dev import-linter`
+- [x] **Bước 1: Thêm thư viện** (trong `backend/`): `uv add --dev import-linter`
 
-- [ ] **Bước 2: Hợp đồng** (`backend/.importlinter`)
+- [x] **Bước 2: Hợp đồng** (`backend/.importlinter`)
 
 ```ini
 # Ranh giới module của backend. Chạy: uv run lint-imports (CI chạy ở job lint).
@@ -137,11 +137,11 @@ forbidden_modules =
     app.worker
 ```
 
-- [ ] **Bước 3: Chạy**: `uv run lint-imports`
+- [x] **Bước 3: Chạy**: `uv run lint-imports`
 
 Expected: 5 dòng `KEPT`, cuối cùng `Contracts: 5 kept, 0 broken.`
 
-- [ ] **Bước 4: Thử vi phạm** (không commit): thêm dòng đầu `app/modules/courses/service.py`:
+- [x] **Bước 4: Thử vi phạm** (không commit): thêm dòng đầu `app/modules/courses/service.py`:
 
 ```python
 from app.modules.studio.models import Note  # noqa
@@ -149,7 +149,7 @@ from app.modules.studio.models import Note  # noqa
 
 Chạy lại `uv run lint-imports` → `Phần nền không import phần tính năng BROKEN`, mã thoát khác 0. **Xóa dòng vừa thêm**, chạy lại → `5 kept`.
 
-- [ ] **Bước 5: Commit**
+- [x] **Bước 5: Commit**
 
 ```bash
 git add backend/.importlinter backend/pyproject.toml backend/uv.lock
