@@ -9,6 +9,7 @@ from app.ai.retry import is_retryable
 from app.ai.vision import VisionExtractor
 from app.core.config import get_settings
 from app.ingestion.chunker import PageText
+from app.ingestion.spacing import add_missing_spaces, glue_points
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,13 @@ def _extract_text_pages(doc: pymupdf.Document) -> list[tuple[int, str, int]]:
         raise ValueError(f"PDF quá dài (tối đa {MAX_PAGES} trang)")
     # use_ocr=False: không dùng OCR của pymupdf4llm (Tesseract/RapidOCR); trang scan đi qua vision
     parts = pymupdf4llm.to_markdown(doc, page_chunks=True, use_ocr=False, show_progress=False)
+    # PDF xuất từ slide hay mất dấu cách giữa các khối chữ ("hiệu quảsử dụng"): chèn lại theo vị trí ký tự
     return [
-        (i + 1, part["text"], sum(1 for b in part.get("page_boxes") or [] if b.get("class") == "formula"))
+        (
+            i + 1,
+            add_missing_spaces(part["text"], glue_points(doc[i])),
+            sum(1 for b in part.get("page_boxes") or [] if b.get("class") == "formula"),
+        )
         for i, part in enumerate(parts)
     ]
 
