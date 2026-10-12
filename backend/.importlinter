@@ -1,0 +1,77 @@
+# Ranh giới module của backend. Chạy: uv run lint-imports (CI chạy ở job lint).
+# Phần NỀN (auth, courses, enrollment, materials, jobs, notify) không được phụ thuộc phần TÍNH NĂNG
+# (tutor, quiz, studio, analytics, admin). Nhờ vậy sửa / bỏ một tính năng không kéo theo phần nền.
+# Mỗi ngoại lệ phải ghi lý do; thêm ngoại lệ mới nghĩa là phải giải thích được vì sao.
+
+[importlinter]
+root_package = app
+include_external_packages = False
+
+[importlinter:contract:base-not-depend-on-features]
+name = Phần nền không import phần tính năng
+type = forbidden
+source_modules =
+    app.modules.auth
+    app.modules.courses
+    app.modules.enrollment
+    app.modules.materials
+    app.modules.jobs
+    app.modules.notify
+forbidden_modules =
+    app.modules.tutor
+    app.modules.quiz
+    app.modules.studio
+    app.modules.analytics
+    app.modules.admin
+ignore_imports =
+    # Chặn xóa khóa / chương / bài khi học viên đã làm quiz hoặc hỏi AI Tutor: chỉ ĐỌC bảng, không gọi service
+    app.modules.courses.service -> app.modules.quiz.models
+    app.modules.courses.service -> app.modules.tutor.models
+
+[importlinter:contract:notify-is-leaf]
+name = notify (hộp thư đi email) không phụ thuộc module nào khác
+type = forbidden
+source_modules =
+    app.modules.notify
+forbidden_modules =
+    app.modules.auth
+    app.modules.courses
+    app.modules.enrollment
+    app.modules.materials
+    app.modules.jobs
+
+[importlinter:contract:tutor-quiz-independent]
+name = AI Tutor và Quiz độc lập với nhau
+type = independence
+modules =
+    app.modules.tutor
+    app.modules.quiz
+ignore_imports =
+    # Cùng ngoại lệ chặn xóa ở trên (đường vòng qua courses.service, chỉ đọc bảng)
+    app.modules.courses.service -> app.modules.quiz.models
+    app.modules.courses.service -> app.modules.tutor.models
+
+[importlinter:contract:core-and-ai-below-features]
+name = core, lớp AI và ingestion không phụ thuộc phần tính năng
+type = forbidden
+source_modules =
+    app.core
+    app.ai
+    app.ingestion
+forbidden_modules =
+    app.modules.tutor
+    app.modules.quiz
+    app.modules.studio
+    app.modules.analytics
+    app.modules.admin
+    app.worker
+    app.main
+
+[importlinter:contract:modules-not-import-entrypoints]
+name = Module không import điểm khởi động (main, worker)
+type = forbidden
+source_modules =
+    app.modules
+forbidden_modules =
+    app.main
+    app.worker
