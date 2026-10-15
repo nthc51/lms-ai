@@ -473,7 +473,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 
 ### 6.2 Auth
 
-- **Endpoint:** `POST /auth/register|login|refresh|logout`, `GET /me`.
+- **Endpoint:** `POST /auth/register|login|refresh|logout`, `GET /me`, `PATCH /me` (sửa họ tên), `POST /me/password` (đổi mật khẩu khi đang đăng nhập).
 - **Access token:** JWT sống 15 phút, chỉ giữ trong bộ nhớ, gửi qua header `Authorization`.
 - **Refresh token:** sống 7 ngày, nằm trong cookie `httpOnly; SameSite=Lax; Path=/api/v1/auth`.
 - **Xoay vòng:** mỗi lần refresh thì cấp token mới và thu hồi token cũ. Token đã thu hồi mà bị dùng lại thì thu hồi toàn bộ phiên của user đó.
@@ -769,3 +769,4 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-12 | AI Tutor: `availability` có `state` (ready/processing/model_mismatch/failed/empty/draft); lúc tài liệu đang xử lý vẫn gửi được câu hỏi (`waiting_for_docs`, tối đa 5 câu/phiên), job `tutor_waiting` sau `ingest_pdf` + cron 5 phút trả lời bằng đúng luồng Tutor, nhận câu bằng UPDATE có điều kiện, câu trả lời ghi `created_at` của câu hỏi |
 | 2026-10-12 | Trích PDF: chèn lại dấu cách bị mất ở PDF xuất từ slide (hai ký tự cách nhau > 10% cỡ chữ mà không có dấu cách); script `reprocess_pdfs` xử lý lại hàng loạt; `app.scripts.lock_user` khóa/mở khóa tài khoản bằng lệnh (kể cả admin, không khóa admin cuối cùng) |
 | 2026-10-12 | B1: `time_limit_sec` (60 giây – 4 giờ) và `shuffle` khi tạo/sửa quiz (null tường minh = bỏ giới hạn); `deadline_at` theo giờ DB, `server_now` trong bài làm để đồng hồ không lệch; quá `deadline_at + 5s` thì lưu/nộp bị từ chối và bài chốt `timed_out` với đáp án đã autosave; chốt khi có thao tác trên bài + cron mỗi phút. B2: hybrid vector top-20 + full-text top-20 gộp RRF (k=60), `RETRIEVAL_MODE=vector` để so sánh, benchmark có `mode=`. B3: `POST /attempts/{id}/answers/{qid}/explain` sau khi nộp, chỉ câu sai/bỏ trống, 30 lần/giờ/học viên, lỗi AI → 503 |
+| 2026-10-15 | Hồ sơ cá nhân: `PATCH /me` (họ tên, gọn khoảng trắng, 1–120 ký tự), `POST /me/password` (đúng mật khẩu hiện tại, khác mật khẩu cũ, 10 lần thử/giờ/tài khoản; thu hồi mọi phiên rồi cấp phiên mới cho trình duyệt đang dùng). Menu tài khoản (Hồ sơ cá nhân, Ghi chú, chế độ màu, Đăng xuất) ở thanh trên của mọi trang kể cả trang học và quiz; đăng xuất tải lại trang chủ. Giao diện: bảng màu sáng trung tính, bo góc 4px, `--mark` cho trích dẫn; trang chủ cho khách mới (không nằm trong khung app) có phần thử hỏi với 4 câu mẫu cố định |

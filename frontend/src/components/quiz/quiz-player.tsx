@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { ErrorState } from "@/components/app/states";
+import { UserMenu } from "@/components/app/user-menu";
 import { BreakReminder } from "@/components/lesson/break-reminder";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
@@ -300,6 +301,7 @@ function Shell({
         </Button>
         <h1 className="min-w-0 flex-1 truncate font-semibold">{title ?? "Quiz"}</h1>
         {aside}
+        <UserMenu compact />
       </header>
       <main id="main" className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 md:px-8">
         {children}

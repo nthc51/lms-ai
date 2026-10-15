@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { ThemeSwitcher } from "@/components/app/theme-switcher";
+import { UserMenu } from "@/components/app/user-menu";
 import { ErrorState } from "@/components/app/states";
 import { Markdown } from "@/components/content/markdown";
 import { DocumentsPanel } from "@/components/studio/documents-panel";
@@ -205,6 +206,7 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
         <Button variant="ghost" className="hidden lg:inline-flex" aria-pressed={tutorOpen} onClick={() => setTutorOpen((v) => !v)}>
           <MessageCircleQuestion /> Hỏi AI
         </Button>
+        <UserMenu compact />
       </header>
 
       <div className="flex">

@@ -13,6 +13,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, push: vi.fn() }
 vi.mock("sonner", () => ({ toast: { info: (m: string) => toastInfo(m), error: (m: string) => toastError(m) } }));
 vi.mock("@/lib/quiz/queries", () => ({ useQuiz: () => ({ data: { title: "Quiz thử" } }) }));
 vi.mock("@/lib/quiz/use-quiz-attempt", () => ({ useQuizAttempt: () => hook.current }));
+// Menu tài khoản ở thanh trên cần AuthProvider; test này chỉ kiểm phần làm bài.
+vi.mock("@/components/app/user-menu", () => ({ UserMenu: () => null }));
 
 const attemptData = {
   id: "a1",

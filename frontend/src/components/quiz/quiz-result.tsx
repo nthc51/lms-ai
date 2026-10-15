@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, CircleSlash, RotateCcw, Sparkles, XCircle } fr
 import Link from "next/link";
 import * as React from "react";
 import { ErrorState } from "@/components/app/states";
+import { UserMenu } from "@/components/app/user-menu";
 import { Button } from "@/components/ui/button";
 import { Badge, Skeleton } from "@/components/ui/misc";
 import { errorMessage } from "@/lib/api/errors";
@@ -30,6 +31,7 @@ export function QuizResult({ slug, lessonId, quizId, attemptId }: { slug: string
           </Link>
         </Button>
         <p className="min-w-0 flex-1 truncate font-semibold">{quiz.data?.title ?? "Kết quả quiz"}</p>
+        <UserMenu compact />
       </header>
       <main id="main" className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6 md:px-8">
         {result.isPending ? (
