@@ -279,6 +279,29 @@ async def reset_password(db: AsyncSession, raw: str, password: str) -> User:
     return user
 
 
+async def update_profile(db: AsyncSession, user: User, full_name: str) -> User:
+    user.full_name = full_name
+    await db.commit()
+    return user
+
+
+async def change_password(db: AsyncSession, user: User, current: str, new: str) -> tuple[str, str]:
+    """Đổi mật khẩu khi đang đăng nhập. Thu hồi MỌI phiên cũ (máy khác đang đăng nhập bị đăng xuất khi access
+    token hết hạn) rồi cấp phiên mới cho chính trình duyệt này để người dùng không bị văng ra."""
+    await db.refresh(user, with_for_update=True)  # hai lần đổi cùng lúc: lần sau thấy hash mới
+    if not verify_password(current, user.password_hash):
+        raise AppError("WRONG_PASSWORD", "Mật khẩu hiện tại không đúng", 400)
+    if verify_password(new, user.password_hash):
+        raise AppError("SAME_PASSWORD", "Mật khẩu mới phải khác mật khẩu hiện tại", 400)
+    user.password_hash = hash_password(new)
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=utcnow())
+    )
+    return await issue_tokens(db, user)  # commit luôn mật khẩu mới và việc thu hồi
+
+
 async def request_teacher_review(db: AsyncSession, user: User) -> User:
     """Giảng viên bị từ chối gửi lại yêu cầu duyệt: quay về hàng chờ, xóa lý do cũ, báo admin."""
     if user.role != Role.teacher or user.teacher_status != TeacherStatus.rejected:

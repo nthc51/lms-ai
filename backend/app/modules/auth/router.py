@@ -9,8 +9,10 @@ from app.core.ratelimit import RateLimiter, get_rate_limiter
 from app.modules.auth import service
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
+    ChangePasswordIn,
     ForgotPasswordIn,
     LoginIn,
+    ProfileIn,
     RegisterIn,
     ResendVerificationIn,
     ResetPasswordIn,
@@ -44,6 +46,7 @@ RESEND_LIMIT = 3  # mỗi email tối đa 3 lần / giờ
 RESEND_IP_LIMIT = 10  # mỗi IP tối đa 10 lần / giờ (chặn spam nhiều email khác nhau)
 RESET_LIMIT = 3  # quên mật khẩu: mỗi email tối đa 3 lần / giờ
 RESET_IP_LIMIT = 10  # và mỗi IP tối đa 10 lần / giờ
+PASSWORD_CHANGE_LIMIT = 10  # đổi mật khẩu: mỗi tài khoản tối đa 10 lần thử / giờ (chặn dò mật khẩu hiện tại)
 
 
 def _too_many(wait: int) -> AppError:
@@ -168,6 +171,30 @@ async def login(
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)):
     return user
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    data: ProfileIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    """Sửa hồ sơ (hiện chỉ có họ tên). Email không đổi được ở đây vì là tên đăng nhập đã xác nhận."""
+    return await service.update_profile(db, user, data.full_name)
+
+
+@router.post("/me/password", response_model=TokenOut)
+async def change_my_password(
+    data: ChangePasswordIn,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+):
+    """Đổi mật khẩu. 400 WRONG_PASSWORD / SAME_PASSWORD; 429 khi thử quá PASSWORD_CHANGE_LIMIT lần / giờ.
+    Mọi phiên khác bị thu hồi; trả access token mới và đặt cookie refresh mới cho trình duyệt này."""
+    await _limit(limiter, f"password-change:{user.id}", PASSWORD_CHANGE_LIMIT)
+    access, raw = await service.change_password(db, user, data.current_password, data.new_password)
+    set_refresh_cookie(response, raw)
+    return TokenOut(access_token=access)
 
 
 @router.post("/auth/refresh", response_model=TokenOut)

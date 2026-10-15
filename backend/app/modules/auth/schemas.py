@@ -51,6 +51,23 @@ class ResetPasswordIn(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class ProfileIn(BaseModel):
+    full_name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("full_name")
+    @classmethod
+    def strip_name(cls, v: str) -> str:
+        v = " ".join(v.split())  # bỏ khoảng trắng thừa ở giữa và hai đầu
+        if not v:
+            raise ValueError("Họ tên không được để trống")
+        return v
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
