@@ -3,7 +3,7 @@ import type { User } from "@/lib/auth/auth-context";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 
-/** Mục điều hướng theo vai trò (design-system §7.1). Điện thoại hiển thị tối đa 4 mục. */
+/** Mục điều hướng theo vai trò (design-system §7.1). Thanh dưới điện thoại hiển thị tối đa 3 mục. */
 export function navItems(user: User | null): NavItem[] {
   const base: NavItem[] = [
     { href: "/", label: "Trang chủ", icon: Home },

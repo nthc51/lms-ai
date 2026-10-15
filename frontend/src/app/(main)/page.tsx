@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowRight, Clock, XCircle } from "lucide-react";
+import { Clock, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/app/states";
-import { MyCourseList } from "@/components/course/my-course-list";
+import { MyCourseList, ResumeCard } from "@/components/course/my-course-list";
 import { Landing } from "@/components/landing/landing";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
@@ -82,12 +82,8 @@ export default function HomePage() {
       <TeacherReviewNotice user={user} />
       {user.role === "student" ? (
         <>
-          <MyCourseList limit={3} />
-          <Button asChild variant="link" className="mt-4">
-            <Link href="/my">
-              Xem tất cả khóa của tôi <ArrowRight />
-            </Link>
-          </Button>
+          <ResumeCard />
+          <MyCourseList limit={3} moreHref="/my" />
         </>
       ) : (
         <Button asChild>

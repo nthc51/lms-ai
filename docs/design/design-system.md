@@ -174,7 +174,7 @@ Nạp font qua `next/font/google` với `subsets: ["vietnamese", "latin"]` và `
   - Giảng viên: Khóa đang dạy, Câu hỏi chờ duyệt.
   - Admin: Duyệt giảng viên.
   - Menu tài khoản ở góc trên phải.
-- **Điện thoại (< 768px):** thanh điều hướng dưới cùng, **tối đa 4 mục**, có icon và chữ. Trang bài học **ẩn thanh dưới** để có thêm chỗ đọc.
+- **Điện thoại (< 768px):** thanh điều hướng dưới cùng, **tối đa 3 mục**, có icon và chữ. Tài khoản (hồ sơ, đăng xuất) nằm ở nút chữ cái tròn góc trên, có ở mọi trang. Trang bài học **ẩn thanh dưới** để có thêm chỗ đọc.
 - **Tablet:** thanh bên thu gọn (icon).
 - **Breadcrumb** (Khóa học › Chương › Bài) trên desktop. Trên điện thoại chỉ hiện nút ← với tên cấp cha.
 

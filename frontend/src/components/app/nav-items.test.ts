@@ -16,7 +16,7 @@ describe("navItems", () => {
     expect(navItems(user("teacher", "approved")).map((i) => i.href)).toEqual(["/teach", "/explore"]);
     expect(navItems(user("teacher", "pending")).map((i) => i.href)).toEqual(["/explore"]);
   });
-  it("tối đa 3 mục (thanh dưới thêm mục Tài khoản = 4)", () => {
+  it("tối đa 3 mục (tài khoản nằm ở menu góc trên, không chiếm chỗ thanh dưới)", () => {
     for (const r of ["student", "teacher", "admin"] as const) expect(navItems(user(r, "approved")).length).toBeLessThanOrEqual(3);
   });
   it("isActive khớp tiền tố nhưng / chỉ khớp chính nó", () => {

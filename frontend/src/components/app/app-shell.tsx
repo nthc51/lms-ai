@@ -1,6 +1,5 @@
 "use client";
 
-import { User as UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
@@ -11,7 +10,7 @@ import { UserMenu } from "./user-menu";
 
 /**
  * Khung chung: thanh bên 240px (≥1024px), thu gọn icon 64px (768–1023px),
- * thanh dưới tối đa 4 mục (<768px). Góc trên luôn có menu tài khoản (hồ sơ, ghi chú, chế độ màu, đăng xuất).
+ * thanh dưới tối đa 3 mục (<768px; tài khoản nằm ở menu góc trên). Góc trên luôn có menu tài khoản (hồ sơ, ghi chú, chế độ màu, đăng xuất).
  * Trang bài học và quiz không dùng khung này nhưng có cùng menu tài khoản ở thanh trên.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -67,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <nav
         aria-label="Điều hướng chính"
         className="fixed inset-x-0 bottom-0 z-30 grid h-16 border-t bg-surface md:hidden"
-        style={{ gridTemplateColumns: `repeat(${items.length + 1}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
       >
         {items.map(({ href, label, icon: Icon }) => (
           <Link
@@ -83,17 +82,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {label}
           </Link>
         ))}
-        <Link
-          href={user ? "/account" : "/login"}
-          aria-current={isActive(pathname, "/account") ? "page" : undefined}
-          className={cn(
-            "flex flex-col items-center justify-center gap-0.5 text-xs",
-            isActive(pathname, "/account") ? "text-primary" : "text-muted-foreground",
-          )}
-        >
-          <UserIcon className="size-5" aria-hidden />
-          {user ? "Tài khoản" : "Đăng nhập"}
-        </Link>
       </nav>
     </div>
   );
