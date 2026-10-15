@@ -509,7 +509,7 @@ git commit -m "feat(web): khung app cùng giọng trang chủ khách, tiêu đ�
 - Modify: `frontend/e2e/mock-api.ts`, `frontend/e2e/home-student.spec.ts`
 - Modify: `docs/design/design-system.md`, `docs/specs/2026-09-29-lms-ai-design.md`
 
-- [ ] **Bước 1: Truy vấn quiz chưa làm.** Nộp bài xong thì làm mới danh sách này, để quiz vừa làm biến khỏi trang chủ.
+- [x] **Bước 1: Truy vấn quiz chưa làm.** Nộp bài xong thì làm mới danh sách này, để quiz vừa làm biến khỏi trang chủ.
 
 ```diff
 --- a/frontend/src/lib/queries.ts
@@ -553,7 +553,7 @@ git commit -m "feat(web): khung app cùng giọng trang chủ khách, tiêu đ�
  
 ```
 
-- [ ] **Bước 2: Danh sách khóa.**
+- [x] **Bước 2: Danh sách khóa.**
   - `MyCourseList` và `ResumeCard` của plan trước được thay bằng `CourseRows` (dạng hàng, cho trang chủ) và `CourseBoard` (dạng khối, cho Khóa của tôi).
   - Hàm `pickResume` chọn khóa để học tiếp: ưu tiên khóa máy này nhớ bài đang học; không có thì lấy khóa chưa xong đầu tiên, khi đó nút đổi thành "Vào khóa học".
 
@@ -829,7 +829,7 @@ describe("CourseBoard", () => {
 });
 ```
 
-- [ ] **Bước 3: Trang chủ học viên.**
+- [x] **Bước 3: Trang chủ học viên.**
   - Ngày hôm nay và bài đang học (đọc từ localStorage) chỉ vẽ sau khi mount, để không lệch giữa server và trình duyệt.
   - Mục "Việc nên làm tiếp" chỉ hiện khi API trả về ít nhất một quiz.
 
@@ -1169,7 +1169,7 @@ describe("StudentHome", () => {
  }
 ```
 
-- [ ] **Bước 4: Khám phá.**
+- [x] **Bước 4: Khám phá.**
   - Khối "khóa mới nhất" chỉ hiện ở trang 1, khi không tìm kiếm và có từ 2 khóa trở lên. Mỗi lần hiện, khối này gọi thêm `GET /courses/{slug}` để lấy 3 bài đầu.
   - Nhãn "Bạn đang học" lấy từ trang đầu `/me/courses`, và chỉ gọi khi người dùng là học viên.
 
@@ -1330,7 +1330,7 @@ export default function ExplorePage() {
 }
 ```
 
-- [ ] **Bước 5: E2E**
+- [x] **Bước 5: E2E**
 
 ```diff
 --- a/frontend/e2e/mock-api.ts
@@ -1393,7 +1393,7 @@ export default function ExplorePage() {
    if (isMobile) {
 ```
 
-- [ ] **Bước 6: Tài liệu**
+- [x] **Bước 6: Tài liệu**
 
 ```diff
 --- a/docs/design/design-system.md
@@ -1439,7 +1439,7 @@ export default function ExplorePage() {
 +| 2026-10-15 | Giao diện sau đăng nhập cùng giọng với trang chủ cho khách: thanh bên một tông màu, ô tên app nền đậm, tiêu đề trang 800; trang chủ học viên có lời chào lớn, khối đang học (tên bài lấy từ API, phần đã đọc lưu trên máy), ba con số, "Việc nên làm tiếp" từ `GET /me/pending-quizzes` (quiz đã xuất bản trong khóa đã đăng ký, chưa nộp lần nào, bài làm dở trước, tối đa 6), danh sách khóa dạng hàng; Khám phá có khóa mới nhất trong khối màu và mục lục khóa; Khóa của tôi chia Đang học / Đã xong |
 ```
 
-- [ ] **Bước 7: Kiểm tra + commit**
+- [x] **Bước 7: Kiểm tra + commit**
 
 ```powershell
 cd frontend
