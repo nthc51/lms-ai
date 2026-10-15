@@ -327,7 +327,7 @@ git commit -m "feat(auth): sửa họ tên và đổi mật khẩu khi đang đ�
 - Create: `frontend/e2e/landing.spec.ts`
 - Modify: `docs/design/design-system.md`
 
-- [ ] **Bước 1: Màu, bo góc, `--mark`.**
+- [x] **Bước 1: Màu, bo góc, `--mark`.**
   - Màu sáng mới đều đạt chuẩn AA. Đã tính lại: chữ/nền 13.27, chữ phụ 5.68, màu chính 5.53, chữ trên nút 6.10, màu nhấn 4.70, đỏ 5.95, xanh lá 4.56.
   - Chữ trên `--mark` đạt 11.8 (sáng), 10.7 (tối), 8.9 (giấy).
   - Các class `rounded-md` / `rounded-lg` sẵn có tự nhỏ lại vì đọc `--radius`.
@@ -422,7 +422,7 @@ git commit -m "feat(auth): sửa họ tên và đổi mật khẩu khi đang đ�
  };
 ```
 
-- [ ] **Bước 2: Số trích dẫn `[n]` dùng nền `--mark`.** Áp cho cả AI Tutor, Studio và ghi chú (cùng component). Khi hover thì chuyển sang màu chính.
+- [x] **Bước 2: Số trích dẫn `[n]` dùng nền `--mark`.** Áp cho cả AI Tutor, Studio và ghi chú (cùng component). Khi hover thì chuyển sang màu chính.
 
 ```diff
 --- a/frontend/src/components/tutor/citation-chip.tsx
@@ -438,7 +438,7 @@ git commit -m "feat(auth): sửa họ tên và đổi mật khẩu khi đang đ�
          </button>
 ```
 
-- [ ] **Bước 3: Nội dung mẫu của phần "Thử hỏi".** Bốn câu cố định, không gọi API. Các thẻ `<sub>` / `<span class="hl">` trong chuỗi do code viết sẵn (không phải dữ liệu người dùng), nên dùng `dangerouslySetInnerHTML` được.
+- [x] **Bước 3: Nội dung mẫu của phần "Thử hỏi".** Bốn câu cố định, không gọi API. Các thẻ `<sub>` / `<span class="hl">` trong chuỗi do code viết sẵn (không phải dữ liệu người dùng), nên dùng `dangerouslySetInnerHTML` được.
 
 ```ts
 /**
@@ -523,7 +523,7 @@ export const SAMPLES: Record<SampleKey, SampleAnswer> = {
 export const SAMPLE_KEYS = Object.keys(SAMPLES) as SampleKey[];
 ```
 
-- [ ] **Bước 4: Trang chủ cho khách.** Đây là bản demo đã duyệt, chuyển sang React:
+- [x] **Bước 4: Trang chủ cho khách.** Đây là bản demo đã duyệt, chuyển sang React:
   - **Ngăn ảnh hưởng tới app:** toàn bộ CSS nằm dưới `.landing` và có màu cố định (trang chủ luôn sáng). Font lấy Be Vietnam Pro đã nạp sẵn.
   - **Chuyển động:** chỉ dùng `transform` / `opacity`, có nhánh `prefers-reduced-motion`.
   - **Khi tắt JavaScript:** nội dung vẫn hiện đủ, vì class `is-js` chỉ được thêm khi script chạy.
@@ -1472,7 +1472,7 @@ export function Landing() {
 .landing .rv-done .badge-ok{margin-left:6px}
 ```
 
-- [ ] **Bước 5: Gắn vào trang chủ.** Khách xem `<Landing />`. `AppShell` bỏ khung ở `/` khi chưa đăng nhập, kể cả lúc đang khôi phục phiên, để khách không thấy khung app nháy lên rồi biến mất. Người đã đăng nhập vẫn thấy trang chủ cũ trong khung app.
+- [x] **Bước 5: Gắn vào trang chủ.** Khách xem `<Landing />`. `AppShell` bỏ khung ở `/` khi chưa đăng nhập, kể cả lúc đang khôi phục phiên, để khách không thấy khung app nháy lên rồi biến mất. Người đã đăng nhập vẫn thấy trang chủ cũ trong khung app.
 
 ```diff
 --- a/frontend/src/app/(main)/page.tsx
@@ -1543,7 +1543,7 @@ export function Landing() {
        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:p-2">
 ```
 
-- [ ] **Bước 6: E2E trang chủ**
+- [x] **Bước 6: E2E trang chủ**
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -1579,7 +1579,7 @@ test.describe("trang chủ cho khách", () => {
 });
 ```
 
-- [ ] **Bước 7: Design system**
+- [x] **Bước 7: Design system**
 
 ```diff
 --- a/docs/design/design-system.md
@@ -1641,7 +1641,7 @@ test.describe("trang chủ cho khách", () => {
  
 ```
 
-- [ ] **Bước 8: Kiểm tra + commit**
+- [x] **Bước 8: Kiểm tra + commit**
 
 ```powershell
 cd frontend
