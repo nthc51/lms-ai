@@ -8,7 +8,7 @@
 
 ## 1. Nguyên tắc: dịu mắt khi học lâu
 
-1. **Không dùng trắng tuyệt đối (#FFF) và đen tuyệt đối (#000) làm nền hay chữ.** Nền sáng là màu giấy ấm, nền tối là xám than. Chữ không dùng đen hay trắng thuần.
+1. **Không dùng trắng tuyệt đối (#FFF) và đen tuyệt đối (#000) làm nền hay chữ.** Nền sáng là xám trắng trung tính (từ 2026-10-15, trước đó là màu giấy ấm), nền tối là xám than. Chữ không dùng đen hay trắng thuần.
 2. **Tương phản vừa đủ, không gắt.** Chữ nội dung đạt 10.9–14.4:1 (trên chuẩn AAA 7:1), nhưng không chạm mức 21:1 như đen trên trắng. Chữ phụ đạt ≥ 5.4:1.
 3. **Màu nhấn dùng tiết kiệm.** Màu chính (xanh lục lam đậm) chỉ dùng cho **một hành động chính** trên mỗi màn hình và cho trạng thái đang chọn. Phần còn lại là trung tính.
 4. **Chữ đọc lớn, dòng ngắn.** Nội dung bài 17px (chỉnh được 15–21px), giãn dòng 1.75, mỗi dòng tối đa khoảng 68 ký tự.
@@ -23,14 +23,15 @@
 
 | Token | Sáng | Tối dịu | Giấy (sepia) | Dùng cho |
 |---|---|---|---|---|
-| `--background` | `#F7F5F0` | `#171A1E` | `#F3EAD7` | Nền trang |
-| `--surface` (card) | `#FFFDF9` | `#1F2328` | `#F9F2E3` | Thẻ, khung đọc, panel |
+| `--background` | `#F3F4F1` | `#171A1E` | `#F3EAD7` | Nền trang |
+| `--surface` (card) | `#FCFCFA` | `#1F2328` | `#F9F2E3` | Thẻ, khung đọc, panel |
 | `--foreground` | `#24292F` | `#E4E1DA` | `#3A2F24` | Chữ chính |
 | `--muted-foreground` | `#5B6470` | `#A3A8AF` | `#6B5B49` | Chữ phụ, nhãn, thời gian |
-| `--border` | `#E3DED4` | `#33383F` | `#DDCFB4` | Viền, đường phân cách |
+| `--border` | `#DFE2DC` | `#33383F` | `#DDCFB4` | Viền, đường phân cách |
 | `--primary` | `#0F6E66` | `#5FBFB3` | `#2F6B5E` | Nút chính, liên kết, mục đang chọn |
 | `--primary-foreground` | `#FFFFFF` | `#0E1A19` | `#FFFFFF` | Chữ trên nút chính |
-| `--accent` | `#A15C07` | `#E0A458` | `#8A5313` | Tiến độ, điểm nổi bật, trích dẫn nguồn |
+| `--accent` | `#A15C07` | `#E0A458` | `#8A5313` | Tiến độ, điểm nổi bật |
+| `--mark` | `#FFE68F` | `#E3C55A` | `#F2D36B` | Nền số trích dẫn [n] và dòng tài liệu được tô (như bút dạ quang); chữ trên nó là `--mark-foreground` |
 | `--success` | `#2F7D4F` | `#7CC49A` | `#3B6E45` | Đúng, hoàn thành, đã xử lý |
 | `--destructive` | `#B42318` | `#F2867A` | `#A3321F` | Xóa, lỗi, sai |
 
@@ -38,7 +39,7 @@
 
 | | Chữ/nền | Chữ phụ/nền | Màu chính/nền | Chữ trên nút chính | Màu nhấn | Đỏ | Xanh lá |
 |---|---|---|---|---|---|---|---|
-| Sáng | 13.45 | 5.50 | 5.60 | 6.10 | 4.76 | 6.03 | 4.63 |
+| Sáng | 13.27 | 5.68 | 5.53 | 6.10 | 4.70 | 5.95 | 4.56 |
 | Tối dịu | 13.37 | 7.30 | 7.97 | 8.12 | 8.00 | 7.04 | 8.50 |
 | Giấy | 10.89 | 5.46 | 5.19 | 6.20 | 5.28 | 5.79 | 5.01 |
 
@@ -62,14 +63,14 @@ Nạp font qua `next/font/google` với `subsets: ["vietnamese", "latin"]` và `
 
 - `xs` 12px: chỉ dùng cho nhãn phụ, không bao giờ dùng cho nội dung.
 - `sm` 14px, `base` 16px, `lg` 18px, `xl` 20px, `2xl` 24px, `3xl` 30px.
-- Tiêu đề trang trên điện thoại 24px, desktop 30px. Độ đậm 600, không dùng 800–900.
+- Tiêu đề trang trên điện thoại 24px, desktop 30px. Độ đậm 600, không dùng 800–900 trong app. Ngoại lệ duy nhất: trang chủ cho khách (`components/landing`) dùng 800 cho tiêu đề lớn.
 
 ---
 
 ## 4. Khoảng cách, bo góc, đổ bóng, chuyển động
 
 - **Khoảng cách:** bội số của 4px. Khoảng cách giữa các khối nội dung trên trang: 24px trên điện thoại, 32px trên desktop.
-- **Bo góc:** `--radius: 10px` cho thẻ và panel, 8px cho nút và ô nhập, tròn hẳn cho huy hiệu (badge).
+- **Bo góc:** `--radius: 4px` cho thẻ, panel, nút và ô nhập (từ 2026-10-15, trước đó 10px/8px); tròn hẳn cho huy hiệu và ảnh đại diện. Trang chủ cho khách dùng góc vuông.
 - **Đổ bóng:** rất nhẹ, chỉ dùng cho lớp nổi (menu, dialog, panel Tutor trên điện thoại). Thẻ thường chỉ dùng viền.
 - **Chuyển động:** 150ms khi hover hoặc nhấn, 200ms khi mở panel. Không có hiệu ứng khi cuộn trang. Khi `prefers-reduced-motion` bật thì tắt hết chuyển động.
 

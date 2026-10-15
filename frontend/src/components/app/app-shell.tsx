@@ -18,9 +18,13 @@ const ROLE_LABEL = { student: "Học viên", teacher: "Giảng viên", admin: "Q
  * thanh dưới tối đa 4 mục (<768px). Trang bài học không dùng khung này.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, status } = useAuth();
   const pathname = usePathname();
   const items = navItems(user);
+
+  // Trang chủ của khách là trang giới thiệu toàn màn hình, có thanh điều hướng riêng.
+  // Lúc đang khôi phục phiên cũng chưa vẽ khung, để khách không thấy khung app nháy lên rồi biến mất.
+  if (pathname === "/" && status !== "authenticated") return <>{children}</>;
 
   return (
     <div className="min-h-dvh md:pl-16 lg:pl-60">

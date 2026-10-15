@@ -45,7 +45,7 @@ export function CitationChip({
         <button
           type="button"
           aria-label={`Nguồn ${n}${where ? `, ${where}` : ""}`}
-          className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded border border-accent/50 px-1 align-text-top text-xs font-medium text-accent hover:bg-accent/10"
+          className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-sm bg-mark px-1 align-text-top text-xs font-semibold text-mark-foreground transition-colors duration-150 hover:bg-primary hover:text-primary-foreground"
         >
           {n}
         </button>

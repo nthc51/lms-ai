@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowRight, Clock, Compass, XCircle } from "lucide-react";
+import { ArrowRight, Clock, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/app/states";
 import { MyCourseList } from "@/components/course/my-course-list";
+import { Landing } from "@/components/landing/landing";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
 import { api, unwrap } from "@/lib/api/client";
@@ -67,25 +68,8 @@ export default function HomePage() {
   }, [isAdmin, router]);
   if (status === "loading" || isAdmin) return <Skeleton className="h-40 w-full" />;
 
-  if (!user)
-    return (
-      <section className="mx-auto max-w-2xl py-10 text-center md:py-20">
-        <h1 className="text-3xl font-semibold md:text-4xl">Học theo nhịp của bạn, có AI giải đáp ngay trong bài</h1>
-        <p className="mt-4 text-lg text-muted-foreground">
-          AI Tutor trả lời dựa trên đúng tài liệu của khóa học và luôn ghi nguồn, để bạn kiểm chứng được.
-        </p>
-        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg">
-            <Link href="/explore">
-              <Compass /> Khám phá khóa học
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link href="/register">Tạo tài khoản</Link>
-          </Button>
-        </div>
-      </section>
-    );
+  // Khách: trang giới thiệu riêng, không nằm trong khung app (AppShell bỏ khung ở "/" khi chưa đăng nhập).
+  if (!user) return <Landing />;
 
   // Chỉ giảng viên đã duyệt mới vào được /teach.
   const canTeach = user.role === "teacher" && user.teacher_status === "approved";

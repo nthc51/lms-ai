@@ -1,6 +1,7 @@
 import "@fontsource/be-vietnam-pro/400.css";
 import "@fontsource/be-vietnam-pro/500.css";
 import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/800.css";
 import "@fontsource-variable/noto-sans";
 import "@fontsource-variable/jetbrains-mono";
 import type { Metadata, Viewport } from "next";
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f5f0" },
+    { media: "(prefers-color-scheme: light)", color: "#f3f4f1" },
     { media: "(prefers-color-scheme: dark)", color: "#171a1e" },
   ],
 };
