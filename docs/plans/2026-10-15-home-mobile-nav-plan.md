@@ -40,7 +40,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 - Create: `frontend/e2e/home-student.spec.ts`
 - Modify: `docs/design/design-system.md`
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
 
 ```tsx
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -112,7 +112,7 @@ describe("ResumeCard", () => {
 });
 ```
 
-- [ ] **Bước 2: Danh sách khóa và thẻ Học tiếp.** `ResumeCard` đọc `localStorage` nên chỉ vẽ sau khi đã mount (`useMounted`). Thẻ dùng chung truy vấn `/me/courses` với danh sách khóa (cùng query key), nên không gọi API thêm lần nào.
+- [x] **Bước 2: Danh sách khóa và thẻ Học tiếp.** `ResumeCard` đọc `localStorage` nên chỉ vẽ sau khi đã mount (`useMounted`). Thẻ dùng chung truy vấn `/me/courses` với danh sách khóa (cùng query key), nên không gọi API thêm lần nào.
 
 ```diff
 --- a/frontend/src/components/course/my-course-list.tsx
@@ -254,7 +254,7 @@ describe("ResumeCard", () => {
          <Button asChild>
 ```
 
-- [ ] **Bước 3: Thanh dưới điện thoại 3 mục**
+- [x] **Bước 3: Thanh dưới điện thoại 3 mục**
 
 ```diff
 --- a/frontend/src/components/app/app-shell.tsx
@@ -332,7 +332,7 @@ describe("ResumeCard", () => {
    it("isActive khớp tiền tố nhưng / chỉ khớp chính nó", () => {
 ```
 
-- [ ] **Bước 4: E2E**
+- [x] **Bước 4: E2E**
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -361,7 +361,7 @@ test("trang chủ học viên: thẻ Học tiếp vào thẳng bài đang học,
 });
 ```
 
-- [ ] **Bước 5: Design system**
+- [x] **Bước 5: Design system**
 
 ```diff
 --- a/docs/design/design-system.md
@@ -377,7 +377,7 @@ test("trang chủ học viên: thẻ Học tiếp vào thẳng bài đang học,
  
 ```
 
-- [ ] **Bước 6: Kiểm tra + commit**
+- [x] **Bước 6: Kiểm tra + commit**
 
 ```powershell
 cd frontend
