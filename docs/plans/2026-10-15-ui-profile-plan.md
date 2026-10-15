@@ -67,7 +67,7 @@ Dùng **400** cho mật khẩu sai, không dùng 401: frontend gặp 401 sẽ t�
 - Create: `backend/tests/test_profile.py`
 - Regenerate: `frontend/openapi.json`, `frontend/src/lib/api/schema.d.ts`
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
 
 ```python
 """Hồ sơ cá nhân: sửa họ tên, đổi mật khẩu khi đang đăng nhập."""
@@ -179,7 +179,7 @@ async def test_change_password_is_rate_limited_per_account(client):
 
 Chạy: `cd backend; uv run pytest tests/test_profile.py -q`. Kỳ vọng fail (405 / 404 vì chưa có endpoint).
 
-- [ ] **Bước 2: Schema**
+- [x] **Bước 2: Schema**
 
 ```diff
 --- a/backend/app/modules/auth/schemas.py
@@ -210,7 +210,7 @@ Chạy: `cd backend; uv run pytest tests/test_profile.py -q`. Kỳ vọng fail (
      token_type: str = "bearer"
 ```
 
-- [ ] **Bước 3: Service.** `db.refresh(user, with_for_update=True)` khóa dòng user, để hai lần đổi cùng lúc thì lần sau thấy mật khẩu mới. `issue_tokens` commit luôn mật khẩu mới và việc thu hồi phiên.
+- [x] **Bước 3: Service.** `db.refresh(user, with_for_update=True)` khóa dòng user, để hai lần đổi cùng lúc thì lần sau thấy mật khẩu mới. `issue_tokens` commit luôn mật khẩu mới và việc thu hồi phiên.
 
 ```diff
 --- a/backend/app/modules/auth/service.py
@@ -247,7 +247,7 @@ Chạy: `cd backend; uv run pytest tests/test_profile.py -q`. Kỳ vọng fail (
      if user.role != Role.teacher or user.teacher_status != TeacherStatus.rejected:
 ```
 
-- [ ] **Bước 4: Router**
+- [x] **Bước 4: Router**
 
 ```diff
 --- a/backend/app/modules/auth/router.py
@@ -304,7 +304,7 @@ Chạy: `cd backend; uv run pytest tests/test_profile.py -q`. Kỳ vọng fail (
      response: Response, refresh_token: str | None = Cookie(default=None), db: AsyncSession = Depends(get_db)
 ```
 
-- [ ] **Bước 5: Chạy test, kiểu API cho frontend, commit**
+- [x] **Bước 5: Chạy test, kiểu API cho frontend, commit**
 
 ```powershell
 uv run pytest tests/test_profile.py -q          # 6 pass
