@@ -83,6 +83,7 @@ export function useQuizAttempt(quizId: string) {
     qc.setQueryData(quizKeys.result(a.id), result);
     qc.invalidateQueries({ queryKey: quizKeys.quiz(quizId) });
     qc.invalidateQueries({ queryKey: ["lesson-quizzes"] });
+    qc.invalidateQueries({ queryKey: ["pending-quizzes"] }); // trang chủ: quiz này không còn là việc cần làm
     return result;
   }, [a, answers, closed, quizId, qc, saverFor]);
 

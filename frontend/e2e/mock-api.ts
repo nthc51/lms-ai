@@ -140,6 +140,7 @@ export async function mockApi(page: Page, opts: { user?: typeof student | typeof
     "GET /lessons/*/documents": (r) => json(r, []),
     "POST /tutor/messages/*/followups": (r) => json(r, { questions: [] }),
     "GET /notes": (r) => json(r, { items: [], total: 0, page: 1, size: 20 }),
+    "GET /me/pending-quizzes": (r) => json(r, []),
     ...opts.extra,
   };
 

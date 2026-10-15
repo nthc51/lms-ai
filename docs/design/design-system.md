@@ -32,6 +32,10 @@
 | `--primary-foreground` | `#FFFFFF` | `#0E1A19` | `#FFFFFF` | Chữ trên nút chính |
 | `--accent` | `#A15C07` | `#E0A458` | `#8A5313` | Tiến độ, điểm nổi bật |
 | `--mark` | `#FFE68F` | `#E3C55A` | `#F2D36B` | Nền số trích dẫn [n] và dòng tài liệu được tô (như bút dạ quang); chữ trên nó là `--mark-foreground` |
+| `--sidebar` | `#E8EBE5` | `#1B1F23` | `#ECE2CC` | Thanh bên, thanh dưới điện thoại (không viền, tách bằng tông màu) |
+| `--brand` | `#16181B` | `#0F1113` | `#3A2F24` | Ô tên "LMS-AI" ở đầu thanh bên, nút lọc đang chọn (chữ trắng) |
+| `--field-1/2/3` | `#CDDFD7` / `#DFE6EC` / `#E4ECE8` | `#1F3330` / `#222B33` / `#1D2A27` | `#E2D6B5` / `#E9DFC7` / `#EFE6CF` | Khối màu lớn (khối đang học, khóa nổi bật, khối khóa). Trên `--field-1` chỉ dùng màu chữ chính: chữ phụ và màu chính chỉ đạt khoảng 4.3:1 |
+| `--track` | `#D6DBD3` | `#3A4048` | `#D9CBA9` | Nền thanh tiến độ (phần đã xong là màu chính, góc vuông) |
 | `--success` | `#2F7D4F` | `#7CC49A` | `#3B6E45` | Đúng, hoàn thành, đã xử lý |
 | `--destructive` | `#B42318` | `#F2867A` | `#A3321F` | Xóa, lỗi, sai |
 
@@ -63,7 +67,7 @@ Nạp font qua `next/font/google` với `subsets: ["vietnamese", "latin"]` và `
 
 - `xs` 12px: chỉ dùng cho nhãn phụ, không bao giờ dùng cho nội dung.
 - `sm` 14px, `base` 16px, `lg` 18px, `xl` 20px, `2xl` 24px, `3xl` 30px.
-- Tiêu đề trang trên điện thoại 24px, desktop 30px. Độ đậm 600, không dùng 800–900 trong app. Ngoại lệ duy nhất: trang chủ cho khách (`components/landing`) dùng 800 cho tiêu đề lớn.
+- Tiêu đề trang (`PageHeader`) từ 2026-10-15: 32–48px, độ đậm 800, giãn chữ -0.035em, cùng giọng với trang chủ cho khách. Lời chào ở trang chủ học viên và tiêu đề trang Khám phá lớn hơn (tới 88px / 68px). Chữ nội dung và nhãn vẫn 400–600.
 
 ---
 

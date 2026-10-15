@@ -17,6 +17,7 @@ export const qk = {
   catalog: (q: string, page: number) => ["catalog", q, page] as const,
   course: (slug: string) => ["course", slug] as const,
   myCourses: (page: number) => ["my-courses", page] as const,
+  pendingQuizzes: ["pending-quizzes"] as const,
   lesson: (id: string) => ["lesson", id] as const,
   lessonVideo: (id: string) => ["lesson-video", id] as const,
   teacherCourses: (page: number) => [...TEACHER_COURSES, page] as const,
@@ -47,6 +48,15 @@ export function useMyCourses(page = 1, enabled = true) {
   return useQuery({
     queryKey: qk.myCourses(page),
     queryFn: () => unwrap(api.GET("/api/v1/me/courses", { params: { query: { page, size: 20 } } })),
+    enabled,
+  });
+}
+
+/** Quiz chưa nộp trong các khóa đã đăng ký (trang chủ học viên: "Việc nên làm tiếp"). */
+export function usePendingQuizzes(enabled = true) {
+  return useQuery({
+    queryKey: qk.pendingQuizzes,
+    queryFn: () => unwrap(api.GET("/api/v1/me/pending-quizzes")),
     enabled,
   });
 }

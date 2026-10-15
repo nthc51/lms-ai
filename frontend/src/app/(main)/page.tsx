@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/app/states";
-import { MyCourseList, ResumeCard } from "@/components/course/my-course-list";
+import { StudentHome } from "@/components/home/student-home";
 import { Landing } from "@/components/landing/landing";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
@@ -71,25 +71,20 @@ export default function HomePage() {
   // Khách: trang giới thiệu riêng, không nằm trong khung app (AppShell bỏ khung ở "/" khi chưa đăng nhập).
   if (!user) return <Landing />;
 
+  if (user.role === "student") return <StudentHome givenName={givenName(user.full_name)} />;
+
   // Chỉ giảng viên đã duyệt mới vào được /teach.
   const canTeach = user.role === "teacher" && user.teacher_status === "approved";
 
   return (
     <>
       <PageHeader title={`Chào ${givenName(user.full_name)}`}>
-        {user.role === "student" ? "Tiếp tục từ chỗ bạn đã dừng." : canTeach ? "Quản lý các khóa bạn đang dạy." : "Chào mừng bạn đến với LMS-AI."}
+        {canTeach ? "Quản lý các khóa bạn đang dạy." : "Chào mừng bạn đến với LMS-AI."}
       </PageHeader>
       <TeacherReviewNotice user={user} />
-      {user.role === "student" ? (
-        <>
-          <ResumeCard />
-          <MyCourseList limit={3} moreHref="/my" />
-        </>
-      ) : (
-        <Button asChild>
-          <Link href={canTeach ? "/teach" : "/explore"}>{canTeach ? "Tới khóa đang dạy" : "Khám phá khóa học"}</Link>
-        </Button>
-      )}
+      <Button asChild>
+        <Link href={canTeach ? "/teach" : "/explore"}>{canTeach ? "Tới khóa đang dạy" : "Khám phá khóa học"}</Link>
+      </Button>
     </>
   );
 }
