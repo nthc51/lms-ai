@@ -2685,6 +2685,37 @@
         }
       }
     },
+    "/api/v1/me/pending-quizzes": {
+      "get": {
+        "tags": [
+          "quiz"
+        ],
+        "summary": "My Pending Quizzes",
+        "description": "Tối đa 6 quiz chưa nộp lần nào trong các khóa đã đăng ký (bài làm dở trước). Trang chủ học viên dùng.",
+        "operationId": "my_pending_quizzes_api_v1_me_pending_quizzes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PendingQuizOut"
+                  },
+                  "type": "array",
+                  "title": "Response My Pending Quizzes Api V1 Me Pending Quizzes Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/quizzes/{quiz_id}": {
       "get": {
         "tags": [
@@ -7570,6 +7601,69 @@
           "markdown"
         ],
         "title": "PageOut"
+      },
+      "PendingQuizOut": {
+        "properties": {
+          "quiz_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Quiz Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "lesson_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lesson Id"
+          },
+          "lesson_title": {
+            "type": "string",
+            "title": "Lesson Title"
+          },
+          "course_title": {
+            "type": "string",
+            "title": "Course Title"
+          },
+          "course_slug": {
+            "type": "string",
+            "title": "Course Slug"
+          },
+          "question_count": {
+            "type": "integer",
+            "title": "Question Count"
+          },
+          "time_limit_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Sec"
+          },
+          "in_progress": {
+            "type": "boolean",
+            "title": "In Progress"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quiz_id",
+          "title",
+          "lesson_id",
+          "lesson_title",
+          "course_title",
+          "course_slug",
+          "question_count",
+          "time_limit_sec",
+          "in_progress"
+        ],
+        "title": "PendingQuizOut",
+        "description": "Quiz đã xuất bản trong khóa học viên đã đăng ký mà học viên chưa nộp lần nào (trang chủ: việc nên làm tiếp)."
       },
       "PresignIn": {
         "properties": {

@@ -9,12 +9,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError, not_found
 from app.core.pagination import PageParams, paginate
 from app.modules.auth.models import Role, User
-from app.modules.courses.models import Course, Lesson, Section
+from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.courses.service import ensure_owner, get_owned_lesson
+from app.modules.enrollment.models import Enrollment
 from app.modules.enrollment.service import ensure_lesson_access
-from app.modules.quiz.models import USABLE_REVIEW, Question, Quiz, QuizAttempt, QuizQuestion, QuizStatus
+from app.modules.quiz.models import (
+    USABLE_REVIEW,
+    AttemptStatus,
+    Question,
+    Quiz,
+    QuizAttempt,
+    QuizQuestion,
+    QuizStatus,
+)
 from app.modules.quiz.questions import to_out
-from app.modules.quiz.schemas import QuestionOut, QuizCreate, QuizOut, QuizPage, QuizUpdate
+from app.modules.quiz.schemas import PendingQuizOut, QuestionOut, QuizCreate, QuizOut, QuizPage, QuizUpdate
 
 
 async def get_quiz_context(db: AsyncSession, quiz_id: uuid.UUID) -> tuple[Quiz, Course]:
@@ -258,3 +267,51 @@ async def get_quiz_for_viewer(db: AsyncSession, user: User, quiz_id: uuid.UUID) 
             raise not_found("Quiz")
         await ensure_lesson_access(db, quiz.lesson_id, user)
     return (await _to_outs(db, [quiz], user, manager, with_questions=True))[0]
+
+
+PENDING_LIMIT = 6
+
+
+async def list_pending_quizzes(
+    db: AsyncSession, user: User, limit: int = PENDING_LIMIT
+) -> list[PendingQuizOut]:
+    """Quiz đã xuất bản trong các khóa đã xuất bản mà người dùng đã đăng ký, chưa nộp lần nào (bài làm dở vẫn tính
+    là chưa xong). Bài làm dở lên trước, rồi tới quiz mới nhất. Không đăng ký khóa nào thì danh sách rỗng."""
+    finished = select(QuizAttempt.quiz_id).where(
+        QuizAttempt.user_id == user.id,
+        QuizAttempt.status.in_([AttemptStatus.completed, AttemptStatus.timed_out]),
+    )
+    open_ = select(QuizAttempt.quiz_id).where(
+        QuizAttempt.user_id == user.id, QuizAttempt.status == AttemptStatus.in_progress
+    )
+    in_progress = Quiz.id.in_(open_)
+    stmt = (
+        select(Quiz, Lesson.title, Course.title, Course.slug, in_progress)
+        .join(Lesson, Lesson.id == Quiz.lesson_id)
+        .join(Section, Section.id == Lesson.section_id)
+        .join(Course, Course.id == Section.course_id)
+        .join(Enrollment, (Enrollment.course_id == Course.id) & (Enrollment.user_id == user.id))
+        .where(
+            Quiz.status == QuizStatus.published,
+            Course.status == CourseStatus.published,
+            Quiz.id.not_in(finished),
+        )
+        .order_by(in_progress.desc(), Quiz.created_at.desc(), Quiz.id)
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+    counts = await _question_counts(db, [r[0].id for r in rows])
+    return [
+        PendingQuizOut(
+            quiz_id=quiz.id,
+            title=quiz.title,
+            lesson_id=quiz.lesson_id,
+            lesson_title=lesson_title,
+            course_title=course_title,
+            course_slug=course_slug,
+            question_count=counts.get(quiz.id, 0),
+            time_limit_sec=quiz.time_limit_sec,
+            in_progress=bool(doing),
+        )
+        for quiz, lesson_title, course_title, course_slug, doing in rows
+    ]

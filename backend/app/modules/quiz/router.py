@@ -19,6 +19,7 @@ from app.modules.quiz.schemas import (
     AttemptOut,
     AttemptResult,
     ExplainOut,
+    PendingQuizOut,
     QuestionOut,
     QuestionPage,
     QuestionReview,
@@ -83,6 +84,12 @@ async def lesson_quizzes(
     db: AsyncSession = Depends(get_db),
 ):
     return await quizzes.list_lesson_quizzes(db, user, lesson_id, params)
+
+
+@router.get("/me/pending-quizzes", response_model=list[PendingQuizOut])
+async def my_pending_quizzes(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Tối đa 6 quiz chưa nộp lần nào trong các khóa đã đăng ký (bài làm dở trước). Trang chủ học viên dùng."""
+    return await quizzes.list_pending_quizzes(db, user)
 
 
 @router.get("/quizzes/{quiz_id}", response_model=QuizOut)

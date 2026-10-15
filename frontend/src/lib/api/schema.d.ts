@@ -780,6 +780,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/pending-quizzes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Pending Quizzes
+         * @description Tối đa 6 quiz chưa nộp lần nào trong các khóa đã đăng ký (bài làm dở trước). Trang chủ học viên dùng.
+         */
+        get: operations["my_pending_quizzes_api_v1_me_pending_quizzes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/quizzes/{quiz_id}": {
         parameters: {
             query?: never;
@@ -2468,6 +2488,36 @@ export interface components {
             extraction_method: components["schemas"]["ExtractionMethod"];
             /** Markdown */
             markdown: string;
+        };
+        /**
+         * PendingQuizOut
+         * @description Quiz đã xuất bản trong khóa học viên đã đăng ký mà học viên chưa nộp lần nào (trang chủ: việc nên làm tiếp).
+         */
+        PendingQuizOut: {
+            /**
+             * Quiz Id
+             * Format: uuid
+             */
+            quiz_id: string;
+            /** Title */
+            title: string;
+            /**
+             * Lesson Id
+             * Format: uuid
+             */
+            lesson_id: string;
+            /** Lesson Title */
+            lesson_title: string;
+            /** Course Title */
+            course_title: string;
+            /** Course Slug */
+            course_slug: string;
+            /** Question Count */
+            question_count: number;
+            /** Time Limit Sec */
+            time_limit_sec: number | null;
+            /** In Progress */
+            in_progress: boolean;
         };
         /** PresignIn */
         PresignIn: {
@@ -4855,6 +4905,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_pending_quizzes_api_v1_me_pending_quizzes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingQuizOut"][];
                 };
             };
         };

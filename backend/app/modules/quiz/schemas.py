@@ -126,6 +126,20 @@ class QuizPage(Page[QuizOut]):
     pass
 
 
+class PendingQuizOut(BaseModel):
+    """Quiz đã xuất bản trong khóa học viên đã đăng ký mà học viên chưa nộp lần nào (trang chủ: việc nên làm tiếp)."""
+
+    quiz_id: uuid.UUID
+    title: str
+    lesson_id: uuid.UUID
+    lesson_title: str
+    course_title: str
+    course_slug: str
+    question_count: int
+    time_limit_sec: int | None
+    in_progress: bool  # đang có bài làm dở
+
+
 class AttemptQuestion(BaseModel):
     """Câu hỏi khi đang làm bài: KHÔNG có đáp án đúng, không có giải thích."""
 
