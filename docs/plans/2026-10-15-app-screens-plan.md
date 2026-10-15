@@ -67,7 +67,7 @@ Gõ **đúng** code trong plan. Nếu phải lệch thì ghi lý do vào commit.
 - Create: `backend/tests/test_pending_quizzes.py`
 - Regenerate: `frontend/openapi.json`, `frontend/src/lib/api/schema.d.ts`
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
 
 ```python
 """Trang chủ học viên: quiz chưa làm trong các khóa đã đăng ký (GET /me/pending-quizzes)."""
@@ -122,7 +122,7 @@ async def test_pending_quizzes_need_login(client):
     assert (await client.get(f"{API}/me/pending-quizzes")).status_code == 401
 ```
 
-- [ ] **Bước 2: Schema, service, router.**
+- [x] **Bước 2: Schema, service, router.**
   - Ẩn khóa ở trang quản trị sẽ chuyển khóa sang `archived`, nên điều kiện `Course.status == published` loại luôn khóa bị ẩn.
   - Điều kiện "chưa nộp" là không có lượt nào ở trạng thái `completed` hay `timed_out`.
 
@@ -260,7 +260,7 @@ async def test_pending_quizzes_need_login(client):
      quiz_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ```
 
-- [ ] **Bước 3: Chạy test, kiểu API, commit**
+- [x] **Bước 3: Chạy test, kiểu API, commit**
 
 ```powershell
 cd backend
