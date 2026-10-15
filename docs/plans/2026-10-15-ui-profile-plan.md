@@ -1667,7 +1667,7 @@ git commit -m "feat(web): bảng màu sáng trung tính, bo góc 4px, trích d�
 - Create: `frontend/e2e/account.spec.ts`
 - Modify: `docs/specs/2026-09-29-lms-ai-design.md`
 
-- [ ] **Bước 1: Hook gọi API.** Đổi mật khẩu xong thì dùng ngay access token mới. Cookie refresh mới do backend đặt và dùng chung cho mọi tab.
+- [x] **Bước 1: Hook gọi API.** Đổi mật khẩu xong thì dùng ngay access token mới. Cookie refresh mới do backend đặt và dùng chung cho mọi tab.
 
 ```ts
 "use client";
@@ -1714,7 +1714,7 @@ export function passwordErrorMessage(err: unknown) {
 }
 ```
 
-- [ ] **Bước 2: Menu tài khoản dùng chung.**
+- [x] **Bước 2: Menu tài khoản dùng chung.**
   - `compact`: chỉ hiện chữ cái đại diện; tên vẫn có cho trình đọc màn hình, nên e2e cũ tìm nút theo tên vẫn chạy.
   - **Trên điện thoại** luôn ở dạng gọn.
   - **Đăng xuất** dùng `window.location.assign("/")` (tải lại hẳn trang). Nếu dùng `router.push`, trang có `RequireAuth` thấy phiên mất sẽ kịp chuyển sang `/login?next=…`; tải lại hẳn cũng bỏ sạch dữ liệu của phiên cũ trong bộ nhớ.
@@ -1875,7 +1875,7 @@ describe("UserMenu", () => {
 });
 ```
 
-- [ ] **Bước 3: Khung app dùng menu mới.** Menu cũ chỉ có trên máy tính và không có mục Hồ sơ; giờ được bỏ, menu mới hiện ở mọi cỡ màn hình.
+- [x] **Bước 3: Khung app dùng menu mới.** Menu cũ chỉ có trên máy tính và không có mục Hồ sơ; giờ được bỏ, menu mới hiện ở mọi cỡ màn hình.
 
 ```diff
 --- a/frontend/src/components/app/app-shell.tsx
@@ -1972,7 +1972,7 @@ describe("UserMenu", () => {
 -}
 ```
 
-- [ ] **Bước 4: Trang Hồ sơ cá nhân**
+- [x] **Bước 4: Trang Hồ sơ cá nhân**
   - **Form họ tên:** nút Lưu chỉ bật khi đã sửa. Lưu xong thì tải lại `/me` để menu ở mọi trang hiện tên mới.
   - **Form mật khẩu:**
     - Kiểm hai ô mật khẩu mới phải khớp.
@@ -2300,7 +2300,7 @@ describe("PasswordForm", () => {
      </RequireAuth>
 ```
 
-- [ ] **Bước 5: Menu ở trang học, trang làm quiz, trang kết quả.** Test của trang làm quiz mock menu để không cần `AuthProvider`.
+- [x] **Bước 5: Menu ở trang học, trang làm quiz, trang kết quả.** Test của trang làm quiz mock menu để không cần `AuthProvider`.
 
 ```diff
 --- a/frontend/src/components/lesson/lesson-view.tsx
@@ -2379,7 +2379,7 @@ describe("PasswordForm", () => {
          {result.isPending ? (
 ```
 
-- [ ] **Bước 6: E2E.** Hai kịch bản:
+- [x] **Bước 6: E2E.** Hai kịch bản:
   - Từ trang Khám phá mở menu → Hồ sơ cá nhân → sửa tên (menu hiện tên mới) → đổi mật khẩu.
   - Đang học bài thì mở menu → Đăng xuất → về trang chủ giới thiệu.
 
@@ -2455,7 +2455,7 @@ test.describe("hồ sơ cá nhân và menu tài khoản", () => {
 });
 ```
 
-- [ ] **Bước 7: Spec**
+- [x] **Bước 7: Spec**
 
 ```diff
 --- a/docs/specs/2026-09-29-lms-ai-design.md
@@ -2476,7 +2476,7 @@ test.describe("hồ sơ cá nhân và menu tài khoản", () => {
 +| 2026-10-15 | Hồ sơ cá nhân: `PATCH /me` (họ tên, gọn khoảng trắng, 1–120 ký tự), `POST /me/password` (đúng mật khẩu hiện tại, khác mật khẩu cũ, 10 lần thử/giờ/tài khoản; thu hồi mọi phiên rồi cấp phiên mới cho trình duyệt đang dùng). Menu tài khoản (Hồ sơ cá nhân, Ghi chú, chế độ màu, Đăng xuất) ở thanh trên của mọi trang kể cả trang học và quiz; đăng xuất tải lại trang chủ. Giao diện: bảng màu sáng trung tính, bo góc 4px, `--mark` cho trích dẫn; trang chủ cho khách mới (không nằm trong khung app) có phần thử hỏi với 4 câu mẫu cố định |
 ```
 
-- [ ] **Bước 8: Kiểm tra + commit**
+- [x] **Bước 8: Kiểm tra + commit**
 
 ```powershell
 cd frontend
