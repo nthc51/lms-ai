@@ -280,7 +280,7 @@ git commit -m "feat(quiz): GET /me/pending-quizzes, quiz chưa làm trong các k
 **Files:**
 - Modify: `frontend/src/app/globals.css`, `frontend/src/components/app/app-shell.tsx`, `frontend/src/components/app/states.tsx`, `frontend/src/components/ui/misc.tsx`, `frontend/src/components/course/course-card.tsx`
 
-- [ ] **Bước 1: Token**
+- [x] **Bước 1: Token**
 
 ```diff
 --- a/frontend/src/app/globals.css
@@ -340,7 +340,7 @@ git commit -m "feat(quiz): GET /me/pending-quizzes, quiz chưa làm trong các k
    --font-sans: "Be Vietnam Pro", system-ui, sans-serif;
 ```
 
-- [ ] **Bước 2: Khung app.**
+- [x] **Bước 2: Khung app.**
   - Ô tên app lúc thanh bên thu gọn (768–1023px) chỉ hiện chữ "L"; tên đầy đủ nằm trong `aria-label`.
   - Thanh bên có `z-40` để đè lên thanh trên.
 
@@ -431,7 +431,7 @@ git commit -m "feat(quiz): GET /me/pending-quizzes, quiz chưa làm trong các k
              <Icon className="size-5" aria-hidden />
 ```
 
-- [ ] **Bước 3: Tiêu đề trang, thanh tiến độ, nút phân trang**
+- [x] **Bước 3: Tiêu đề trang, thanh tiến độ, nút phân trang**
 
 ```diff
 --- a/frontend/src/components/app/states.tsx
@@ -490,7 +490,7 @@ git commit -m "feat(quiz): GET /me/pending-quizzes, quiz chưa làm trong các k
      </nav>
 ```
 
-- [ ] **Bước 4:** `cd frontend; npx tsc --noEmit; npx eslint .; npx vitest run` (pass hết). Commit:
+- [x] **Bước 4:** `cd frontend; npx tsc --noEmit; npx eslint .; npx vitest run` (pass hết). Commit:
 
 ```powershell
 git add frontend/src/app/globals.css frontend/src/components/app frontend/src/components/ui/misc.tsx frontend/src/components/course/course-card.tsx
