@@ -21,6 +21,13 @@
   --ring: #0f6e66;
   --mark: #ffe68f;
   --mark-foreground: #24292f;
+  /* Khung app và các khối màu (2026-10-15b): thanh bên, ô tên app, ba màu khối, nền thanh tiến độ */
+  --sidebar: #e8ebe5;
+  --brand: #16181b;
+  --field-1: #cddfd7;
+  --field-2: #dfe6ec;
+  --field-3: #e4ece8;
+  --track: #d6dbd3;
   --radius: 4px;
   --reader-size: 17px;
 }
@@ -40,6 +47,12 @@
   --ring: #5fbfb3;
   --mark: #e3c55a;
   --mark-foreground: #1a1608;
+  --sidebar: #1b1f23;
+  --brand: #0f1113;
+  --field-1: #1f3330;
+  --field-2: #222b33;
+  --field-3: #1d2a27;
+  --track: #3a4048;
   color-scheme: dark;
 }
 
@@ -58,6 +71,12 @@
   --ring: #2f6b5e;
   --mark: #f2d36b;
   --mark-foreground: #3a2f24;
+  --sidebar: #ece2cc;
+  --brand: #3a2f24;
+  --field-1: #e2d6b5;
+  --field-2: #e9dfc7;
+  --field-3: #efe6cf;
+  --track: #d9cba9;
 }
 
 @theme inline {
@@ -75,6 +94,12 @@
   --color-ring: var(--ring);
   --color-mark: var(--mark);
   --color-mark-foreground: var(--mark-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-brand: var(--brand);
+  --color-field-1: var(--field-1);
+  --color-field-2: var(--field-2);
+  --color-field-3: var(--field-3);
+  --color-track: var(--track);
   --radius-lg: var(--radius);
   --radius-md: var(--radius);
   --font-sans: "Be Vietnam Pro", system-ui, sans-serif;

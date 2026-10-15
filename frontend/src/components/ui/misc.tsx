@@ -31,10 +31,10 @@ export function Progress({ value, className, label }: { value: number; className
     <ProgressPrimitive.Root
       value={value}
       aria-label={label}
-      className={cn("relative h-2 w-full overflow-hidden rounded-full bg-muted", className)}
+      className={cn("relative h-2 w-full overflow-hidden bg-track", className)}
     >
       <ProgressPrimitive.Indicator
-        className="h-full bg-accent transition-transform duration-200"
+        className="h-full bg-primary transition-transform duration-500"
         style={{ transform: `translateX(-${100 - Math.min(100, Math.max(0, value))}%)` }}
       />
     </ProgressPrimitive.Root>

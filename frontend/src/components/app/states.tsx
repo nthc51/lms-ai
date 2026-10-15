@@ -59,8 +59,8 @@ export function PageHeader({ title, actions, children }: { title: string; action
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3 md:mb-8">
       <div>
-        <h1 className="text-2xl font-semibold md:text-3xl">{title}</h1>
-        {children ? <div className="mt-1 text-muted-foreground">{children}</div> : null}
+        <h1 className="text-[clamp(2rem,1.4rem+2vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.035em]">{title}</h1>
+        {children ? <div className="mt-2 text-lg text-muted-foreground">{children}</div> : null}
       </div>
       {actions}
     </div>

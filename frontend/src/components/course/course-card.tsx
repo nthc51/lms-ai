@@ -38,14 +38,14 @@ export function Pagination({ page, total, size, onPage }: { page: number; total:
   const pages = Math.max(1, Math.ceil(total / size));
   if (pages <= 1) return null;
   return (
-    <nav aria-label="Phân trang" className="mt-6 flex items-center justify-center gap-3 text-sm">
-      <button className="h-10 rounded-md border px-3 disabled:opacity-50" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+    <nav aria-label="Phân trang" className="mt-6 flex items-center justify-center gap-3 text-[15px]">
+      <button className="h-11 bg-surface px-4 font-semibold transition-colors duration-150 hover:bg-field-3 disabled:opacity-50" disabled={page <= 1} onClick={() => onPage(page - 1)}>
         Trang trước
       </button>
       <span aria-current="page">
         {page}/{pages}
       </span>
-      <button className="h-10 rounded-md border px-3 disabled:opacity-50" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+      <button className="h-11 bg-surface px-4 font-semibold transition-colors duration-150 hover:bg-field-3 disabled:opacity-50" disabled={page >= pages} onClick={() => onPage(page + 1)}>
         Trang sau
       </button>
     </nav>
