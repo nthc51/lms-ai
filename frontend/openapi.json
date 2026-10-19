@@ -3249,6 +3249,55 @@
         }
       }
     },
+    "/api/v1/courses/{course_id}/insights": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Course Insights",
+        "description": "Phân tích lớp học (B7): câu hay sai, bài yếu, học viên cần để ý. Chỉ giảng viên của khóa hoặc admin.",
+        "operationId": "course_insights_api_v1_courses__course_id__insights_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseInsights"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/courses/{course_id}/tutor-feedback": {
       "get": {
         "tags": [
@@ -6763,6 +6812,49 @@
         ],
         "title": "CourseDetail"
       },
+      "CourseInsights": {
+        "properties": {
+          "course_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Course Id"
+          },
+          "min_answers": {
+            "type": "integer",
+            "title": "Min Answers"
+          },
+          "hard_questions": {
+            "items": {
+              "$ref": "#/components/schemas/HardQuestion"
+            },
+            "type": "array",
+            "title": "Hard Questions"
+          },
+          "weak_lessons": {
+            "items": {
+              "$ref": "#/components/schemas/WeakLesson"
+            },
+            "type": "array",
+            "title": "Weak Lessons"
+          },
+          "students_at_risk": {
+            "items": {
+              "$ref": "#/components/schemas/StudentAtRisk"
+            },
+            "type": "array",
+            "title": "Students At Risk"
+          }
+        },
+        "type": "object",
+        "required": [
+          "course_id",
+          "min_answers",
+          "hard_questions",
+          "weak_lessons",
+          "students_at_risk"
+        ],
+        "title": "CourseInsights"
+      },
       "CourseOut": {
         "properties": {
           "id": {
@@ -7192,6 +7284,80 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HardQuestion": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Question Id"
+          },
+          "stem": {
+            "type": "string",
+            "title": "Stem"
+          },
+          "lesson_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lesson Id"
+          },
+          "lesson_title": {
+            "type": "string",
+            "title": "Lesson Title"
+          },
+          "answers": {
+            "type": "integer",
+            "title": "Answers"
+          },
+          "wrong": {
+            "type": "integer",
+            "title": "Wrong"
+          },
+          "wrong_rate": {
+            "type": "number",
+            "title": "Wrong Rate"
+          },
+          "correct_option": {
+            "type": "string",
+            "title": "Correct Option"
+          },
+          "top_wrong": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WrongOption"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_id",
+          "stem",
+          "lesson_id",
+          "lesson_title",
+          "answers",
+          "wrong",
+          "wrong_rate",
+          "correct_option",
+          "top_wrong",
+          "source_page"
+        ],
+        "title": "HardQuestion",
+        "description": "Câu hỏi quiz học viên hay làm sai (B7)."
       },
       "JobOut": {
         "properties": {
@@ -9538,6 +9704,57 @@
         ],
         "title": "SourceType"
       },
+      "StudentAtRisk": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "progress_pct": {
+            "type": "integer",
+            "title": "Progress Pct"
+          },
+          "avg_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Score"
+          },
+          "last_active_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Active At"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "full_name",
+          "progress_pct",
+          "avg_score",
+          "last_active_at",
+          "reasons"
+        ],
+        "title": "StudentAtRisk",
+        "description": "Học viên cần giảng viên để ý (B7): điểm quiz trung bình thấp hoặc lâu không học."
+      },
       "StudioItem": {
         "properties": {
           "kind": {
@@ -10084,6 +10301,76 @@
           "token"
         ],
         "title": "VerifyEmailIn"
+      },
+      "WeakLesson": {
+        "properties": {
+          "lesson_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lesson Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "section_title": {
+            "type": "string",
+            "title": "Section Title"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "avg_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Score"
+          },
+          "tutor_questions": {
+            "type": "integer",
+            "title": "Tutor Questions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lesson_id",
+          "title",
+          "section_title",
+          "attempts",
+          "avg_score",
+          "tutor_questions"
+        ],
+        "title": "WeakLesson",
+        "description": "Bài học có điểm quiz thấp hoặc học viên hỏi AI Tutor nhiều (B7)."
+      },
+      "WrongOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "count"
+        ],
+        "title": "WrongOption"
       }
     },
     "securitySchemes": {

@@ -1456,7 +1456,7 @@ git commit -m "feat: thảo luận theo bài (B4) và thông báo realtime qua S
 - Create: `backend/tests/test_insights.py`
 - Regenerate: `frontend/openapi.json`, `frontend/src/lib/api/schema.d.ts`
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
 
 ```python
 """B7: phân tích lớp học (câu hay sai, bài yếu, học viên cần để ý)."""
@@ -1528,7 +1528,7 @@ async def test_inactive_student_listed_and_access(client, db):
     assert (await client.get(f"{API}/courses/{course['id']}/insights", headers=sv)).status_code == 403
 ```
 
-- [ ] **Bước 2: Schema, service, router.**
+- [x] **Bước 2: Schema, service, router.**
   - Chỉ tính bài quiz đã nộp (`completed`, `timed_out`).
   - "Hoạt động gần nhất" là thời điểm muộn nhất trong: lúc đăng ký, lần cập nhật tiến độ, lần bắt đầu làm quiz, câu hỏi gửi AI Tutor.
 
@@ -1896,7 +1896,7 @@ async def test_inactive_student_listed_and_access(client, db):
      course_id: uuid.UUID,
 ```
 
-- [ ] **Bước 3: Chạy test, kiểu API, commit**
+- [x] **Bước 3: Chạy test, kiểu API, commit**
 
 ```powershell
 cd backend

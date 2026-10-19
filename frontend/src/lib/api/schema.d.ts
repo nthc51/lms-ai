@@ -942,6 +942,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courses/{course_id}/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Course Insights
+         * @description Phân tích lớp học (B7): câu hay sai, bài yếu, học viên cần để ý. Chỉ giảng viên của khóa hoặc admin.
+         */
+        get: operations["course_insights_api_v1_courses__course_id__insights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courses/{course_id}/tutor-feedback": {
         parameters: {
             query?: never;
@@ -2148,6 +2168,22 @@ export interface components {
             /** Is Owner */
             is_owner: boolean;
         };
+        /** CourseInsights */
+        CourseInsights: {
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /** Min Answers */
+            min_answers: number;
+            /** Hard Questions */
+            hard_questions: components["schemas"]["HardQuestion"][];
+            /** Weak Lessons */
+            weak_lessons: components["schemas"]["WeakLesson"][];
+            /** Students At Risk */
+            students_at_risk: components["schemas"]["StudentAtRisk"][];
+        };
         /** CourseOut */
         CourseOut: {
             /**
@@ -2328,6 +2364,37 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HardQuestion
+         * @description Câu hỏi quiz học viên hay làm sai (B7).
+         */
+        HardQuestion: {
+            /**
+             * Question Id
+             * Format: uuid
+             */
+            question_id: string;
+            /** Stem */
+            stem: string;
+            /**
+             * Lesson Id
+             * Format: uuid
+             */
+            lesson_id: string;
+            /** Lesson Title */
+            lesson_title: string;
+            /** Answers */
+            answers: number;
+            /** Wrong */
+            wrong: number;
+            /** Wrong Rate */
+            wrong_rate: number;
+            /** Correct Option */
+            correct_option: string;
+            top_wrong: components["schemas"]["WrongOption"] | null;
+            /** Source Page */
+            source_page: number | null;
         };
         /** JobOut */
         JobOut: {
@@ -3249,6 +3316,30 @@ export interface components {
          * @enum {string}
          */
         SourceType: "pdf" | "video";
+        /**
+         * StudentAtRisk
+         * @description Học viên cần giảng viên để ý (B7): điểm quiz trung bình thấp hoặc lâu không học.
+         */
+        StudentAtRisk: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Full Name */
+            full_name: string;
+            /** Progress Pct */
+            progress_pct: number;
+            /** Avg Score */
+            avg_score: number | null;
+            /**
+             * Last Active At
+             * Format: date-time
+             */
+            last_active_at: string;
+            /** Reasons */
+            reasons: string[];
+        };
         /** StudioItem */
         StudioItem: {
             kind: components["schemas"]["ArtifactKind"];
@@ -3446,6 +3537,36 @@ export interface components {
         VerifyEmailIn: {
             /** Token */
             token: string;
+        };
+        /**
+         * WeakLesson
+         * @description Bài học có điểm quiz thấp hoặc học viên hỏi AI Tutor nhiều (B7).
+         */
+        WeakLesson: {
+            /**
+             * Lesson Id
+             * Format: uuid
+             */
+            lesson_id: string;
+            /** Title */
+            title: string;
+            /** Section Title */
+            section_title: string;
+            /** Attempts */
+            attempts: number;
+            /** Avg Score */
+            avg_score: number | null;
+            /** Tutor Questions */
+            tutor_questions: number;
+        };
+        /** WrongOption */
+        WrongOption: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /** Count */
+            count: number;
         };
     };
     responses: never;
@@ -5483,6 +5604,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CourseAnalytics"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    course_insights_api_v1_courses__course_id__insights_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseInsights"];
                 };
             };
             /** @description Validation Error */

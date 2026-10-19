@@ -7,7 +7,7 @@ from app.core.db import get_db
 from app.core.deps import require_staff
 from app.core.pagination import PageParams, page_params
 from app.modules.analytics import service
-from app.modules.analytics.schemas import CourseAnalytics, TutorFeedbackPage
+from app.modules.analytics.schemas import CourseAnalytics, CourseInsights, TutorFeedbackPage
 from app.modules.auth.models import User
 from app.modules.courses.service import get_owned_course
 
@@ -20,6 +20,15 @@ async def course_analytics(
 ):
     course = await get_owned_course(db, course_id, user)  # người khác → 404 (spec 6.6)
     return await service.course_analytics(db, course)
+
+
+@router.get("/courses/{course_id}/insights", response_model=CourseInsights)
+async def course_insights(
+    course_id: uuid.UUID, user: User = Depends(require_staff), db: AsyncSession = Depends(get_db)
+):
+    """Phân tích lớp học (B7): câu hay sai, bài yếu, học viên cần để ý. Chỉ giảng viên của khóa hoặc admin."""
+    course = await get_owned_course(db, course_id, user)
+    return await service.course_insights(db, course)
 
 
 @router.get("/courses/{course_id}/tutor-feedback", response_model=TutorFeedbackPage)

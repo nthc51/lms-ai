@@ -1,24 +1,32 @@
-"""Số liệu cơ bản cho dashboard giảng viên (A8). Phân tích sâu (câu hay sai, chủ đề yếu) là B7."""
+"""Số liệu cho dashboard giảng viên: số liệu cơ bản (A8) và phân tích lớp học (B7: câu hay sai, bài yếu,
+học viên cần để ý)."""
 
 import uuid
 
-from sqlalchemy import and_, distinct, func, select
+from sqlalchemy import and_, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.core.pagination import PageParams, paginate
+from app.core.time import utcnow
 from app.modules.analytics.schemas import (
     CourseAnalytics,
+    CourseInsights,
+    HardQuestion,
     LessonStat,
     QuizStat,
+    StudentAtRisk,
     TutorFeedbackItem,
     TutorFeedbackPage,
     TutorStat,
+    WeakLesson,
+    WrongOption,
 )
 from app.modules.auth.models import User
 from app.modules.courses.models import Course, Lesson, Section
 from app.modules.enrollment.models import Enrollment, LessonProgress, ProgressStatus
-from app.modules.quiz.models import AttemptStatus, Quiz, QuizAttempt
+from app.modules.materials.models import Chunk
+from app.modules.quiz.models import AttemptAnswer, AttemptStatus, Question, Quiz, QuizAttempt
 from app.modules.tutor.models import ChatMessage, ChatRole, ChatSession
 
 
@@ -171,3 +179,232 @@ async def downvoted_answers(
         for m, q, cid, ctitle, slug, lid, ltitle, student in rows
     ]
     return TutorFeedbackPage(items=items, total=total, page=params.page, size=params.size)
+
+
+# ---------- B7: phân tích lớp học ----------
+
+MIN_ANSWERS = 3  # ít hơn thì tỉ lệ sai chưa nói lên gì
+HARD_LIMIT = 10
+WEAK_LIMIT = 5
+RISK_LIMIT = 20
+LOW_SCORE = 50.0  # điểm quiz trung bình (phần trăm) dưới mức này là thấp
+INACTIVE_DAYS = 7
+
+
+async def course_insights(db: AsyncSession, course: Course) -> CourseInsights:
+    """Câu hay sai, bài yếu, học viên cần để ý. Chỉ tính bài quiz đã nộp (completed / timed_out)."""
+    finished = QuizAttempt.status.in_((AttemptStatus.completed, AttemptStatus.timed_out))
+    course_quiz_attempts = (
+        select(QuizAttempt.id)
+        .join(Quiz, Quiz.id == QuizAttempt.quiz_id)
+        .join(Lesson, Lesson.id == Quiz.lesson_id)
+        .join(Section, Section.id == Lesson.section_id)
+        .where(Section.course_id == course.id, finished)
+    )
+    return CourseInsights(
+        course_id=course.id,
+        min_answers=MIN_ANSWERS,
+        hard_questions=await _hard_questions(db, course_quiz_attempts),
+        weak_lessons=await _weak_lessons(db, course, finished),
+        students_at_risk=await _students_at_risk(db, course, finished),
+    )
+
+
+async def _hard_questions(db: AsyncSession, attempts) -> list[HardQuestion]:
+    stats = (
+        select(
+            AttemptAnswer.question_id,
+            func.count().label("answers"),
+            func.count().filter(AttemptAnswer.is_correct.is_(False)).label("wrong"),
+        )
+        .where(AttemptAnswer.attempt_id.in_(attempts))
+        .group_by(AttemptAnswer.question_id)
+        .subquery()
+    )
+    rate = stats.c.wrong * 1.0 / stats.c.answers
+    rows = (
+        await db.execute(
+            select(Question, stats.c.answers, stats.c.wrong, Lesson.title, Chunk.page_no)
+            .join(stats, stats.c.question_id == Question.id)
+            .join(Lesson, Lesson.id == Question.lesson_id)
+            .outerjoin(Chunk, Chunk.id == Question.source_chunk_id)
+            .where(stats.c.answers >= MIN_ANSWERS, stats.c.wrong > 0)
+            .order_by(rate.desc(), stats.c.wrong.desc(), Question.id)
+            .limit(HARD_LIMIT)
+        )
+    ).all()
+    if not rows:
+        return []
+    picks = (
+        await db.execute(
+            select(AttemptAnswer.question_id, AttemptAnswer.selected_option_id, func.count())
+            .where(
+                AttemptAnswer.attempt_id.in_(attempts),
+                AttemptAnswer.is_correct.is_(False),
+                AttemptAnswer.question_id.in_([q.id for q, *_ in rows]),
+            )
+            .group_by(AttemptAnswer.question_id, AttemptAnswer.selected_option_id)
+        )
+    ).all()
+    top: dict[uuid.UUID, tuple[str, int]] = {}
+    for qid, opt, n in sorted(picks, key=lambda p: (-p[2], p[1])):
+        top.setdefault(qid, (opt, n))
+    out = []
+    for q, answers, wrong, lesson_title, page in rows:
+        texts = {o["id"]: o["text"] for o in q.options}
+        tw = top.get(q.id)
+        out.append(
+            HardQuestion(
+                question_id=q.id,
+                stem=q.stem,
+                lesson_id=q.lesson_id,
+                lesson_title=lesson_title,
+                answers=answers,
+                wrong=wrong,
+                wrong_rate=round(wrong / answers, 4),
+                correct_option=q.correct_option_id,
+                top_wrong=WrongOption(id=tw[0], text=texts.get(tw[0], ""), count=tw[1]) if tw else None,
+                source_page=page,
+            )
+        )
+    return out
+
+
+async def _weak_lessons(db: AsyncSession, course: Course, finished) -> list[WeakLesson]:
+    quiz_stats = (
+        select(
+            Quiz.lesson_id, func.count(QuizAttempt.id).label("n"), func.avg(QuizAttempt.score).label("avg")
+        )
+        .join(QuizAttempt, and_(QuizAttempt.quiz_id == Quiz.id, finished))
+        .group_by(Quiz.lesson_id)
+        .subquery()
+    )
+    asked = (
+        select(ChatSession.lesson_id, func.count(ChatMessage.id).label("n"))
+        .join(ChatMessage, ChatMessage.session_id == ChatSession.id)
+        .where(ChatSession.course_id == course.id, ChatMessage.role == ChatRole.user)
+        .group_by(ChatSession.lesson_id)
+        .subquery()
+    )
+    rows = (
+        await db.execute(
+            select(
+                Lesson.id,
+                Lesson.title,
+                Section.title,
+                func.coalesce(quiz_stats.c.n, 0),
+                quiz_stats.c.avg,
+                func.coalesce(asked.c.n, 0),
+            )
+            .join(Section, Section.id == Lesson.section_id)
+            .outerjoin(quiz_stats, quiz_stats.c.lesson_id == Lesson.id)
+            .outerjoin(asked, asked.c.lesson_id == Lesson.id)
+            .where(Section.course_id == course.id, or_(quiz_stats.c.n > 0, asked.c.n > 0))
+            .order_by(quiz_stats.c.avg.asc().nulls_last(), func.coalesce(asked.c.n, 0).desc(), Lesson.id)
+            .limit(WEAK_LIMIT)
+        )
+    ).all()
+    return [
+        WeakLesson(
+            lesson_id=lid,
+            title=title,
+            section_title=section_title,
+            attempts=n,
+            avg_score=round(float(avg), 2) if avg is not None else None,
+            tutor_questions=q,
+        )
+        for lid, title, section_title, n, avg, q in rows
+    ]
+
+
+async def _students_at_risk(db: AsyncSession, course: Course, finished) -> list[StudentAtRisk]:
+    lesson_ids = (
+        select(Lesson.id).join(Section, Section.id == Lesson.section_id).where(Section.course_id == course.id)
+    )
+    total_lessons = await db.scalar(select(func.count()).select_from(lesson_ids.subquery())) or 0
+    students = (
+        await db.execute(
+            select(User.id, User.full_name, Enrollment.enrolled_at)
+            .join(Enrollment, Enrollment.user_id == User.id)
+            .where(Enrollment.course_id == course.id, Enrollment.completed_at.is_(None))
+        )
+    ).all()
+    if not students:
+        return []
+    ids = [s[0] for s in students]
+    progress = dict(
+        (
+            await db.execute(
+                select(
+                    LessonProgress.user_id,
+                    func.count().filter(LessonProgress.status == ProgressStatus.done),
+                )
+                .where(LessonProgress.user_id.in_(ids), LessonProgress.lesson_id.in_(lesson_ids))
+                .group_by(LessonProgress.user_id)
+            )
+        ).all()
+    )
+    touched = dict(
+        (
+            await db.execute(
+                select(LessonProgress.user_id, func.max(LessonProgress.updated_at))
+                .where(LessonProgress.user_id.in_(ids), LessonProgress.lesson_id.in_(lesson_ids))
+                .group_by(LessonProgress.user_id)
+            )
+        ).all()
+    )
+    quiz = {
+        uid: (avg, last)
+        for uid, avg, last in (
+            await db.execute(
+                select(
+                    QuizAttempt.user_id,
+                    func.avg(QuizAttempt.score).filter(finished),
+                    func.max(QuizAttempt.started_at),
+                )
+                .join(Quiz, Quiz.id == QuizAttempt.quiz_id)
+                .where(QuizAttempt.user_id.in_(ids), Quiz.lesson_id.in_(lesson_ids))
+                .group_by(QuizAttempt.user_id)
+            )
+        ).all()
+    }
+    asked = dict(
+        (
+            await db.execute(
+                select(ChatSession.user_id, func.max(ChatMessage.created_at))
+                .join(ChatMessage, ChatMessage.session_id == ChatSession.id)
+                .where(
+                    ChatSession.course_id == course.id,
+                    ChatSession.user_id.in_(ids),
+                    ChatMessage.role == ChatRole.user,
+                )
+                .group_by(ChatSession.user_id)
+            )
+        ).all()
+    )
+    now = utcnow()
+    out = []
+    for uid, name, enrolled_at in students:
+        avg, quiz_last = quiz.get(uid, (None, None))
+        last = max(t for t in (enrolled_at, touched.get(uid), quiz_last, asked.get(uid)) if t is not None)
+        reasons = []
+        if avg is not None and avg < LOW_SCORE:
+            reasons.append(f"Điểm quiz trung bình {round(float(avg))}%")
+        idle = (now - last).days
+        if idle >= INACTIVE_DAYS:
+            reasons.append(f"Không học {idle} ngày")
+        if not reasons:
+            continue
+        done = progress.get(uid, 0)
+        out.append(
+            StudentAtRisk(
+                user_id=uid,
+                full_name=name,
+                progress_pct=round(100 * done / total_lessons) if total_lessons else 0,
+                avg_score=round(float(avg), 2) if avg is not None else None,
+                last_active_at=last,
+                reasons=reasons,
+            )
+        )
+    out.sort(key=lambda s: s.last_active_at)
+    return out[:RISK_LIMIT]
