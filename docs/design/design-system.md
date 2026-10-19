@@ -177,7 +177,7 @@ Nạp font qua `next/font/google` với `subsets: ["vietnamese", "latin"]` và `
   - Học viên: Trang chủ, Khám phá, Khóa của tôi.
   - Giảng viên: Khóa đang dạy, Câu hỏi chờ duyệt.
   - Admin: Duyệt giảng viên.
-  - Menu tài khoản ở góc trên phải.
+  - Menu tài khoản ở góc trên phải, bên trái nó là chuông thông báo (số chưa đọc trên huy hiệu, `aria-label` đọc cả số; danh sách 10 thông báo mới nhất trong popover, thông báo chưa đọc in đậm và có chấm màu kèm nhãn ẩn "Chưa đọc"). Chuông có cả ở thanh trên của trang bài học.
 - **Điện thoại (< 768px):** thanh điều hướng dưới cùng, **tối đa 3 mục**, có icon và chữ. Tài khoản (hồ sơ, đăng xuất) nằm ở nút chữ cái tròn góc trên, có ở mọi trang. Trang bài học **ẩn thanh dưới** để có thêm chỗ đọc.
 - **Tablet:** thanh bên thu gọn (icon).
 - **Breadcrumb** (Khóa học › Chương › Bài) trên desktop. Trên điện thoại chỉ hiện nút ← với tên cấp cha.
@@ -201,6 +201,7 @@ Trang chủ ─[Học tiếp ▸ đúng bài, đúng chỗ]┘
 - **Desktop:** cột nội dung 68 ký tự ở giữa; mục lục khóa ở trái (thu gọn được); panel Tutor ở phải (400px, mở/đóng). Khi mở Tutor, cột nội dung **không bị co** dưới 60 ký tự; nếu màn hình hẹp, Tutor đè lên làm lớp nổi.
 - **Điện thoại:** video ở trên, dính trên cùng khi cuộn (có nút thu nhỏ). Nội dung ở dưới. Nút nổi "Hỏi AI" ở góc dưới phải, mở khung trượt từ dưới lên chiếm 85% chiều cao, vuốt xuống để đóng, và giữ nguyên lịch sử chat.
 - Thanh tiến độ mảnh (2px) màu `--accent` ở mép trên, cho biết đã đọc tới đâu.
+- Cuối bài là phần **Thảo luận** (`#thao-luan`, liên kết từ thông báo cuộn thẳng tới đây): ô hỏi ở trên, câu hỏi mới nhất trước, trả lời thụt vào một cấp có vạch `--field-1` bên trái; giảng viên của khóa có nhãn "Giảng viên" nền `--field-1` chữ `--foreground`; bình luận đã xóa còn dòng "Bình luận đã bị xóa." để giữ mạch trả lời; xóa luôn qua hộp xác nhận.
 
 ### 7.3 Luồng giảng viên
 
@@ -213,6 +214,8 @@ Khóa đang dạy ─[Tạo khóa]─▶ Trình soạn khóa
 ```
 
 Trình soạn khóa trên desktop có 3 vùng: mục lục bên trái, nội dung bài ở giữa, thông tin và tài liệu của bài bên phải. Trên điện thoại chỉ cho xem và sửa nhẹ (tên, nội dung). Kéo thả dùng nút ↑↓ thay thế. Có dòng chữ "Soạn nội dung dài nên dùng máy tính".
+
+Trang **Thống kê khóa học** có thêm ba phần phân tích lớp (B7) dưới bảng quiz: câu hay sai (mỗi dòng dẫn tới ngân hàng câu hỏi của bài), bài cần xem lại (bảng), học viên cần để ý (thẻ có tiến độ và lý do in bằng chữ, không chỉ dựa vào màu). Phần nào chưa đủ số liệu thì có một câu giải thích thay vì bảng trống.
 
 ---
 

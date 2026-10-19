@@ -2757,7 +2757,7 @@ git commit -m "feat(web): chuông thông báo realtime và phần thảo luận 
 - Create: `frontend/src/components/teach/meter.tsx`, `frontend/src/components/teach/course-insights.tsx`, `frontend/src/components/teach/course-insights.test.tsx`, `frontend/e2e/discussion-notifications.spec.ts`
 - Modify: `frontend/src/lib/quiz/queries.ts`, `frontend/src/components/teach/course-analytics.tsx`, `frontend/e2e/mock-api.ts`, `docs/specs/2026-09-29-lms-ai-design.md`, `docs/design/design-system.md`
 
-- [ ] **Bước 1: Truy vấn và giao diện.** `Meter` được chuyển ra file riêng để trang thống kê và phần phân tích dùng chung, không import vòng.
+- [x] **Bước 1: Truy vấn và giao diện.** `Meter` được chuyển ra file riêng để trang thống kê và phần phân tích dùng chung, không import vòng.
 
 ```diff
 --- a/frontend/src/lib/quiz/queries.ts
@@ -3043,7 +3043,7 @@ describe("CourseInsightsSection", () => {
 -}
 ```
 
-- [ ] **Bước 2: E2E.**
+- [x] **Bước 2: E2E.**
   - `mock-api.ts` thêm handler mặc định cho thảo luận, thông báo và phân tích, để các spec cũ không gặp `UNMOCKED`.
   - Muốn ghi đè thì spec phải dùng **đúng khóa** của handler mặc định (ví dụ `"GET /courses/*/insights"`). Lý do: bộ mock lấy handler khớp đầu tiên.
 
@@ -3222,7 +3222,7 @@ test.describe("thảo luận và thông báo", () => {
 });
 ```
 
-- [ ] **Bước 3: Tài liệu.** Đánh dấu B4, B6, B7 đã xong. Sửa bảng API thông báo theo thiết kế thật (không dùng stream-token), thêm mục phân tích B7 và dòng quyết định 2026-10-19. Design system thêm chuông, phần thảo luận và trang phân tích.
+- [x] **Bước 3: Tài liệu.** Đánh dấu B4, B6, B7 đã xong. Sửa bảng API thông báo theo thiết kế thật (không dùng stream-token), thêm mục phân tích B7 và dòng quyết định 2026-10-19. Design system thêm chuông, phần thảo luận và trang phân tích.
 
 ```diff
 --- a/docs/specs/2026-09-29-lms-ai-design.md
@@ -3299,7 +3299,7 @@ test.describe("thảo luận và thông báo", () => {
  ## 8. Tính năng cho buổi học dài
 ```
 
-- [ ] **Bước 4: Kiểm tra + commit**
+- [x] **Bước 4: Kiểm tra + commit**
 
 ```powershell
 cd frontend

@@ -141,6 +141,14 @@ export async function mockApi(page: Page, opts: { user?: typeof student | typeof
     "POST /tutor/messages/*/followups": (r) => json(r, { questions: [] }),
     "GET /notes": (r) => json(r, { items: [], total: 0, page: 1, size: 20 }),
     "GET /me/pending-quizzes": (r) => json(r, []),
+    // B4/B6/B7: mặc định chưa có thảo luận, thông báo hay số liệu phân tích
+    "GET /lessons/*/comments": (r) => json(r, { items: [], total: 0, page: 1, size: 10 }),
+    "GET /me/notifications": (r) => json(r, { items: [], total: 0, page: 1, size: 10, unread: 0 }),
+    "GET /me/notifications/unread": (r) => json(r, { unread: 0 }),
+    "GET /me/notifications/stream": (r) =>
+      r.fulfill({ status: 200, contentType: "text/event-stream", body: 'event: unread\ndata: {"unread": 0, "latest": null}\n\n' }),
+    "GET /courses/*/insights": (r) =>
+      json(r, { course_id: COURSE_ID, min_answers: 3, hard_questions: [], weak_lessons: [], students_at_risk: [] }),
     ...opts.extra,
   };
 

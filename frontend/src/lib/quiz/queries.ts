@@ -14,6 +14,7 @@ export const quizKeys = {
   quiz: (quizId: string) => ["quiz", quizId] as const,
   result: (attemptId: string) => ["attempt-result", attemptId] as const,
   analytics: (courseId: string) => ["analytics", courseId] as const,
+  insights: (courseId: string) => ["insights", courseId] as const,
   job: (jobId: string) => ["job", jobId] as const,
 };
 
@@ -159,5 +160,14 @@ export function useCourseAnalytics(courseId: string | undefined) {
     queryKey: quizKeys.analytics(courseId ?? "none"),
     enabled: !!courseId,
     queryFn: () => unwrap(api.GET("/api/v1/courses/{course_id}/analytics", { params: { path: { course_id: courseId! } } })),
+  });
+}
+
+/** Phân tích lớp học (B7): câu hay sai, bài yếu, học viên cần để ý. */
+export function useCourseInsights(courseId: string | undefined) {
+  return useQuery({
+    queryKey: quizKeys.insights(courseId ?? "none"),
+    enabled: !!courseId,
+    queryFn: () => unwrap(api.GET("/api/v1/courses/{course_id}/insights", { params: { path: { course_id: courseId! } } })),
   });
 }
