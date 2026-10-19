@@ -6,6 +6,7 @@ import * as React from "react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { cn } from "@/lib/utils";
 import { isActive, navItems } from "./nav-items";
+import { NotificationBell } from "./notification-bell";
 import { UserMenu } from "./user-menu";
 
 /**
@@ -64,7 +65,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           LMS-AI
         </Link>
         <div className="hidden md:block" />
-        <UserMenu />
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <UserMenu />
+        </div>
       </header>
 
       <main id="main" className="mx-auto w-full max-w-6xl px-4 pb-24 pt-4 md:px-8 md:pb-16 md:pt-6">

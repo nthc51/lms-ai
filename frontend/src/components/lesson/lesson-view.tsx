@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { ThemeSwitcher } from "@/components/app/theme-switcher";
+import { NotificationBell } from "@/components/app/notification-bell";
 import { UserMenu } from "@/components/app/user-menu";
 import { ErrorState } from "@/components/app/states";
 import { Markdown } from "@/components/content/markdown";
@@ -41,6 +42,7 @@ import { useLessonDocuments } from "@/lib/studio/queries";
 import { canAskTutor, useTutorChat } from "@/lib/tutor/use-tutor-chat";
 import { cn } from "@/lib/utils";
 import { BreakReminder } from "./break-reminder";
+import { LessonDiscussion } from "./lesson-discussion";
 import { LessonMaterials } from "./lesson-materials";
 import { LessonQuizzes } from "./lesson-quizzes";
 import { CourseOutline } from "./course-outline";
@@ -206,6 +208,7 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
         <Button variant="ghost" className="hidden lg:inline-flex" aria-pressed={tutorOpen} onClick={() => setTutorOpen((v) => !v)}>
           <MessageCircleQuestion /> Hỏi AI
         </Button>
+        <NotificationBell />
         <UserMenu compact />
       </header>
 
@@ -264,6 +267,8 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
                   onGo={go}
                   videoRef={videoRef}
                 />
+
+                <LessonDiscussion lessonId={lessonId} />
               </>
             )}
           </article>

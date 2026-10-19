@@ -1919,7 +1919,7 @@ git commit -m "feat(analytics): GET /courses/{id}/insights, câu hay sai, bài y
 - Create tests: `frontend/src/lib/format.test.ts`, `frontend/src/components/app/notification-bell.test.tsx`, `frontend/src/components/lesson/lesson-discussion.test.tsx`
 - Modify: `frontend/src/components/app/app-shell.tsx`, `frontend/src/components/lesson/lesson-view.tsx`
 
-- [ ] **Bước 1: Định dạng thời gian.** Hiện "vừa xong", "5 phút trước"...; quá 30 ngày thì ghi ngày/tháng/năm.
+- [x] **Bước 1: Định dạng thời gian.** Hiện "vừa xong", "5 phút trước"...; quá 30 ngày thì ghi ngày/tháng/năm.
 
 ```ts
 /** "vừa xong", "5 phút trước", "3 giờ trước", "2 ngày trước"; quá 30 ngày thì ghi ngày tháng năm. */
@@ -1960,7 +1960,7 @@ describe("timeAgo", () => {
 });
 ```
 
-- [ ] **Bước 2: Truy vấn thông báo và luồng SSE.**
+- [x] **Bước 2: Truy vấn thông báo và luồng SSE.**
   - Luồng ghi thẳng số chưa đọc vào cache của TanStack Query.
   - Trước khi ghi, nó hủy lệnh `GET /unread` đang chạy dở. Nếu không, lệnh gửi trước mà về sau sẽ ghi đè số mới hơn (lỗi này đã gặp trong test).
 
@@ -2058,7 +2058,7 @@ export function useNotificationStream(enabled: boolean) {
 }
 ```
 
-- [ ] **Bước 3: Chuông thông báo.** Đặt cạnh menu tài khoản ở khung app và ở thanh trên trang bài học.
+- [x] **Bước 3: Chuông thông báo.** Đặt cạnh menu tài khoản ở khung app và ở thanh trên trang bài học.
 
 ```tsx
 "use client";
@@ -2276,7 +2276,7 @@ describe("NotificationBell", () => {
        <main id="main" className="mx-auto w-full max-w-6xl px-4 pb-24 pt-4 md:px-8 md:pb-16 md:pt-6">
 ```
 
-- [ ] **Bước 4: Phần thảo luận.**
+- [x] **Bước 4: Phần thảo luận.**
   - Đặt cuối bài học, sau nút "Đánh dấu đã học xong" và "Bài tiếp".
   - Mở từ thông báo (`#thao-luan`) thì đợi danh sách tải xong rồi mới cuộn tới.
   - Ctrl+Enter để gửi, Esc để đóng ô trả lời.
@@ -2742,7 +2742,7 @@ describe("LessonDiscussion", () => {
            </article>
 ```
 
-- [ ] **Bước 5:** `cd frontend; npx tsc --noEmit; npx eslint .; npx vitest run` (**178 pass**). Commit:
+- [x] **Bước 5:** `cd frontend; npx tsc --noEmit; npx eslint .; npx vitest run` (**178 pass**). Commit:
 
 ```powershell
 git add frontend
