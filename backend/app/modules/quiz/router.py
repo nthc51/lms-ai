@@ -9,6 +9,7 @@ from app.core.deps import get_current_user, require_role, require_staff
 from app.core.pagination import PageParams, page_params
 from app.core.ratelimit import RateLimiter, get_rate_limiter
 from app.modules.auth.models import Role, User
+from app.modules.inbox.hub import NotificationHub, get_hub
 from app.modules.jobs.queue import JobQueue, get_queue
 from app.modules.materials.schemas import JobRef
 from app.modules.quiz import attempts, explain, questions, quizzes
@@ -120,10 +121,13 @@ async def delete_quiz(
 
 @router.post("/quizzes/{quiz_id}/publish", response_model=QuizOut)
 async def publish_quiz(
-    quiz_id: uuid.UUID, user: User = Depends(require_staff), db: AsyncSession = Depends(get_db)
+    quiz_id: uuid.UUID,
+    user: User = Depends(require_staff),
+    db: AsyncSession = Depends(get_db),
+    hub: NotificationHub = Depends(get_hub),
 ):
     quiz = await quizzes.get_owned_quiz(db, quiz_id, user)
-    return await quizzes.publish_quiz(db, user, quiz)
+    return await quizzes.publish_quiz(db, user, quiz, hub)
 
 
 @router.post("/quizzes/{quiz_id}/attempts", response_model=AttemptOut, status_code=201)

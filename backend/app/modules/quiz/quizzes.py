@@ -13,6 +13,9 @@ from app.modules.courses.models import Course, CourseStatus, Lesson, Section
 from app.modules.courses.service import ensure_owner, get_owned_lesson
 from app.modules.enrollment.models import Enrollment
 from app.modules.enrollment.service import ensure_lesson_access
+from app.modules.inbox import service as inbox
+from app.modules.inbox.hub import NotificationHub
+from app.modules.inbox.models import NotificationKind
 from app.modules.quiz.models import (
     USABLE_REVIEW,
     AttemptStatus,
@@ -216,7 +219,10 @@ async def delete_quiz(db: AsyncSession, quiz: Quiz) -> None:
     await db.commit()
 
 
-async def publish_quiz(db: AsyncSession, user: User, quiz: Quiz) -> QuizOut:
+async def publish_quiz(
+    db: AsyncSession, user: User, quiz: Quiz, hub: NotificationHub | None = None
+) -> QuizOut:
+    """Xuất bản quiz. Khóa đang xuất bản thì báo cho mọi học viên đã đăng ký (B6), cùng transaction."""
     await _lock_quiz(db, quiz)
     if quiz.status == QuizStatus.published:
         raise AppError("INVALID_STATE", "Quiz đã được xuất bản", 409)
@@ -242,8 +248,34 @@ async def publish_quiz(db: AsyncSession, user: User, quiz: Quiz) -> QuizOut:
             {"invalid_question_ids": invalid},
         )
     quiz.status = QuizStatus.published
+    notified = await _notify_students(db, quiz)
     await db.commit()
+    if hub is not None:
+        await inbox.publish(hub, notified)
     return (await _to_outs(db, [quiz], user, True, with_questions=True))[0]
+
+
+async def _notify_students(db: AsyncSession, quiz: Quiz) -> list[str]:
+    row = (
+        await db.execute(
+            select(Course, Lesson)
+            .join(Section, Section.course_id == Course.id)
+            .join(Lesson, Lesson.section_id == Section.id)
+            .where(Lesson.id == quiz.lesson_id)
+        )
+    ).one()
+    course, lesson = row
+    if course.status != CourseStatus.published:
+        return []
+    students = (await db.scalars(select(Enrollment.user_id).where(Enrollment.course_id == course.id))).all()
+    return inbox.add(
+        db,
+        list(students),
+        NotificationKind.quiz_published,
+        f"Quiz mới: {quiz.title}",
+        f"/learn/{course.slug}/{lesson.id}/quiz/{quiz.id}",
+        body=f"{course.title} · {lesson.title}",
+    )
 
 
 async def list_lesson_quizzes(

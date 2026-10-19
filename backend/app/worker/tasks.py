@@ -12,10 +12,14 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.time import utcnow
 from app.ingestion.pipeline import error_text, ingest_pdf_source
+from app.modules.courses.models import Course, Lesson, Section
+from app.modules.inbox import service as inbox
+from app.modules.inbox.hub import get_hub
+from app.modules.inbox.models import NotificationKind
 from app.modules.jobs.models import Job, JobStatus
 from app.modules.jobs.queue import ArqQueue, JobQueue
 from app.modules.jobs.service import create_and_enqueue, finish_job
-from app.modules.materials.models import Source, SourceStatus
+from app.modules.materials.models import Asset, Source, SourceStatus
 from app.modules.quiz.attempts import finalize_overdue_attempts
 from app.modules.quiz.generation import QuizGenerationError, generate_questions_for_lesson
 from app.modules.quiz.schemas import QuizGenerateIn
@@ -137,8 +141,70 @@ async def ingest_pdf(ctx: dict, job_id: str) -> None:
         )
 
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("ingest_pdf"))
+    await _notify_job_owner(ctx, uuid.UUID(job_id), session_factory)
     await _queue_source_guide(ctx, uuid.UUID(job_id), session_factory)
     await _queue_waiting_answers(ctx, uuid.UUID(job_id), session_factory)
+
+
+async def _notify_job_owner(ctx: dict, job_id: uuid.UUID, session_factory: async_sessionmaker) -> None:
+    """Job xử lý PDF / sinh câu hỏi kết thúc thì báo người tạo job (B6): xong → mở bài để xem, lỗi → kèm lý do.
+    Lỗi ở đây chỉ ghi log: thông báo là phần phụ, trạng thái job đã được ghi."""
+    try:
+        async with session_factory() as db:
+            job = await db.get(Job, job_id)
+            if job is None or job.created_by is None or job.status not in (JobStatus.done, JobStatus.failed):
+                return
+            ok = job.status == JobStatus.done
+            if job.type == "ingest_pdf":
+                row = (
+                    await db.execute(
+                        select(Asset.original_name, Lesson, Course)
+                        .select_from(Source)
+                        .join(Asset, Asset.id == Source.asset_id)
+                        .join(Lesson, Lesson.id == Source.lesson_id)
+                        .join(Section, Section.id == Lesson.section_id)
+                        .join(Course, Course.id == Section.course_id)
+                        .where(Source.id == job.ref_id)
+                    )
+                ).first()
+                if row is None:
+                    return
+                name, lesson, course = row
+                kind = NotificationKind.doc_ready if ok else NotificationKind.doc_failed
+                title = (
+                    f"Tài liệu đã sẵn sàng · {lesson.title}"
+                    if ok
+                    else f"Xử lý tài liệu không thành công · {lesson.title}"
+                )
+                body = (name or "Tài liệu PDF") + ("" if ok else f": {job.error_msg or 'lỗi không rõ'}")
+                link = f"/teach/{course.slug}/lessons/{lesson.id}"
+            elif job.type == "quiz_gen":
+                row = (
+                    await db.execute(
+                        select(Lesson, Course)
+                        .join(Section, Section.id == Lesson.section_id)
+                        .join(Course, Course.id == Section.course_id)
+                        .where(Lesson.id == job.ref_id)
+                    )
+                ).first()
+                if row is None:
+                    return
+                lesson, course = row
+                kind = NotificationKind.questions_ready if ok else NotificationKind.questions_failed
+                title = (
+                    f"Câu hỏi AI đã soạn xong · {lesson.title}"
+                    if ok
+                    else f"Sinh câu hỏi không thành công · {lesson.title}"
+                )
+                body = "Câu hỏi đang chờ bạn duyệt" if ok else (job.error_msg or "")
+                link = f"/teach/{course.slug}/lessons/{lesson.id}/questions"
+            else:
+                return
+            ids = inbox.add(db, [job.created_by], kind, title, link, body=body)
+            await db.commit()
+        await inbox.publish(ctx.get("hub") or get_hub(), ids)
+    except Exception:
+        logger.exception("Không tạo được thông báo cho job %s", job_id)
 
 
 def _queue_of(ctx: dict) -> JobQueue | None:
@@ -275,6 +341,7 @@ async def quiz_gen(ctx: dict, job_id: str) -> None:
             raise RuntimeError(QUIZ_GEN_ERROR) from e
 
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("quiz_gen"))
+    await _notify_job_owner(ctx, jid, session_factory)
 
 
 async def _fail_jobs(db, jobs_where, error: str, now) -> int:

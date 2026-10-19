@@ -14,7 +14,9 @@ from app.modules.admin.router import router as admin_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.router import router as auth_router
 from app.modules.courses.router import router as courses_router
+from app.modules.discussion.router import router as discussion_router
 from app.modules.enrollment.router import router as enrollment_router
+from app.modules.inbox.router import router as inbox_router
 from app.modules.jobs.router import router as jobs_router
 from app.modules.materials.router import router as materials_router
 from app.modules.quiz.router import router as quiz_router
@@ -69,6 +71,8 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router)
     app.include_router(admin_router)
     app.include_router(studio_router)
+    app.include_router(discussion_router)
+    app.include_router(inbox_router)
     app.include_router(health_router)
     setup_metrics(app)
     return app

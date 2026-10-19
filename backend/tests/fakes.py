@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from app.core.storage import download_headers
 
 
@@ -103,3 +106,36 @@ class RecordingMailer:
             self.fail_times -= 1
             raise ConnectionError("SMTP down")
         self.sent.append({"to": to, "subject": subject, "text": text, "html": html})
+
+
+class InMemoryHub:
+    """Hub thông báo giả: ghi lại ai được báo, và cho luồng SSE trong test chờ tín hiệu thật (asyncio.Event)."""
+
+    def __init__(self) -> None:
+        self.published: list[str] = []
+        self._events: dict[str, list] = {}
+
+    async def publish(self, user_ids: list[str]) -> None:
+        for uid in user_ids:
+            self.published.append(uid)
+            for ev in self._events.get(uid, []):
+                ev.set()
+
+    @asynccontextmanager
+    async def subscribe(self, user_id: str):
+        ev = asyncio.Event()
+        self._events.setdefault(user_id, []).append(ev)
+
+        class _Sub:
+            async def wait(self, timeout: float) -> bool:
+                try:
+                    await asyncio.wait_for(ev.wait(), timeout)
+                except TimeoutError:
+                    return False
+                ev.clear()
+                return True
+
+        try:
+            yield _Sub()
+        finally:
+            self._events[user_id].remove(ev)

@@ -150,6 +150,15 @@ erDiagram
         uuid id PK
         datetime created_at
     }
+    lesson_comments {
+        uuid lesson_id FK
+        uuid user_id FK
+        uuid parent_id FK
+        text body
+        datetime deleted_at
+        uuid id PK
+        datetime created_at
+    }
     lesson_progress {
         uuid user_id PK, FK
         uuid lesson_id PK, FK
@@ -188,6 +197,16 @@ erDiagram
         datetime updated_at
         uuid id PK
         datetime created_at
+    }
+    notifications {
+        uuid user_id FK
+        string kind
+        string title
+        string body
+        string link
+        datetime read_at
+        datetime created_at
+        uuid id PK
     }
     questions {
         uuid lesson_id FK
@@ -318,10 +337,12 @@ erDiagram
     courses ||--o{ notes : "course_id"
     courses ||--o{ sections : "course_id"
     courses ||--o{ study_artifacts : "course_id"
+    lesson_comments |o--o{ lesson_comments : "parent_id"
     lessons |o--o{ chat_sessions : "lesson_id"
     lessons |o--o{ notes : "lesson_id"
     lessons |o--o{ study_artifacts : "lesson_id"
     lessons ||--o{ chunks : "lesson_id"
+    lessons ||--o{ lesson_comments : "lesson_id"
     lessons ||--o{ lesson_progress : "lesson_id"
     lessons ||--o{ questions : "lesson_id"
     lessons ||--o{ quizzes : "lesson_id"
@@ -346,8 +367,10 @@ erDiagram
     users ||--o{ email_tokens : "user_id"
     users ||--o{ enrollments : "user_id"
     users ||--o{ flashcard_reviews : "user_id"
+    users ||--o{ lesson_comments : "user_id"
     users ||--o{ lesson_progress : "user_id"
     users ||--o{ notes : "user_id"
+    users ||--o{ notifications : "user_id"
     users ||--o{ quiz_attempts : "user_id"
     users ||--o{ refresh_tokens : "user_id"
 ```
