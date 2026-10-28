@@ -20,7 +20,7 @@ export function navItems(user: User | null): NavItem[] {
   // Chỉ giảng viên đã duyệt: GET /teacher/courses dùng require_teacher_approved (admin nhận 403).
   if (user.role === "teacher" && user.teacher_status === "approved")
     return [{ href: "/teach", label: "Khóa đang dạy", icon: GraduationCap }, ...base.slice(1)];
-  return base.slice(1); // giảng viên chờ duyệt / bị từ chối
+  return base; // giảng viên chờ duyệt / bị từ chối: trang chủ có trạng thái duyệt và nút gửi lại yêu cầu
 }
 
 /** Mục chỉ sáng khi khớp đúng đường dẫn (không khớp tiền tố): "/" và "/admin" là cha của các mục khác. */

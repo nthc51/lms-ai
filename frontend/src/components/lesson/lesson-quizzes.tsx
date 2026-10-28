@@ -4,12 +4,12 @@ import { ClipboardCheck, Play, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge, Skeleton } from "@/components/ui/misc";
-import { lastAttempt } from "@/lib/quiz/attempt-store";
 import { useLessonQuizzes } from "@/lib/quiz/queries";
 import { formatScore } from "@/components/quiz/quiz-result";
 
 /**
- * Quiz của bài, hiện dưới nội dung bài học. Học viên chỉ thấy quiz đã xuất bản (backend lọc).
+ * Quiz của bài, hiện dưới nội dung bài học. Học viên chỉ thấy quiz đã xuất bản (backend lọc), kèm lượt làm gần
+ * nhất của chính mình (my_last_attempt) để mở lại kết quả hay làm tiếp bài dở.
  * Lỗi tải không chặn trang học: chỉ hiện một dòng nhỏ.
  */
 export function LessonQuizzes({ slug, lessonId, isStudent }: { slug: string; lessonId: string; isStudent: boolean }) {
@@ -27,10 +27,12 @@ export function LessonQuizzes({ slug, lessonId, isStudent }: { slug: string; les
       <ul className="mt-3 space-y-3">
         {items.map((q) => {
           const base = `/learn/${slug}/${lessonId}/quiz/${q.id}`;
-          const last = isStudent ? lastAttempt.get(q.id) : null;
+          // lượt làm gần nhất lấy từ server (theo tài khoản, đúng trên mọi thiết bị)
+          const last = isStudent ? (q.my_last_attempt ?? null) : null;
           const used = q.attempts_used ?? 0;
           const left = q.max_attempts - used;
-          const inProgress = last?.status === "in_progress";
+          // bài dở đã quá giờ: không làm tiếp được, mở kết quả thì server chốt bài
+          const inProgress = last?.status === "in_progress" && !last.expired;
           return (
             <li key={q.id} className="flex flex-wrap items-center gap-3 rounded-lg border bg-surface p-4">
               <div className="min-w-0 flex-1">
@@ -47,9 +49,11 @@ export function LessonQuizzes({ slug, lessonId, isStudent }: { slug: string; les
                 </Badge>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  {last && last.status !== "in_progress" && last.score != null ? (
+                  {last && !inProgress ? (
                     <Button asChild variant="link">
-                      <Link href={`${base}/result/${last.attemptId}`}>Điểm gần nhất {formatScore(last.score)}</Link>
+                      <Link href={`${base}/result/${last.id}`}>
+                        {last.score != null ? `Điểm gần nhất ${formatScore(last.score)}` : "Xem kết quả"}
+                      </Link>
                     </Button>
                   ) : null}
                   {inProgress || left > 0 ? (

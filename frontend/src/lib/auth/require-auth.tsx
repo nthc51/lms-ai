@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/misc";
 import { isStaff, useAuth } from "./auth-context";
 
@@ -38,10 +40,15 @@ export function RequireAuth({ staff = false, admin = false, children }: { staff?
         <p className="mt-2 text-muted-foreground">
           {user?.role === "teacher"
             ? user.teacher_status === "rejected"
-              ? "Yêu cầu giảng dạy của bạn đã bị từ chối. Vui lòng liên hệ quản trị viên."
+              ? "Yêu cầu giảng dạy của bạn chưa được chấp nhận. Xem lý do và gửi lại yêu cầu ở trang chủ."
               : "Tài khoản giảng viên của bạn đang chờ quản trị viên duyệt."
             : "Trang này chỉ dành cho giảng viên."}
         </p>
+        {user?.role === "teacher" ? (
+          <Button asChild variant="outline" className="mt-4">
+            <Link href="/">Về trang chủ</Link>
+          </Button>
+        ) : null}
       </div>
     );
   }

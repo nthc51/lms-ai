@@ -57,7 +57,8 @@ export function RegisterForm() {
               <label
                 key={r}
                 className={cn(
-                  "flex h-11 cursor-pointer items-center justify-center rounded-md border text-sm",
+                  // radio ẩn (sr-only): viền focus hiện trên nhãn để người dùng bàn phím thấy đang ở ô nào
+                  "flex h-11 cursor-pointer items-center justify-center rounded-md border text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring",
                   role === r && "border-primary bg-primary/10 font-medium text-primary",
                 )}
               >

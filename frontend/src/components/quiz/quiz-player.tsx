@@ -13,7 +13,6 @@ import { ConfirmDialog } from "@/components/ui/dialog";
 import { Progress, Skeleton } from "@/components/ui/misc";
 import { ApiError, errorMessage } from "@/lib/api/errors";
 import type { SaveState } from "@/lib/quiz/answer-saver";
-import { lastAttempt } from "@/lib/quiz/attempt-store";
 import { useQuiz } from "@/lib/quiz/queries";
 import { useQuizAttempt } from "@/lib/quiz/use-quiz-attempt";
 import { cn } from "@/lib/utils";
@@ -74,15 +73,15 @@ export function QuizPlayer({ slug, lessonId, quizId }: { slug: string; lessonId:
   if (attempt.isError) {
     const err = attempt.error;
     if (err instanceof ApiError && err.code === "QUIZ_ATTEMPT_LIMIT") {
-      const last = lastAttempt.get(quizId);
+      const last = quiz.data?.my_last_attempt;
       return (
         <Shell title={quiz.data?.title} lessonHref={lessonHref}>
           <div className="mx-auto max-w-md rounded-lg border p-6 text-center">
             <p className="font-medium">Bạn đã dùng hết số lần làm quiz này.</p>
             <div className="mt-4 flex flex-col justify-center gap-2 sm:flex-row">
-              {last && last.status !== "in_progress" ? (
+              {last ? (
                 <Button asChild>
-                  <Link href={`${lessonHref}/quiz/${quizId}/result/${last.attemptId}`}>Xem kết quả gần nhất</Link>
+                  <Link href={`${lessonHref}/quiz/${quizId}/result/${last.id}`}>Xem kết quả gần nhất</Link>
                 </Button>
               ) : null}
               <Button asChild variant="outline">

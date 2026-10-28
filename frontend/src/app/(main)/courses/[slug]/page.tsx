@@ -94,6 +94,8 @@ export default function CourseDetailPage() {
 
       {/* Hộp hành động: dính bên phải trên desktop, dính đáy trên điện thoại */}
       <aside className="lg:sticky lg:top-20 lg:self-start">
+        {/* chừa chỗ cho hộp dính đáy trên điện thoại để bài cuối của mục lục không bị che */}
+        <div aria-hidden className="h-20 md:hidden" />
         <div className="fixed inset-x-0 bottom-16 z-20 border-t bg-surface p-3 md:static md:rounded-lg md:border md:p-5">
           {c.is_owner ? (
             <Button asChild size="lg" className="w-full">

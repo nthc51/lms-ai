@@ -29,8 +29,10 @@ describe("RequireAuth", () => {
     auth.status = "authenticated";
     auth.user = { role: "teacher", teacher_status: "rejected" };
     render(<RequireAuth staff>soạn khóa</RequireAuth>);
-    expect(screen.getByText(/đã bị từ chối/)).toBeInTheDocument();
+    expect(screen.getByText(/chưa được chấp nhận/)).toBeInTheDocument();
     expect(screen.queryByText(/đang chờ quản trị viên duyệt/)).not.toBeInTheDocument();
+    // nút gửi lại yêu cầu nằm ở trang chủ
+    expect(screen.getByRole("link", { name: "Về trang chủ" })).toHaveAttribute("href", "/");
   });
 
   it("trang quản trị: giảng viên đã duyệt cũng bị chặn, admin thì vào được", () => {

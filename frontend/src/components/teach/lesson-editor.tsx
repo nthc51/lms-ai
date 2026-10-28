@@ -177,7 +177,7 @@ function Content({ lesson, slug }: { lesson: LessonDetail; slug: string }) {
         onOpenChange={setDeleteOpen}
         destructive
         title={`Xóa bài “${lesson.title}”?`}
-        description="Nội dung, video, tài liệu PDF và tiến độ học của bài sẽ bị xóa và không khôi phục được."
+        description="Nội dung, video, tài liệu PDF và quiz của bài sẽ bị xóa, không khôi phục được. Bài đã có học viên học, làm quiz hoặc hỏi AI thì không xóa được."
         confirmLabel="Xóa bài"
         pendingLabel="Đang xóa…"
         onConfirm={async () => {

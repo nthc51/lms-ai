@@ -870,7 +870,7 @@ git commit -m "feat(api): my_last_attempt cho học viên, done_lesson_ids ở t
 - Create: `frontend/src/components/lesson/lesson-quizzes.test.tsx`, `frontend/src/components/lesson/course-outline.test.tsx`
 - Modify e2e: `frontend/e2e/quiz.spec.ts`, `frontend/e2e/student.spec.ts`, `frontend/e2e/admin.spec.ts`
 
-- [ ] **Bước 1: Bỏ localStorage, dùng `my_last_attempt`.**
+- [x] **Bước 1: Bỏ localStorage, dùng `my_last_attempt`.**
   - Chạy `git rm frontend/src/lib/quiz/attempt-store.ts`.
   - Mở bài làm xong thì tải lại danh sách quiz của bài, để quay về bài học thấy ngay "Làm tiếp".
 
@@ -1110,7 +1110,7 @@ describe("LessonQuizzes (lượt làm gần nhất lấy từ server)", () => {
 });
 ```
 
-- [ ] **Bước 2: Dấu đã học trong mục lục.**
+- [x] **Bước 2: Dấu đã học trong mục lục.**
   - Mục lục mặc định đọc `course.done_lesson_ids`.
   - Một bài vừa chuyển sang "đã học xong" thì tải lại khóa và danh sách Khóa của tôi.
   - Video đã xong vẫn lưu vị trí mỗi 15 giây với status `done`. Những lần lưu đó không gây tải lại.
@@ -1216,7 +1216,7 @@ describe("CourseOutline", () => {
  }
 ```
 
-- [ ] **Bước 3: Giảng viên chưa được duyệt**
+- [x] **Bước 3: Giảng viên chưa được duyệt**
 
 ```diff
 --- a/frontend/src/app/(auth)/login/login-form.tsx
@@ -1311,7 +1311,7 @@ describe("CourseOutline", () => {
    it("trang quản trị: giảng viên đã duyệt cũng bị chặn, admin thì vào được", () => {
 ```
 
-- [ ] **Bước 4: Chữ giao diện, mục lục trên điện thoại, focus ở trang đăng ký**
+- [x] **Bước 4: Chữ giao diện, mục lục trên điện thoại, focus ở trang đăng ký**
 
 ```diff
 --- a/frontend/src/components/teach/quiz-manager.tsx
@@ -1386,7 +1386,7 @@ describe("CourseOutline", () => {
                >
 ```
 
-- [ ] **Bước 5: E2E.**
+- [x] **Bước 5: E2E.**
   - `quiz.spec.ts`: API giả trả `my_last_attempt` thay đổi theo bài làm.
   - `student.spec.ts`: đánh dấu xong thì mục lục có dấu tích (chỉ kiểm ở desktop, vì trên điện thoại mục lục nằm trong khung trượt).
   - `admin.spec.ts`: giảng viên bị từ chối đăng nhập thì về trang chủ.
@@ -1495,7 +1495,7 @@ describe("CourseOutline", () => {
      await mockApi(page, { user: teacher, extra: { "GET /courses/giai-tich-1": (r) => r.fulfill({ json: hiddenCourse }) } });
 ```
 
-- [ ] **Bước 6: Kiểm tra + commit**
+- [x] **Bước 6: Kiểm tra + commit**
 
 ```powershell
 cd frontend

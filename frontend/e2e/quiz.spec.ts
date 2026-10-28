@@ -8,11 +8,17 @@ test.describe("học viên làm quiz", () => {
     const saved: Record<string, string> = {};
     let submitted: { final_answers: { question_id: string; selected_option_id: string }[] } | null = null;
     let used = 0;
+    // lượt làm gần nhất do server trả kèm quiz (theo tài khoản, không lưu trên máy)
+    let last: Record<string, unknown> | null = null;
     await mockApi(page, {
       extra: {
-        "GET /quizzes": (r) => r.fulfill({ json: { items: [quiz({ attempts_used: used })], total: 1, page: 1, size: 50 } }),
-        [`GET /quizzes/${QUIZ_ID}`]: (r) => r.fulfill({ json: quiz({ attempts_used: used }) }),
-        [`POST /quizzes/${QUIZ_ID}/attempts`]: (r) => r.fulfill({ status: 201, json: attempt() }),
+        "GET /quizzes": (r) =>
+          r.fulfill({ json: { items: [quiz({ attempts_used: used, my_last_attempt: last })], total: 1, page: 1, size: 50 } }),
+        [`GET /quizzes/${QUIZ_ID}`]: (r) => r.fulfill({ json: quiz({ attempts_used: used, my_last_attempt: last }) }),
+        [`POST /quizzes/${QUIZ_ID}/attempts`]: (r) => {
+          last = { id: ATTEMPT_ID, attempt_no: 1, status: "in_progress", score: null, expired: false };
+          return r.fulfill({ status: 201, json: attempt() });
+        },
         [`PUT /attempts/${ATTEMPT_ID}/answers/*`]: async (r, url) => {
           const qid = url.pathname.split("/").pop()!;
           saved[qid] = r.request().postDataJSON().selected_option_id;
@@ -22,7 +28,9 @@ test.describe("học viên làm quiz", () => {
           submitted = r.request().postDataJSON();
           used = 1;
           const answers = Object.fromEntries(submitted!.final_answers.map((a) => [a.question_id, a.selected_option_id]));
-          return r.fulfill({ json: result(answers) });
+          const graded = result(answers);
+          last = { id: ATTEMPT_ID, attempt_no: 1, status: graded.status, score: graded.score, expired: false };
+          return r.fulfill({ json: graded });
         },
         [`POST /attempts/${ATTEMPT_ID}/answers/*/explain`]: (r) =>
           r.fulfill({ json: { text: "Bạn chọn x, nhưng theo quy tắc lũy thừa đạo hàm của x² là 2x [1].", source_page_no: 4 } }),

@@ -105,7 +105,7 @@ export function QuizManager({ lessonId }: { lessonId: string }) {
         open={!!publishing}
         onOpenChange={(o) => !o && setPublishing(null)}
         title={`Xuất bản “${publishing?.title}”?`}
-        description="Học viên đã đăng ký sẽ thấy và làm được quiz này. Sau khi xuất bản chỉ đổi được tiêu đề, không thêm bớt câu hỏi."
+        description="Học viên đã đăng ký sẽ thấy, làm được quiz này và nhận thông báo. Sau khi xuất bản không thêm bớt câu hỏi hay đổi cài đặt được nữa."
         confirmLabel="Xuất bản"
         pendingLabel="Đang xuất bản…"
         onConfirm={async () => {

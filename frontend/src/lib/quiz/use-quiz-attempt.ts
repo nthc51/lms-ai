@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import { ApiError } from "@/lib/api/errors";
 import { AnswerSaver, type SaveState } from "./answer-saver";
-import { lastAttempt } from "./attempt-store";
 import { quizKeys, saveAnswer, startAttempt, submitAttempt } from "./queries";
 import type { AttemptResult } from "./types";
 
@@ -38,9 +37,11 @@ export function useQuizAttempt(quizId: string) {
     [a, pickedStates],
   );
 
+  // Mở bài xong thì danh sách quiz của bài phải biết đang có bài làm dở ("Làm tiếp"), trên mọi thiết bị
+  const openedId = a?.id;
   React.useEffect(() => {
-    if (a) lastAttempt.set(quizId, { attemptId: a.id, status: "in_progress" });
-  }, [a, quizId]);
+    if (openedId) void qc.invalidateQueries({ queryKey: ["lesson-quizzes"] });
+  }, [openedId, qc]);
 
   const saverFor = React.useCallback((attemptId: string) => {
     if (saverRef.current?.attemptId !== attemptId) {
@@ -79,7 +80,6 @@ export function useQuizAttempt(quizId: string) {
       if (isAttemptClosed(e)) setClosed(true); // nơi gọi quyết định (Task 4 chuyển sang trang kết quả)
       throw e;
     }
-    lastAttempt.set(quizId, { attemptId: a.id, status: result.status, score: result.score, passed: result.passed });
     qc.setQueryData(quizKeys.result(a.id), result);
     qc.invalidateQueries({ queryKey: quizKeys.quiz(quizId) });
     qc.invalidateQueries({ queryKey: ["lesson-quizzes"] });

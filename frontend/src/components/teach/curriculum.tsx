@@ -83,8 +83,8 @@ export function Curriculum({ course, mut }: { course: CourseDetail; mut: Mut }) 
         title={pendingDelete?.kind === "section" ? `Xóa chương “${pendingDelete.title}”?` : `Xóa bài “${pendingDelete?.title}”?`}
         description={
           pendingDelete?.kind === "section"
-            ? `Chương này có ${pendingDelete.lessons} bài. Toàn bộ bài, tài liệu và tiến độ học của các bài đó sẽ bị xóa và không khôi phục được.`
-            : "Nội dung, video, tài liệu PDF và tiến độ học của bài sẽ bị xóa và không khôi phục được."
+            ? `Chương này có ${pendingDelete.lessons} bài. Toàn bộ bài, tài liệu và quiz của các bài đó sẽ bị xóa, không khôi phục được. Chương đã có học viên học, làm quiz hoặc hỏi AI thì không xóa được.`
+            : "Nội dung, video, tài liệu PDF và quiz của bài sẽ bị xóa, không khôi phục được. Bài đã có học viên học, làm quiz hoặc hỏi AI thì không xóa được."
         }
         confirmLabel={pendingDelete?.kind === "section" ? "Xóa chương" : "Xóa bài"}
         pendingLabel="Đang xóa…"

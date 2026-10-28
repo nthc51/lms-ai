@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { expectAccessible, expectNoHorizontalScroll } from "./a11y";
-import { L1, L2, mockApi } from "./mock-api";
+import { courseDetail, L1, L2, mockApi } from "./mock-api";
 
 test.describe("học viên", () => {
   test("khách xem catalog → chi tiết → bấm Đăng ký thì được chuyển tới đăng nhập", async ({ page }) => {
@@ -41,7 +41,17 @@ test.describe("học viên", () => {
   });
 
   test("học bài: đọc, hỏi AI có trích nguồn, đánh dấu xong, sang bài tiếp", async ({ page, isMobile }) => {
-    await mockApi(page);
+    const done: string[] = [];
+    await mockApi(page, {
+      extra: {
+        "GET /courses/giai-tich-1": (r) => r.fulfill({ json: courseDetail({ is_enrolled: true, done_lesson_ids: done }) }),
+        "PUT /lessons/*/progress": (r, url) => {
+          const status = r.request().postDataJSON().status;
+          if (status === "done") done.push(url.pathname.split("/").at(-2)!); // /api/v1/lessons/<id>/progress
+          return r.fulfill({ json: { status, video_position_sec: 0, completed_at: "2026-10-01T00:00:00Z" } });
+        },
+      },
+    });
     await page.goto(`/learn/giai-tich-1/${L1}`);
     await expect(page.getByRole("heading", { name: "Định nghĩa đạo hàm", level: 1 })).toBeVisible();
     await expect(page.locator(".katex").first()).toBeVisible();
@@ -62,6 +72,11 @@ test.describe("học viên", () => {
 
     await page.getByRole("button", { name: "Đánh dấu đã học xong" }).click();
     await expect(page.getByText("Đã học xong bài này")).toBeVisible();
+    if (!isMobile) {
+      // mục lục bên trái có dấu tích ở bài vừa học xong (done_lesson_ids của khóa)
+      const outline = page.getByRole("navigation", { name: "Mục lục khóa học" });
+      await expect(outline.getByRole("link", { name: /Định nghĩa đạo hàm/ }).getByLabel("Đã học")).toBeVisible();
+    }
     await page.getByRole("button", { name: /Bài tiếp: Quy tắc tính đạo hàm/ }).click();
     await expect(page).toHaveURL(new RegExp(L2));
   });

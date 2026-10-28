@@ -3,7 +3,8 @@ import Link from "next/link";
 import type { CourseDetail } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
-/** Mục lục khóa trong trang học bài; bài đang mở được đánh dấu aria-current. */
+/** Mục lục khóa trong trang học bài; bài đang mở được đánh dấu aria-current, bài đã học xong có dấu tích
+ * (mặc định lấy từ `course.done_lesson_ids`, chỉ có khi người xem đã đăng ký khóa). */
 export function CourseOutline({
   course,
   currentLessonId,
@@ -13,11 +14,12 @@ export function CourseOutline({
 }: {
   course: CourseDetail;
   currentLessonId: string;
-  doneIds?: Set<string>;
+  doneIds?: ReadonlySet<string>;
   onNavigate?: () => void;
   /** Link của mỗi bài; mặc định là trang học, trình soạn truyền link soạn bài. */
   hrefFor?: (lessonId: string) => string;
 }) {
+  const done = doneIds ?? new Set(course.done_lesson_ids ?? []);
   return (
     <nav aria-label="Mục lục khóa học" className="space-y-4 p-3">
       {[...course.sections]
@@ -32,7 +34,7 @@ export function CourseOutline({
                 .sort((a, b) => a.position - b.position)
                 .map((l) => {
                   const current = l.id === currentLessonId;
-                  const done = doneIds?.has(l.id);
+                  const isDone = done.has(l.id);
                   return (
                     <li key={l.id}>
                       <Link
@@ -44,7 +46,7 @@ export function CourseOutline({
                           current && "bg-muted font-medium text-primary",
                         )}
                       >
-                        {done ? (
+                        {isDone ? (
                           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-label="Đã học" />
                         ) : (
                           <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />

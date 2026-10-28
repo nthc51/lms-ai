@@ -32,7 +32,9 @@ export function LoginForm() {
     setUnverified(null);
     try {
       const user = await login(values.email, values.password);
-      const fallback = user.role === "student" ? "/" : user.role === "admin" ? "/admin" : "/teach";
+      // Giảng viên chưa được duyệt về trang chủ: ở đó có trạng thái duyệt và nút gửi lại yêu cầu
+      const fallback =
+        user.role === "admin" ? "/admin" : user.role === "teacher" && user.teacher_status === "approved" ? "/teach" : "/";
       router.replace(safeNext(params.get("next"), fallback));
     } catch (err) {
       if (err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED") {

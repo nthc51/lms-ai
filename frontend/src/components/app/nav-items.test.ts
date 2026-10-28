@@ -14,7 +14,7 @@ describe("navItems", () => {
   });
   it("giảng viên đã duyệt có Khóa đang dạy; chờ duyệt thì không", () => {
     expect(navItems(user("teacher", "approved")).map((i) => i.href)).toEqual(["/teach", "/explore"]);
-    expect(navItems(user("teacher", "pending")).map((i) => i.href)).toEqual(["/explore"]);
+    expect(navItems(user("teacher", "pending")).map((i) => i.href)).toEqual(["/", "/explore"]);
   });
   it("tối đa 3 mục (tài khoản nằm ở menu góc trên, không chiếm chỗ thanh dưới)", () => {
     for (const r of ["student", "teacher", "admin"] as const) expect(navItems(user(r, "approved")).length).toBeLessThanOrEqual(3);

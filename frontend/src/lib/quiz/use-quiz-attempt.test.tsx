@@ -4,7 +4,6 @@ import { http, HttpResponse } from "msw";
 import * as React from "react";
 import { describe, expect, it } from "vitest";
 import { api, server } from "@/test/msw";
-import { lastAttempt } from "./attempt-store";
 import { useQuizAttempt } from "./use-quiz-attempt";
 
 const attempt = {
@@ -65,7 +64,6 @@ describe("useQuizAttempt", () => {
         { question_id: "q2", selected_option_id: "A" },
       ],
     });
-    expect(lastAttempt.get("qz-1")).toMatchObject({ attemptId: "at-1", status: "completed", score: 50 });
   });
 
   it("hết lượt làm bài → lỗi QUIZ_ATTEMPT_LIMIT để giao diện hiện thông báo", async () => {

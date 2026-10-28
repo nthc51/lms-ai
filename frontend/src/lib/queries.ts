@@ -103,8 +103,13 @@ export function useSaveProgress(lessonId: string) {
     mutationFn: (body: components["schemas"]["ProgressIn"]) =>
       unwrap(api.PUT("/api/v1/lessons/{lesson_id}/progress", { params: { path: { lesson_id: lessonId } }, body })),
     onSuccess: (progress) => {
+      // video đã xong vẫn lưu vị trí mỗi 15 giây (status "done"): chỉ tải lại khi bài vừa chuyển sang xong
+      const wasDone = qc.getQueryData<LessonDetail>(qk.lesson(lessonId))?.progress?.status === "done";
       qc.setQueryData<LessonDetail>(qk.lesson(lessonId), (old) => (old ? { ...old, progress } : old));
-      if (progress.status === "done") qc.invalidateQueries({ queryKey: ["my-courses"] });
+      if (progress.status === "done" && !wasDone) {
+        qc.invalidateQueries({ queryKey: ["my-courses"] });
+        qc.invalidateQueries({ queryKey: ["course"] }); // mục lục hiện dấu tích bài vừa học xong (done_lesson_ids)
+      }
     },
   });
 }

@@ -11,7 +11,8 @@ const hook = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, push: vi.fn() }) }));
 vi.mock("sonner", () => ({ toast: { info: (m: string) => toastInfo(m), error: (m: string) => toastError(m) } }));
-vi.mock("@/lib/quiz/queries", () => ({ useQuiz: () => ({ data: { title: "Quiz thử" } }) }));
+const quizData = vi.hoisted(() => ({ current: { title: "Quiz thử" } as Record<string, unknown> }));
+vi.mock("@/lib/quiz/queries", () => ({ useQuiz: () => ({ data: quizData.current }) }));
 vi.mock("@/lib/quiz/use-quiz-attempt", () => ({ useQuizAttempt: () => hook.current }));
 // Menu tài khoản ở thanh trên cần AuthProvider; test này chỉ kiểm phần làm bài.
 vi.mock("@/components/app/user-menu", () => ({ UserMenu: () => null }));
@@ -67,6 +68,24 @@ describe("QuizPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setHook();
+  });
+
+  it("hết lượt: mở kết quả gần nhất theo tài khoản (my_last_attempt từ server), không dựa vào máy này", () => {
+    quizData.current = {
+      title: "Quiz thử",
+      my_last_attempt: { id: "at-9", attempt_no: 1, status: "completed", score: 80, expired: false },
+    };
+    setHook({
+      attempt: { isError: true, isPending: false, error: new ApiError(409, "QUIZ_ATTEMPT_LIMIT", "Hết lượt") },
+      attemptId: null,
+    });
+    renderPlayer();
+    expect(screen.getByText("Bạn đã dùng hết số lần làm quiz này.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Xem kết quả gần nhất" })).toHaveAttribute(
+      "href",
+      "/learn/toan/l1/quiz/qz1/result/at-9",
+    );
+    quizData.current = { title: "Quiz thử" };
   });
 
   it("closed=true: chuyển sang trang kết quả đúng một lần, báo toast, không hiện 'sẽ gửi khi nộp'", async () => {

@@ -148,6 +148,17 @@ test.describe("phân quyền và thông báo cho giảng viên", () => {
     await expectAccessible(page);
   });
 
+  test("giảng viên bị từ chối đăng nhập thì về trang chủ, nơi có nút gửi lại yêu cầu", async ({ page }) => {
+    const rejected = { ...teacher, teacher_status: "rejected", review_note: "Chưa có minh chứng chuyên môn" };
+    await mockApi(page, { user: rejected });
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(rejected.email);
+    await page.getByLabel("Mật khẩu").fill("password123");
+    await page.getByRole("button", { name: "Đăng nhập" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("button", { name: "Gửi lại yêu cầu duyệt" })).toBeVisible();
+  });
+
   test("khóa bị ẩn: trình soạn hiện lý do và không còn nút Xuất bản", async ({ page }) => {
     const hiddenCourse = courseDetail({ status: "archived", is_owner: true, hidden_reason: "Sao chép giáo trình" });
     await mockApi(page, { user: teacher, extra: { "GET /courses/giai-tich-1": (r) => r.fulfill({ json: hiddenCourse }) } });
