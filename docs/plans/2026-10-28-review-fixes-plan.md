@@ -1513,7 +1513,7 @@ git commit -m "fix(web): kết quả quiz theo tài khoản, dấu đã học �
 
 **Files:** Modify `docs/specs/2026-09-29-lms-ai-design.md`, `docs/architecture/modules.md`
 
-- [ ] **Bước 1:**
+- [x] **Bước 1:**
   - Dòng trạng thái và dòng tổng tiến độ: **22/41 xong, 8 đang làm, 1 đã cắt**.
   - D1 và D3 thành `[x]` (đã làm xong từ trước nhưng chưa tick). D4 thành `[~]`. Sửa ghi chú S5.
   - Thêm dòng quyết định 2026-10-28.
@@ -1623,7 +1623,7 @@ git commit -m "fix(web): kết quả quiz theo tài khoản, dấu đã học �
  
 ```
 
-- [ ] **Bước 2: Commit**
+- [x] **Bước 2: Commit**
 
 ```powershell
 git add docs

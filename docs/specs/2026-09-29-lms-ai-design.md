@@ -4,7 +4,7 @@
 - **Ngày tạo:** 2026-09-29
 - **Loại:** Đồ án tốt nghiệp: full stack, web động, tích hợp AI
 - **Nguồn lực:** 1 người làm full-time trong 5 tuần, có Claude hỗ trợ viết code
-- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), đang triển khai (xong backend tuần 1 và tuần 2)
+- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), đang triển khai (xong tầng A; tầng B trừ B5; tầng S xong phần code, chưa deploy và đo thật)
 
 ---
 
@@ -12,7 +12,7 @@
 
 > Cập nhật mục này mỗi khi xong việc. Ký hiệu: `[ ]` chưa làm · `[~]` đang làm · `[x]` xong · `[-]` đã cắt.
 
-**Tuần hiện tại:** 2 / 5  **Tổng tiến độ:** 9 / 40 hạng mục
+**Cập nhật:** 2026-10-28 (tuần 5)  **Tổng tiến độ:** 22 / 41 hạng mục xong, 8 đang làm, 1 đã cắt
 
 **Thứ tự ưu tiên:** A (lõi) → B (mức Khá) → S (chất lượng hệ thống) → C (điểm nhấn). Hết thời gian mà vẫn còn việc thì phần bị trễ là tầng C, không phải S. Tuần 5 vẫn giữ cho báo cáo và bộ đánh giá.
 
@@ -49,7 +49,7 @@
   - `/health` (tiến trình còn sống) và `/ready` (DB, Redis, MinIO đều kết nối được).
   - Thu metrics Prometheus (`prometheus-fastapi-instrumentator`, cộng metric riêng cho số job trong hàng đợi và số job lỗi).
   - Dashboard Grafana gồm: số request/giây, độ trễ p50/p95, tỉ lệ lỗi 5xx, job đang chờ và job lỗi, thời gian tới token đầu tiên (TTFT) của AI Tutor.
-- [~] **S5. Hiệu năng:** (đã có cache có phiên bản, `perf_seed` và kịch bản k6 catalog + học viên; chưa đo, chưa có kịch bản làm quiz)
+- [~] **S5. Hiệu năng:** (đã có cache có phiên bản, `perf_seed` và kịch bản k6 cho catalog và trang chi tiết khóa; chưa có kịch bản đọc bài và làm quiz, chưa đo)
   - Viết kịch bản load test k6 cho catalog, trang chi tiết khóa học, đọc bài học và làm quiz.
   - Báo cáo p95 và throughput ở mức 50 người dùng ảo.
   - Cache catalog và trang chi tiết khóa học bằng Redis (TTL 60 giây, xóa cache khi publish hoặc sửa khóa). So sánh số liệu trước và sau khi cache.
@@ -70,10 +70,10 @@
 
 ### Phục vụ bảo vệ
 
-- [~] D1. Nút 👍/👎 cho câu trả lời của AI Tutor
+- [x] D1. Nút 👍/👎 cho câu trả lời của AI Tutor (admin xem tên học viên, giảng viên xem ẩn danh ở trang thống kê)
 - [ ] D2. Deploy VPS có domain và HTTPS
-- [ ] D3. Test tự động (unit, integration, API, phân quyền, đồng thời, 3–4 luồng E2E)
-- [ ] D4. Bộ đánh giá RAG khoảng 80 câu hỏi + script `eval/`
+- [x] D3. Test tự động (unit, integration, API, phân quyền, đồng thời, 3–4 luồng E2E): pytest (backend, DB thật), Vitest (giao diện), Playwright (E2E với API giả lập, khung điện thoại và máy tính, có kiểm axe); CI chạy cả ba
+- [~] D4. Bộ đánh giá RAG khoảng 80 câu hỏi + script `eval/` (đã có script trong `backend/eval/`, bộ dữ liệu mới có 5 câu mẫu)
 - [ ] D5. Đánh giá sinh quiz, chấm bài, Whisper
 - [ ] D6. Đợt dùng thử (5–10 người, 3–4 ngày) + khảo sát SUS
 - [ ] D7. Video demo dự phòng + cache câu trả lời cho các câu demo
@@ -774,3 +774,4 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-15 | Hồ sơ cá nhân: `PATCH /me` (họ tên, gọn khoảng trắng, 1–120 ký tự), `POST /me/password` (đúng mật khẩu hiện tại, khác mật khẩu cũ, 10 lần thử/giờ/tài khoản; thu hồi mọi phiên rồi cấp phiên mới cho trình duyệt đang dùng). Menu tài khoản (Hồ sơ cá nhân, Ghi chú, chế độ màu, Đăng xuất) ở thanh trên của mọi trang kể cả trang học và quiz; đăng xuất tải lại trang chủ. Giao diện: bảng màu sáng trung tính, bo góc 4px, `--mark` cho trích dẫn; trang chủ cho khách mới (không nằm trong khung app) có phần thử hỏi với 4 câu mẫu cố định |
 | 2026-10-15 | Giao diện sau đăng nhập cùng giọng với trang chủ cho khách: thanh bên một tông màu, ô tên app nền đậm, tiêu đề trang 800; trang chủ học viên có lời chào lớn, khối đang học (tên bài lấy từ API, phần đã đọc lưu trên máy), ba con số, "Việc nên làm tiếp" từ `GET /me/pending-quizzes` (quiz đã xuất bản trong khóa đã đăng ký, chưa nộp lần nào, bài làm dở trước, tối đa 6), danh sách khóa dạng hàng; Khám phá có khóa mới nhất trong khối màu và mục lục khóa; Khóa của tôi chia Đang học / Đã xong |
 | 2026-10-19 | B4 thảo luận: bảng `lesson_comments` (gốc + trả lời một cấp, xóa mềm), ai vào được bài thì đọc và viết được; tác giả, giảng viên của khóa hoặc admin được xóa, người khác nhận 404; 30 bình luận/giờ/người. B6 thông báo: bảng `notifications` (trả lời bình luận, câu hỏi mới cho giảng viên, quiz mới xuất bản cho học viên đã đăng ký, tài liệu/câu hỏi AI xong hoặc lỗi cho người tạo job); ghi cùng transaction với sự kiện, sau commit mới phát tín hiệu Redis `notif:{user_id}`; SSE `/me/notifications/stream` không giữ kết nối DB, gửi số chưa đọc khi có tín hiệu, ping 25 giây, Redis lỗi thì tự đọc lại DB theo chu kỳ. B7 `GET /courses/{id}/insights` (xem mục Dashboard) |
+| 2026-10-28 | Sửa lỗi sau rà soát: refresh token có `rotated_at`, chỉ token bị xoay mới coi là bị đánh cắp khi dùng lại (đổi mật khẩu ở máy này không còn làm máy này bị đăng xuất khi máy khác gửi token cũ); `GET /quizzes` trả `my_last_attempt` cho học viên (bỏ lưu bài làm gần nhất ở localStorage); `GET /courses/{slug}` trả `done_lesson_ids` khi người xem đã đăng ký (mục lục hiện dấu đã học); "Sinh lại" trong AI Studio không lấy cache; AI giải thích câu sai và gợi ý hỏi tiếp trả kết nối DB trước khi gọi AI; lọc REFUSE nhận cả dạng in đậm / có dòng sau; thử lại khi rớt kết nối mạng; giảng viên chưa được duyệt đăng nhập thì về trang chủ |

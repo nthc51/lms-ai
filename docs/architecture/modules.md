@@ -14,6 +14,7 @@ Hệ thống là **một khối chia module** (modular monolith): một backend,
 | `materials` | Upload (staging → kiểm tra → key chính thức), tài liệu PDF, đoạn (chunk) | `assets`, `sources`, `source_pages`, `chunks` | `test_uploads.py`, `test_sources_api.py`, `test_chunks_db.py`, `test_pipeline.py` |
 | `jobs` | Tạo job nền chống trùng, đưa vào hàng đợi sau commit | `jobs` | `test_jobs.py`, `test_worker.py` |
 | `notify` | Hộp thư đi email (outbox), gửi SMTP | `email_outbox` | `test_email.py`, `test_mailer.py` |
+| `inbox` | Thông báo trong app (B6): ghi cùng transaction với sự kiện, báo hiệu qua Redis, luồng SSE số chưa đọc | `notifications` | `test_notifications.py` |
 
 ### Phần tính năng
 
@@ -22,7 +23,8 @@ Hệ thống là **một khối chia module** (modular monolith): một backend,
 | `tutor` | AI Tutor: RAG, SSE, phản hồi 👍👎 | `chat_sessions`, `chat_messages` | `test_tutor_*.py` (`models`, `api`, `sessions`, `answer`, `text`) |
 | `quiz` | Sinh câu hỏi bằng AI, duyệt, quiz, làm bài, chấm | `questions`, `quizzes`, `quiz_questions`, `quiz_attempts`, `attempt_answers` | `test_quiz_*.py`, `test_questions_api.py`, `test_quizzes_api.py`, `test_attempts_api.py`, `test_submit_api.py` |
 | `studio` | AI Studio: hướng dẫn tài liệu, báo cáo, flashcard, ghi chú | `source_guides`, `study_artifacts`, `flashcard_reviews`, `notes` | `test_studio.py`, `test_notes.py` |
-| `analytics` | Thống kê khóa cho giảng viên | (chỉ đọc) | `test_analytics.py` |
+| `analytics` | Thống kê khóa cho giảng viên, phân tích lớp (B7: câu hay sai, bài yếu, học viên cần để ý) | (chỉ đọc) | `test_analytics.py`, `test_insights.py` |
+| `discussion` | Thảo luận theo bài (B4): câu hỏi và trả lời một cấp, xóa mềm | `lesson_comments` | `test_discussion.py` |
 | `admin` | Duyệt giảng viên, khóa tài khoản, ẩn khóa, nhật ký, CSV, token AI | `admin_actions` | `test_admin.py` |
 
 ### Lớp dùng chung
@@ -30,7 +32,7 @@ Hệ thống là **một khối chia module** (modular monolith): một backend,
 | Thư mục | Làm gì |
 |---|---|
 | `core/` | Cấu hình, DB, lỗi, middleware, phân quyền, rate limit, storage, cache, metrics, `/ready` |
-| `ai/` | Provider AI (giả / Gemini; sau này OpenRouter), `LLMClient` (thử lại, cache `llm_cache`, ghi `ai_calls`), prompt, retrieval |
+| `ai/` | Provider AI (giả / Gemini / OpenRouter), `LLMClient` (thử lại, cache `llm_cache`, ghi `ai_calls`), prompt, retrieval |
 | `ingestion/` | PDF → trang → đoạn → embedding |
 | `worker/` | Khai báo job nền cho arq (gọi vào service của module) |
 | `backend/eval/` | Benchmark AI (không chạy trong server) |
@@ -40,10 +42,10 @@ Hệ thống là **một khối chia module** (modular monolith): một backend,
 ```mermaid
 flowchart TB
     subgraph F[Phần tính năng]
-        TUT[tutor] ~~~ QZ[quiz] ~~~ STU[studio] ~~~ ANA[analytics] ~~~ ADM[admin]
+        TUT[tutor] ~~~ QZ[quiz] ~~~ STU[studio] ~~~ ANA[analytics] ~~~ ADM[admin] ~~~ DIS[discussion]
     end
     subgraph B[Phần nền]
-        AUTH[auth] ~~~ CRS[courses] ~~~ ENR[enrollment] ~~~ MAT[materials] ~~~ JOB[jobs] ~~~ NTF[notify]
+        AUTH[auth] ~~~ CRS[courses] ~~~ ENR[enrollment] ~~~ MAT[materials] ~~~ JOB[jobs] ~~~ NTF[notify] ~~~ INB[inbox]
     end
     subgraph L[Lớp dùng chung]
         CORE[core] ~~~ AI[ai] ~~~ ING[ingestion]
@@ -54,6 +56,7 @@ flowchart TB
 - Phần tính năng được dùng phần nền; **phần nền không được import phần tính năng**.
 - `tutor` và `quiz` không phụ thuộc nhau.
 - `notify` không phụ thuộc module nào: ai cần gửi mail thì gọi `queue_email`.
+- `inbox` chỉ dựa vào `core` và `auth`: module nào cần báo cho người dùng thì gọi `inbox.service.add` trước commit, `publish` sau commit.
 - `core`, `ai`, `ingestion` không import phần tính năng, `main` hay `worker`.
 - Ngoại lệ duy nhất (ghi rõ trong `.importlinter`): `courses.service` **đọc** bảng của quiz và tutor để chặn xóa khóa đã có học viên làm bài / hỏi AI.
 
