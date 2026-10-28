@@ -30,7 +30,7 @@ class MyCoursePage(Page[MyCourseOut]):
 
 class ProgressIn(BaseModel):
     status: Literal["in_progress", "done"]
-    video_position_sec: int = Field(ge=0)
+    video_position_sec: int = Field(ge=0, le=86_400 * 7)  # cột INTEGER: chặn số quá lớn (422 thay vì 500)
 
 
 class ProgressOut(BaseModel):

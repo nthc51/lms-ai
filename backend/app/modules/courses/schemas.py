@@ -55,7 +55,7 @@ class LessonCreate(BaseModel):
 class LessonUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     content_md: str | None = Field(default=None, max_length=100_000)
-    duration_sec: int | None = Field(default=None, ge=0)
+    duration_sec: int | None = Field(default=None, ge=0, le=86_400 * 7)  # cột INTEGER
     video_asset_id: uuid.UUID | None = None
 
 
@@ -119,3 +119,4 @@ class CourseDetail(CourseOut):
     sections: list[SectionBrief]
     is_enrolled: bool
     is_owner: bool
+    done_lesson_ids: list[uuid.UUID] = []  # bài đã học xong (chỉ khi người xem đã đăng ký khóa)

@@ -49,6 +49,22 @@ async def is_enrolled(db: AsyncSession, user_id: uuid.UUID, course_id: uuid.UUID
     )
 
 
+async def done_lesson_ids(db: AsyncSession, user_id: uuid.UUID, course_id: uuid.UUID) -> list[uuid.UUID]:
+    """Các bài của khóa mà người dùng đã học xong (mục lục ở trang học hiện dấu tích)."""
+    return list(
+        await db.scalars(
+            select(LessonProgress.lesson_id)
+            .join(Lesson, Lesson.id == LessonProgress.lesson_id)
+            .join(Section, Section.id == Lesson.section_id)
+            .where(
+                LessonProgress.user_id == user_id,
+                LessonProgress.status == ProgressStatus.done,
+                Section.course_id == course_id,
+            )
+        )
+    )
+
+
 async def my_courses(db: AsyncSession, user: User, params: PageParams) -> MyCoursePage:
     stmt = (
         select(Enrollment, Course)

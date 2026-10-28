@@ -36,7 +36,7 @@ from app.modules.quiz.models import (
     QuizQuestion,
     QuizStatus,
 )
-from app.modules.quiz.quizzes import get_quiz_context
+from app.modules.quiz.quizzes import LATE_GRACE, get_quiz_context
 from app.modules.quiz.schemas import (
     AnswerIn,
     AnswerOut,
@@ -51,7 +51,6 @@ from app.modules.quiz.schemas import (
 logger = logging.getLogger(__name__)
 
 FINISHED = (AttemptStatus.completed, AttemptStatus.timed_out)
-LATE_GRACE = timedelta(seconds=5)  # spec 6.5: từ chối đáp án đến sau deadline_at + 5 giây
 TIME_UP_MESSAGE = "Đã hết giờ làm bài. Bài đã được nộp với các đáp án đã lưu"
 
 

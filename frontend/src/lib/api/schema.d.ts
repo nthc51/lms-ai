@@ -2167,6 +2167,11 @@ export interface components {
             is_enrolled: boolean;
             /** Is Owner */
             is_owner: boolean;
+            /**
+             * Done Lesson Ids
+             * @default []
+             */
+            done_lesson_ids: string[];
         };
         /** CourseInsights */
         CourseInsights: {
@@ -2574,6 +2579,24 @@ export interface components {
             page: number;
             /** Size */
             size: number;
+        };
+        /**
+         * MyAttemptBrief
+         * @description Lượt làm gần nhất của chính học viên: để trang bài học hiện "Làm tiếp" / "Xem kết quả" trên mọi thiết bị.
+         */
+        MyAttemptBrief: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Attempt No */
+            attempt_no: number;
+            status: components["schemas"]["AttemptStatus"];
+            /** Score */
+            score: number | null;
+            /** Expired */
+            expired: boolean;
         };
         /** MyCourseOut */
         MyCourseOut: {
@@ -3020,6 +3043,7 @@ export interface components {
             created_at: string;
             /** Attempts Used */
             attempts_used?: number | null;
+            my_last_attempt?: components["schemas"]["MyAttemptBrief"] | null;
             /** Questions */
             questions?: components["schemas"]["QuestionOut"][] | null;
         };

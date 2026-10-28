@@ -6794,6 +6794,15 @@
           "is_owner": {
             "type": "boolean",
             "title": "Is Owner"
+          },
+          "done_lesson_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Done Lesson Ids",
+            "default": []
           }
         },
         "type": "object",
@@ -7677,6 +7686,7 @@
             "anyOf": [
               {
                 "type": "integer",
+                "maximum": 604800.0,
                 "minimum": 0.0
               },
               {
@@ -7814,6 +7824,47 @@
           "size"
         ],
         "title": "MessagePage"
+      },
+      "MyAttemptBrief": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "attempt_no": {
+            "type": "integer",
+            "title": "Attempt No"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "expired": {
+            "type": "boolean",
+            "title": "Expired"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "attempt_no",
+          "status",
+          "score",
+          "expired"
+        ],
+        "title": "MyAttemptBrief",
+        "description": "Lượt làm gần nhất của chính học viên: để trang bài học hiện \"Làm tiếp\" / \"Xem kết quả\" trên mọi thiết bị."
       },
       "MyCourseOut": {
         "properties": {
@@ -8486,6 +8537,7 @@
           },
           "video_position_sec": {
             "type": "integer",
+            "maximum": 604800.0,
             "minimum": 0.0,
             "title": "Video Position Sec"
           }
@@ -8921,6 +8973,16 @@
               }
             ],
             "title": "Attempts Used"
+          },
+          "my_last_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MyAttemptBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "questions": {
             "anyOf": [

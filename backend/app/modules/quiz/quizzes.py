@@ -2,8 +2,10 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import timedelta
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, not_found
@@ -26,7 +28,17 @@ from app.modules.quiz.models import (
     QuizStatus,
 )
 from app.modules.quiz.questions import to_out
-from app.modules.quiz.schemas import PendingQuizOut, QuestionOut, QuizCreate, QuizOut, QuizPage, QuizUpdate
+from app.modules.quiz.schemas import (
+    MyAttemptBrief,
+    PendingQuizOut,
+    QuestionOut,
+    QuizCreate,
+    QuizOut,
+    QuizPage,
+    QuizUpdate,
+)
+
+LATE_GRACE = timedelta(seconds=5)  # spec 6.5: từ chối đáp án đến sau deadline_at + 5 giây
 
 
 async def get_quiz_context(db: AsyncSession, quiz_id: uuid.UUID) -> tuple[Quiz, Course]:
@@ -125,6 +137,31 @@ async def _attempts_used(
     return dict(rows.all())
 
 
+async def _last_attempts(
+    db: AsyncSession, user_id: uuid.UUID, quiz_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, MyAttemptBrief]:
+    """Lượt làm mới nhất của học viên ở từng quiz (DISTINCT ON), kèm cờ đã quá giờ theo đồng hồ DB."""
+    if not quiz_ids:
+        return {}
+    expired = (
+        (QuizAttempt.status == AttemptStatus.in_progress)
+        & QuizAttempt.deadline_at.is_not(None)
+        & (QuizAttempt.deadline_at + LATE_GRACE < func.clock_timestamp())
+    )
+    rows = await db.execute(
+        select(QuizAttempt, expired.label("expired"))
+        .where(QuizAttempt.user_id == user_id, QuizAttempt.quiz_id.in_(quiz_ids))
+        .ext(distinct_on(QuizAttempt.quiz_id))
+        .order_by(QuizAttempt.quiz_id, QuizAttempt.attempt_no.desc())
+    )
+    return {
+        a.quiz_id: MyAttemptBrief(
+            id=a.id, attempt_no=a.attempt_no, status=a.status, score=a.score, expired=bool(late)
+        )
+        for a, late in rows.all()
+    }
+
+
 async def quiz_questions(db: AsyncSession, quiz_id: uuid.UUID) -> list[QuestionOut]:
     rows = await db.scalars(
         select(Question)
@@ -141,6 +178,7 @@ async def _to_outs(
     ids = [q.id for q in quizzes]
     counts = await _question_counts(db, ids)
     used = {} if manager else await _attempts_used(db, user.id, ids)
+    last = {} if manager else await _last_attempts(db, user.id, ids)
     result = []
     for q in quizzes:
         out = QuizOut(
@@ -155,6 +193,7 @@ async def _to_outs(
             question_count=counts.get(q.id, 0),
             created_at=q.created_at,
             attempts_used=None if manager else used.get(q.id, 0),
+            my_last_attempt=None if manager else last.get(q.id),
         )
         if manager and with_questions:
             out.questions = await quiz_questions(db, q.id)

@@ -107,6 +107,16 @@ class QuizUpdate(BaseModel):
     shuffle: bool | None = None
 
 
+class MyAttemptBrief(BaseModel):
+    """Lượt làm gần nhất của chính học viên: để trang bài học hiện "Làm tiếp" / "Xem kết quả" trên mọi thiết bị."""
+
+    id: uuid.UUID
+    attempt_no: int
+    status: AttemptStatus
+    score: float | None  # chỉ có khi đã nộp
+    expired: bool  # còn in_progress nhưng đã quá giờ: mở kết quả sẽ chốt timed_out
+
+
 class QuizOut(BaseModel):
     id: uuid.UUID
     lesson_id: uuid.UUID
@@ -119,6 +129,7 @@ class QuizOut(BaseModel):
     question_count: int
     created_at: datetime
     attempts_used: int | None = None  # chỉ trả cho học viên: số lần đã làm
+    my_last_attempt: MyAttemptBrief | None = None  # chỉ trả cho học viên
     questions: list[QuestionOut] | None = None  # chỉ giảng viên sở hữu / admin (có đáp án)
 
 

@@ -44,3 +44,34 @@ async def test_my_courses_shows_progress(client):
     [item] = r.json()["items"]
     assert item["course_id"] == course["id"]
     assert (item["total_lessons"], item["done_lessons"], item["progress_pct"]) == (1, 0, 0)
+
+
+async def test_course_detail_lists_done_lessons_for_enrolled_viewer(client):
+    _, gv = await make_teacher(client)
+    _, sv = await make_student(client)
+    course, _, lesson = await make_published_course(client, gv)
+    slug = course["slug"]
+    await client.post(f"{API}/courses/{course['id']}/enroll", headers=sv)
+    assert (await client.get(f"{API}/courses/{slug}", headers=sv)).json()["done_lesson_ids"] == []
+
+    r = await client.put(
+        f"{API}/lessons/{lesson['id']}/progress", json={"status": "done", "video_position_sec": 0}, headers=sv
+    )
+    assert r.status_code == 200, r.text
+    assert (await client.get(f"{API}/courses/{slug}", headers=sv)).json()["done_lesson_ids"] == [lesson["id"]]
+    # người khác (chủ khóa, khách) không thấy tiến độ của học viên
+    assert (await client.get(f"{API}/courses/{slug}", headers=gv)).json()["done_lesson_ids"] == []
+    assert (await client.get(f"{API}/courses/{slug}")).json()["done_lesson_ids"] == []
+
+
+async def test_huge_video_position_is_rejected_not_500(client):
+    _, gv = await make_teacher(client)
+    _, sv = await make_student(client)
+    course, _, lesson = await make_published_course(client, gv)
+    await client.post(f"{API}/courses/{course['id']}/enroll", headers=sv)
+    r = await client.put(
+        f"{API}/lessons/{lesson['id']}/progress",
+        json={"status": "in_progress", "video_position_sec": 3_000_000_000},
+        headers=sv,
+    )
+    assert r.status_code == 422

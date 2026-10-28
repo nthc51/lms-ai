@@ -465,7 +465,7 @@ git commit -m "fix(ai): Sinh lại không lấy cache, trả kết nối DB trư
 - Modify tests: `backend/tests/test_enrollment.py`, `backend/tests/test_catalog.py`
 - Regenerate: `frontend/openapi.json`, `frontend/src/lib/api/schema.d.ts`
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
 
 ```python
 """Lượt làm gần nhất của học viên trả kèm quiz (my_last_attempt): trang bài học biết "Làm tiếp" / "Xem kết quả"
@@ -594,7 +594,7 @@ async def test_overdue_attempt_is_marked_expired(client, db):
      for i in range(3):
 ```
 
-- [ ] **Bước 2: Quiz trả `my_last_attempt`.**
+- [x] **Bước 2: Quiz trả `my_last_attempt`.**
   - `LATE_GRACE` chuyển từ `attempts.py` sang `quizzes.py`, vì `attempts.py` đã import từ `quizzes.py`.
   - `expired` tính theo đồng hồ DB (`clock_timestamp()`), giống cách chốt bài.
   - Dùng `distinct_on` (SQLAlchemy 2.1) thay cho `.distinct(cột)` đã bị đánh dấu deprecated.
@@ -734,7 +734,7 @@ async def test_overdue_attempt_is_marked_expired(client, db):
  
 ```
 
-- [ ] **Bước 3: Khóa học trả `done_lesson_ids`; tìm kiếm escape `%` `_`; giới hạn số.**
+- [x] **Bước 3: Khóa học trả `done_lesson_ids`; tìm kiếm escape `%` `_`; giới hạn số.**
   - Phần mục lục của trang chi tiết khóa vẫn được cache chung cho mọi người xem.
   - `done_lesson_ids` đọc riêng theo từng người, chỉ khi người đó đã đăng ký khóa.
 
@@ -838,7 +838,7 @@ async def test_overdue_attempt_is_marked_expired(client, db):
          select(Enrollment, Course)
 ```
 
-- [ ] **Bước 4: Chạy test, kiểu API, commit**
+- [x] **Bước 4: Chạy test, kiểu API, commit**
 
 ```powershell
 cd backend

@@ -21,6 +21,15 @@ async def test_catalog_search_ignores_diacritics_and_case(client):
     assert [c["title"] for c in r.json()["items"]] == ["Cấu trúc dữ liệu"]
 
 
+async def test_catalog_search_treats_percent_and_underscore_literally(client):
+    _, gv = await make_teacher(client)
+    await make_published_course(client, gv, title="Giảm 50% học phí")
+    await make_published_course(client, gv, title="Mạng máy tính")
+    for q, expected in (("%", ["Giảm 50% học phí"]), ("_", []), ("m_ng", [])):
+        r = await client.get(f"{API}/courses", params={"q": q})
+        assert [c["title"] for c in r.json()["items"]] == expected, q
+
+
 async def test_catalog_pagination(client):
     _, gv = await make_teacher(client)
     for i in range(3):

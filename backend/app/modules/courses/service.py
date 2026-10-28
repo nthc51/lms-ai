@@ -313,9 +313,12 @@ async def list_published(db: AsyncSession, q: str | None, params: PageParams) ->
         .where(Course.status == CourseStatus.published)
     )
     if q and q.strip():
-        pattern = f"%{q.strip().lower()}%"
+        # % và _ người dùng gõ là ký tự thường, không phải ký tự đại diện của LIKE
+        term = q.strip().lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         base = base.where(
-            func.immutable_unaccent(func.lower(Course.title)).like(func.immutable_unaccent(pattern))
+            func.immutable_unaccent(func.lower(Course.title)).like(
+                func.immutable_unaccent(f"%{term}%"), escape="\\"
+            )
         )
     total, paged = await paginate(db, base.order_by(Course.created_at.desc(), Course.id.desc()), params)
     rows = (await db.execute(paged)).all()
@@ -361,7 +364,8 @@ async def _load_detail_base(db: AsyncSession, slug: str) -> dict:
 
 
 async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> CourseDetail:
-    from app.modules.enrollment.service import is_enrolled  # import trong hàm để tránh vòng import
+    # import trong hàm để tránh vòng import
+    from app.modules.enrollment.service import done_lesson_ids, is_enrolled
 
     async def load():
         base = await _load_detail_base(db, slug)
@@ -376,4 +380,7 @@ async def get_course_detail(db: AsyncSession, slug: str, user: User | None) -> C
     if base["status"] != CourseStatus.published.value and not is_owner:
         raise not_found("Khóa học")
     enrolled = user is not None and await is_enrolled(db, user.id, course_id)
-    return CourseDetail.model_validate({**base, "is_enrolled": enrolled, "is_owner": is_owner})
+    done = await done_lesson_ids(db, user.id, course_id) if user is not None and enrolled else []
+    return CourseDetail.model_validate(
+        {**base, "is_enrolled": enrolled, "is_owner": is_owner, "done_lesson_ids": done}
+    )
