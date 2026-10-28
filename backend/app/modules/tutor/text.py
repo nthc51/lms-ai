@@ -17,13 +17,23 @@ _CITATION_RE = re.compile(r"\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]")
 _SPEAKERS = {ChatRole.user: "Học viên", ChatRole.assistant: "Trợ giảng"}
 
 
+_MARKS = "*_` "
+
+
+def _bare(line: str) -> str:
+    """Bỏ khoảng trắng, dấu định dạng Markdown (**, _, `) và dấu chấm/than ở hai đầu một dòng."""
+    return line.strip().strip(_MARKS).rstrip(".!").strip(_MARKS)
+
+
 def _is_refusal(text: str) -> bool:
-    return text.strip().rstrip(".!").strip() == REFUSE_TOKEN
+    """Dòng đầu tiên chỉ có token REFUSE (có thể in đậm, có dấu chấm); phần sau dòng đó (nếu có) bị bỏ."""
+    return _bare(text.strip().split("\n", 1)[0]) == REFUSE_TOKEN
 
 
 class RefuseFilter:
-    """LLM trả đúng token REFUSE khi thiếu ngữ cảnh (spec 5.3 bước 4). Giữ lại phần đầu câu trả lời chừng nào
-    nó còn có thể là "REFUSE", để học viên không bao giờ thấy token này; câu trả lời thường được đẩy ra ngay."""
+    """LLM trả token REFUSE khi thiếu ngữ cảnh (spec 5.3 bước 4). Giữ lại dòng đầu của câu trả lời chừng nào nó còn
+    có thể là "REFUSE" (kể cả "**REFUSE**", hay "REFUSE" rồi xuống dòng viết thêm), để học viên không bao giờ thấy
+    token này; câu trả lời thường được đẩy ra ngay."""
 
     def __init__(self) -> None:
         self._buffer = ""
@@ -32,10 +42,19 @@ class RefuseFilter:
 
     def feed(self, piece: str) -> str:
         if self._decided:
-            return piece
+            return "" if self.refused else piece
         self._buffer += piece
         head = self._buffer.lstrip()
-        if REFUSE_TOKEN.startswith(head) or _is_refusal(head):
+        first, newline, _ = head.partition("\n")
+        if newline:  # đã có trọn dòng đầu: quyết định ngay
+            if _bare(first) == REFUSE_TOKEN:
+                self.refused = self._decided = True
+                return ""
+            return self._flush()
+        if (
+            REFUSE_TOKEN.startswith(first.lstrip(_MARKS).rstrip(_MARKS + ".!"))
+            or _bare(first) == REFUSE_TOKEN
+        ):
             return ""
         return self._flush()
 

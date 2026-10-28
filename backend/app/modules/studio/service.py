@@ -4,7 +4,7 @@ import logging
 import uuid
 
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.llm_client import LLMClient
@@ -486,6 +486,8 @@ async def followups(db: AsyncSession, llm: LLMClient, user: User, message_id: uu
         answer=message.content,
         sections="\n".join(f"- {h}" for h in headings if h) or "-",
     )
+    message_pk = message.id
+    await db.rollback()  # trả kết nối về pool trong lúc chờ AI
     try:
         result, _ = await llm.generate_json(
             prompt, _Followups, op="tutor_followups", model=get_settings().llm_cheap_model
@@ -494,6 +496,6 @@ async def followups(db: AsyncSession, llm: LLMClient, user: User, message_id: uu
         logger.warning("Không sinh được gợi ý hỏi tiếp cho tin %s", message_id, exc_info=True)
         return FollowupsOut(questions=[])
     questions = [" ".join(q.split())[:150] for q in result.questions if q.strip()][:3]
-    message.followups = questions
+    await db.execute(update(ChatMessage).where(ChatMessage.id == message_pk).values(followups=questions))
     await db.commit()
     return FollowupsOut(questions=questions)

@@ -189,7 +189,7 @@ git commit -m "fix(auth): chỉ token bị xoay mới coi là bị đánh cắp 
 - Modify: `backend/app/modules/studio/generation.py`, `backend/app/modules/studio/service.py`, `backend/app/modules/quiz/explain.py`, `backend/app/modules/tutor/text.py`, `backend/app/ai/retry.py`
 - Modify tests: `backend/tests/test_studio.py`, `backend/tests/test_tutor_text.py`, `backend/tests/test_ai_retry.py`
 
-- [ ] **Bước 1: Test (sẽ fail)**
+- [x] **Bước 1: Test (sẽ fail)**
   - Test "Sinh lại" bật cache: bản thứ hai phải khác bản thứ nhất.
   - Test REFUSE: thêm dạng in đậm, dạng có dòng sau, dạng trong backtick.
   - Test rớt kết nối thì được thử lại.
@@ -260,7 +260,7 @@ git commit -m "fix(auth): chỉ token bị xoay mới coi là bị đánh cắp 
      v, models = vision([TimeoutError(), None], sleep)
 ```
 
-- [ ] **Bước 2: Sửa code**
+- [x] **Bước 2: Sửa code**
   - AI Studio: lời gọi cuối của báo cáo và flashcard không dùng cache. Bước tóm tắt từng phần (map) vẫn dùng cache, vì phần tài liệu không đổi thì kết quả tóm tắt như cũ.
   - `explain_answer`, `followups`:
     - Đọc xong mọi thứ cần thiết rồi mới `await db.rollback()`. Sau rollback, các object ORM hết hạn, không được đọc lại thuộc tính của chúng.
@@ -442,7 +442,7 @@ git commit -m "fix(auth): chỉ token bị xoay mới coi là bị đánh cắp 
      return code is not None and (code == 429 or 500 <= code <= 599)
 ```
 
-- [ ] **Bước 3: Chạy test, commit**
+- [x] **Bước 3: Chạy test, commit**
 
 ```powershell
 cd backend

@@ -8,7 +8,7 @@ mỗi bài làm còn lưu lại ở attempt_answers.ai_explanation để mở l�
 import logging
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.llm_client import LLMClient
@@ -87,6 +87,9 @@ async def explain_answer(
         explanation=question.explanation or "(không có)",
         source=chunk.content if chunk else "(không có đoạn tài liệu nguồn)",
     )
+    has_answer, attempt_pk = answer is not None, attempt.id
+    # Kết thúc transaction đọc để trả kết nối về pool trước khi chờ AI (có thể vài phút khi bị 429 và phải thử lại).
+    await db.rollback()
     try:
         result = await llm.generate(prompt, op="quiz_explain")
     except Exception as e:
@@ -97,7 +100,15 @@ async def explain_answer(
     text = result.text.strip()
     if not text:
         raise AppError("AI_UNAVAILABLE", "AI tạm thời không giải thích được, vui lòng thử lại sau", 503)
-    if answer is not None:
-        answer.ai_explanation = text
+    if has_answer:
+        await db.execute(
+            update(AttemptAnswer)
+            .where(
+                AttemptAnswer.attempt_id == attempt_pk,
+                AttemptAnswer.question_id == question_id,
+                AttemptAnswer.ai_explanation.is_(None),
+            )
+            .values(ai_explanation=text)
+        )
         await db.commit()
     return ExplainOut(text=text, source_page_no=page_no)

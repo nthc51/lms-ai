@@ -1,4 +1,4 @@
-"""Retry dùng chung cho các lời gọi AI (Gemini, OpenRouter): chỉ thử lại khi 429, 5xx hoặc timeout."""
+"""Retry dùng chung cho các lời gọi AI (Gemini, OpenRouter): chỉ thử lại khi 429, 5xx, timeout hoặc rớt kết nối."""
 
 import asyncio
 import logging
@@ -31,7 +31,8 @@ def _status_code(exc: BaseException) -> int | None:
 
 
 def is_retryable(exc: BaseException) -> bool:
-    if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+    # TransportError gồm timeout và lỗi kết nối (ConnectError, "Server disconnected"...): đều là lỗi mạng tạm thời
+    if isinstance(exc, (httpx.TransportError, TimeoutError)):
         return True
     code = _status_code(exc)
     return code is not None and (code == 429 or 500 <= code <= 599)

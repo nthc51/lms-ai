@@ -85,6 +85,17 @@ async def test_report_single_call_keeps_only_valid_citations(client, db):
     assert out.prompt_version == "studio_study_guide@v1"
 
 
+async def test_regenerating_report_calls_ai_again(client, db):
+    """ "Sinh lại" với cùng tài liệu phải gọi AI lần nữa, không lấy lại bản cũ trong llm_cache."""
+    _, _, course, lesson = await _course_with_chunks(client, db)
+    chunks = await load_scope_chunks(db, uuid.UUID(course["id"]), uuid.UUID(lesson["id"]))
+    provider = FakeLLMProvider(["## Bản một [1]", "## Bản hai [1]"])
+    llm = _llm(provider, llm_cache_enabled=True)
+    first = await generate_report(llm, ArtifactKind.study_guide, "Bài: X", chunks, get_settings())
+    second = await generate_report(llm, ArtifactKind.study_guide, "Bài: X", chunks, get_settings())
+    assert (first.content_md, second.content_md) == ("## Bản một [1]", "## Bản hai [1]")
+
+
 async def test_long_material_is_mapped_then_reduced(client, db):
     _, _, course, lesson = await _course_with_chunks(client, db, ["a " * 50, "b " * 50, "c " * 50])
     chunks = await load_scope_chunks(db, uuid.UUID(course["id"]), uuid.UUID(lesson["id"]))

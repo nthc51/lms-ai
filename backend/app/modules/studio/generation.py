@@ -154,7 +154,9 @@ async def generate_report(
         raise ValueError(NO_CONTENT_ERROR)
     context, _, _ = await _context_for(llm, title, chunks, settings)
     prompt = load_prompt(f"studio_{kind.value}").render(scope=title, context=context)
-    result = await llm.generate(prompt, op=f"studio_{kind.value}")
+    # Không dùng cache: job studio chỉ chạy lại với cùng ngữ cảnh khi giảng viên bấm "Sinh lại", lúc đó cache sẽ
+    # trả nguyên bản cũ (temperature 0, cùng prompt).
+    result = await llm.generate(prompt, op=f"studio_{kind.value}", use_cache=False)
     content, cited = clean_citations(result.text.strip(), len(chunks))
     return ReportResult(
         content_md=content, citations=citations_for(cited, chunks), prompt_version=prompt.prompt_version
@@ -196,7 +198,7 @@ async def generate_flashcards(
         count = _cards_wanted(sum(c.token_count for _, c in part))
         prompt = template.render(scope=title, count=count, context=numbered_context(part))
         try:
-            batch, _ = await llm.generate_json(prompt, CardBatch, op="studio_flashcards")
+            batch, _ = await llm.generate_json(prompt, CardBatch, op="studio_flashcards", use_cache=False)
         except LLMOutputError:
             logger.warning("Bỏ một phần flashcard: AI trả JSON sai schema")
             continue

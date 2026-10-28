@@ -28,6 +28,16 @@ def test_refuse_token_is_never_emitted():
         assert _run(pieces) == ("", True)
 
 
+def test_refuse_with_markdown_or_extra_lines_is_still_refusal():
+    for pieces in (
+        ["**REFUSE**"],
+        ["REFUSE\n\nTài liệu ", "không đề cập."],
+        ["`REF", "USE`\nxin lỗi"],
+        ["_REFUSE._"],
+    ):
+        assert _run(pieces) == ("", True), pieces
+
+
 def test_normal_answer_passes_through_immediately():
     f = RefuseFilter()
     assert f.feed("Tìm") == "Tìm" and f.feed(" kiếm") == " kiếm"

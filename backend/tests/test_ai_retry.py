@@ -83,6 +83,15 @@ async def test_timeout_then_success():
     assert models.calls == 2 and sleep.delays == [1.0]
 
 
+async def test_dropped_connection_is_retried():
+    sleep = Sleeps()
+    e, models = embedder(
+        [httpx.RemoteProtocolError("Server disconnected"), httpx.ConnectError("x"), None], sleep
+    )
+    assert await e.embed_query("q") == [0.6, 0.8]
+    assert models.calls == 3
+
+
 async def test_asyncio_timeout_is_retried_too():
     sleep = Sleeps()
     v, models = vision([TimeoutError(), None], sleep)
