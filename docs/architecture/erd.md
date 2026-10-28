@@ -258,6 +258,7 @@ erDiagram
         string token_hash
         datetime expires_at
         datetime revoked_at
+        datetime rotated_at
         uuid id PK
         datetime created_at
     }

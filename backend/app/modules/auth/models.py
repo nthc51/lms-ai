@@ -55,6 +55,9 @@ class RefreshToken(IdMixin, TimestampMixin, Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Chỉ có khi token bị thu hồi vì đã xoay sang token mới (refresh). Dùng lại token loại này mới là dấu hiệu bị
+    # đánh cắp; token bị thu hồi vì đăng xuất, đổi/đặt lại mật khẩu hay khóa tài khoản thì chỉ bị từ chối.
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class EmailToken(IdMixin, TimestampMixin, Base):

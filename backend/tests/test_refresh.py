@@ -51,3 +51,25 @@ async def test_logout_revokes_refresh_token(client):
     assert "refresh_token=" in out.headers["set-cookie"]  # cookie bị xóa
     r = await _refresh_with(client, raw)
     assert r.status_code == 401
+
+
+async def test_token_revoked_by_password_change_does_not_log_out_new_session(client):
+    """Máy B còn giữ refresh token cũ sau khi người dùng đổi mật khẩu ở máy A: B bị từ chối, A vẫn đăng nhập."""
+    await register_user(client, "r4@x.com")
+    phone = await _login_raw(client, "r4@x.com")
+    login = await client.post(f"{API}/auth/login", json={"email": "r4@x.com", "password": "password123"})
+    client.cookies.clear()
+    changed = await client.post(
+        f"{API}/me/password",
+        json={"current_password": "password123", "new_password": "newpass12345"},
+        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+    )
+    assert changed.status_code == 200, changed.text
+    laptop_new = changed.cookies["refresh_token"]
+
+    stale = await _refresh_with(client, phone)
+    assert stale.status_code == 401
+    assert stale.json()["error"]["code"] == "INVALID_TOKEN"
+
+    still = await _refresh_with(client, laptop_new)  # phiên vừa đổi mật khẩu vẫn còn
+    assert still.status_code == 200

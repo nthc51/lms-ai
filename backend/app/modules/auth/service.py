@@ -89,6 +89,10 @@ async def refresh(db: AsyncSession, raw: str) -> tuple[str, str]:
     )
     if token is None:
         raise AppError("INVALID_TOKEN", "Phiên đăng nhập không hợp lệ", 401)
+    if token.revoked_at is not None and token.rotated_at is None:
+        # Thu hồi vì đăng xuất, đổi/đặt lại mật khẩu hay khóa tài khoản: chỉ từ chối, không đụng tới phiên khác
+        # (vd. máy còn lại gửi token cũ sau khi người dùng đổi mật khẩu ở máy này).
+        raise AppError("INVALID_TOKEN", "Phiên đăng nhập không hợp lệ", 401)
     if token.revoked_at is not None:
         # Token đã bị xoay mà vẫn có người dùng lại, coi như bị đánh cắp: thu hồi toàn bộ phiên của user.
         await db.execute(
@@ -103,7 +107,7 @@ async def refresh(db: AsyncSession, raw: str) -> tuple[str, str]:
     user = await db.get(User, token.user_id)
     if user is None or user.locked_at is not None:
         raise AppError("ACCOUNT_LOCKED", "Tài khoản đã bị khóa", 403)
-    token.revoked_at = utcnow()
+    token.revoked_at = token.rotated_at = utcnow()
     return await issue_tokens(db, user)
 
 
