@@ -509,14 +509,14 @@ Sau commit này frontend cũ chưa gửi `version` nên tạm thời không xác
 - Regenerate: `frontend/openapi.json`, `frontend/src/lib/api/schema.d.ts`
 - Modify: `frontend/src/lib/assignments.ts`, `frontend/src/components/teach/submission-review.tsx`, `frontend/src/components/teach/assignment-manager.tsx`, `frontend/src/components/teach/submission-review.test.tsx`, `frontend/src/components/teach/assignment-manager.test.tsx`, `frontend/e2e/assignments.spec.ts`
 
-- [ ] **Bước 1: Sinh lại kiểu API** (`GradeIn` có thêm `version: number`)
+- [x] **Bước 1: Sinh lại kiểu API** (`GradeIn` có thêm `version: number`)
 
 ```powershell
 cd frontend
 npm run gen:api
 ```
 
-- [ ] **Bước 2: Test (sẽ fail).** Màn hình chấm:
+- [x] **Bước 2: Test (sẽ fail).** Màn hình chấm:
   - gửi `version`;
   - AI chấm xong khi đang gõ thì giữ phần đã gõ;
   - chưa gõ thì vẫn điền gợi ý AI;
@@ -706,7 +706,7 @@ npm run gen:api
 npx vitest run src/components/teach    # 4 test mới fail + test cũ "điền sẵn điểm..." fail (chưa gửi version)
 ```
 
-- [ ] **Bước 3: Sửa.** Gợi ý AI tới sau được "điều chỉnh state trong lúc render" (so `ai_result` với bản đã thấy) thay vì `useEffect`. TanStack Query giữ nguyên tham chiếu khi dữ liệu không đổi, nên lần tải lại 4 giây không kích hoạt nhầm.
+- [x] **Bước 3: Sửa.** Gợi ý AI tới sau được "điều chỉnh state trong lúc render" (so `ai_result` với bản đã thấy) thay vì `useEffect`. TanStack Query giữ nguyên tham chiếu khi dữ liệu không đổi, nên lần tải lại 4 giây không kích hoạt nhầm.
 
 ```diff
 --- a/frontend/src/lib/assignments.ts
@@ -978,7 +978,7 @@ npx vitest run src/components/teach    # 4 test mới fail + test cũ "điền s
                  <Button
 ```
 
-- [ ] **Bước 4: Chạy kiểm tra, commit**
+- [x] **Bước 4: Chạy kiểm tra, commit**
 
 ```powershell
 npx tsc --noEmit ; npx eslint .

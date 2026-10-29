@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
 import type { components } from "@/lib/api/schema";
 
 export type Assignment = components["schemas"]["AssignmentOut"];
@@ -126,6 +127,10 @@ export function useGradeMutations(submissionId: string) {
       onSuccess: (detail) => {
         qc.setQueryData(assignmentKeys.submission(submissionId), detail);
         void qc.invalidateQueries({ queryKey: assignmentKeys.all });
+      },
+      // học viên vừa nộp lại: tải bản mới để giảng viên xem rồi chấm lại
+      onError: (err) => {
+        if (err instanceof ApiError && err.code === "STALE_VERSION") refresh();
       },
     }),
     regrade: useMutation({

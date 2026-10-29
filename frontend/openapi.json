@@ -8215,6 +8215,11 @@
       },
       "GradeIn": {
         "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
           "scores": {
             "additionalProperties": {
               "type": "number"
@@ -8238,6 +8243,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "version",
           "scores"
         ],
         "title": "GradeIn"

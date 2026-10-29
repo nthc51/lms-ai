@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
+import { toast } from "sonner";
 import { describe, expect, it, vi } from "vitest";
 import { assignment } from "@/components/assignment/fixtures";
 import { api as url, server } from "@/test/msw";
@@ -45,8 +46,9 @@ const detail = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function setup() {
+function setup(first: ReturnType<typeof detail> = detail()) {
   const graded: unknown[] = [];
+  const state = { detail: first, gradeStatus: 200 };
   server.use(
     http.get(url("/assignments/as-1"), () => HttpResponse.json(assignment({ submission_count: 1, to_review: 1 }))),
     http.get(url("/assignments/as-1/submissions"), () =>
@@ -57,9 +59,14 @@ function setup() {
         size: 20,
       }),
     ),
-    http.get(url("/submissions/sub-1"), () => HttpResponse.json(detail())),
+    http.get(url("/submissions/sub-1"), () => HttpResponse.json(state.detail)),
     http.post(url("/submissions/sub-1/grade"), async ({ request }) => {
       graded.push(await request.json());
+      if (state.gradeStatus === 409)
+        return HttpResponse.json(
+          { error: { code: "STALE_VERSION", message: "Học viên vừa nộp lại bài. Hãy xem bản mới rồi chấm lại" } },
+          { status: 409 },
+        );
       return HttpResponse.json(detail({ status: "graded", final_scores: { c1: 5, c2: 3 }, final_total: 8 }));
     }),
   );
@@ -69,7 +76,7 @@ function setup() {
       <SubmissionReview slug="khoa" lessonId="l1" assignmentId="as-1" />
     </QueryClientProvider>,
   );
-  return { graded };
+  return { graded, state, qc };
 }
 
 describe("SubmissionReview", () => {
@@ -91,7 +98,50 @@ describe("SubmissionReview", () => {
     await user.clear(c1);
     await user.type(c1, "5");
     await user.click(screen.getByRole("button", { name: "Xác nhận điểm" }));
-    await waitFor(() => expect(graded).toEqual([{ scores: { c1: 5, c2: 3 }, feedback: "Bài khá tốt." }]));
+    await waitFor(() => expect(graded).toEqual([{ version: 1, scores: { c1: 5, c2: 3 }, feedback: "Bài khá tốt." }]));
     expect(await screen.findByRole("button", { name: "Cập nhật điểm" })).toBeInTheDocument();
+  });
+
+  it("AI chấm xong trong lúc giảng viên đang chấm tay: giữ nguyên điểm và nhận xét đã gõ", async () => {
+    const user = userEvent.setup();
+    const { state, qc } = setup(detail({ status: "submitted", ai_result: null }));
+    const c1 = await screen.findByLabelText("Điểm Đúng khái niệm");
+    expect(c1).toHaveValue(null);
+    await user.type(c1, "2");
+    await user.type(screen.getByLabelText(/Nhận xét cho học viên/), "Tự chấm");
+    state.detail = detail();
+    await qc.refetchQueries();
+    expect(await screen.findByText("AI gợi ý 4/6")).toBeInTheDocument();
+    expect(screen.getByLabelText("Điểm Đúng khái niệm")).toHaveValue(2);
+    expect(screen.getByLabelText("Điểm Trình bày")).toHaveValue(null);
+    expect(screen.getByLabelText(/Nhận xét cho học viên/)).toHaveValue("Tự chấm");
+  });
+
+  it("chưa gõ gì thì gợi ý AI tới sau vẫn được điền sẵn", async () => {
+    const { state, qc } = setup(detail({ status: "submitted", ai_result: null }));
+    expect(await screen.findByLabelText("Điểm Đúng khái niệm")).toHaveValue(null);
+    state.detail = detail();
+    await qc.refetchQueries();
+    await waitFor(() => expect(screen.getByLabelText("Điểm Đúng khái niệm")).toHaveValue(4));
+    expect(screen.getByLabelText(/Nhận xét cho học viên/)).toHaveValue("Bài khá tốt.");
+  });
+
+  it("bài đã chấm mà giảng viên bỏ nhận xét: không lấy lại nhận xét AI", async () => {
+    setup(detail({ status: "graded", final_scores: { c1: 5, c2: 3 }, final_total: 8, teacher_feedback: null }));
+    expect(await screen.findByLabelText("Điểm Đúng khái niệm")).toHaveValue(5);
+    expect(screen.getByLabelText(/Nhận xét cho học viên/)).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Cập nhật điểm" })).toBeInTheDocument();
+  });
+
+  it("học viên vừa nộp lại: báo lỗi và tải bản mới", async () => {
+    const user = userEvent.setup();
+    const { state } = setup();
+    await screen.findByLabelText("Điểm Đúng khái niệm");
+    state.gradeStatus = 409;
+    state.detail = detail({ version: 2, status: "submitted", ai_result: null, text_content: "Bản nộp lại" });
+    await user.click(screen.getByRole("button", { name: "Xác nhận điểm" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Học viên vừa nộp lại bài. Hãy xem bản mới rồi chấm lại"));
+    expect(await screen.findByText("Bản nộp lại")).toBeInTheDocument();
+    expect(screen.getByText(/lần nộp thứ 2/)).toBeInTheDocument();
   });
 });

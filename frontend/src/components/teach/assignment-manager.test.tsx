@@ -11,12 +11,17 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 
 function setup(items: ReturnType<typeof assignment>[]) {
   const created: unknown[] = [];
+  const updated: unknown[] = [];
   const published: string[] = [];
   server.use(
     http.get(url("/assignments"), () => HttpResponse.json({ items, total: items.length, page: 1, size: 50 })),
     http.post(url("/assignments"), async ({ request }) => {
       created.push(await request.json());
       return HttpResponse.json(assignment({ status: "draft" }), { status: 201 });
+    }),
+    http.patch(url("/assignments/:id"), async ({ request }) => {
+      updated.push(await request.json());
+      return HttpResponse.json(assignment());
     }),
     http.post(url("/assignments/:id/publish"), ({ params }) => {
       published.push(params.id as string);
@@ -29,7 +34,7 @@ function setup(items: ReturnType<typeof assignment>[]) {
       <AssignmentManager slug="khoa" lessonId="l1" />
     </QueryClientProvider>,
   );
-  return { created, published };
+  return { created, updated, published };
 }
 
 describe("AssignmentManager", () => {
@@ -70,5 +75,30 @@ describe("AssignmentManager", () => {
     const confirm = await screen.findByRole("alertdialog");
     await user.click(within(confirm).getByRole("button", { name: "Xuất bản" }));
     await waitFor(() => expect(published).toEqual(["as-1"]));
+  });
+
+  it("sửa bài tập: không đổi hạn nộp thì không gửi lại (giữ phần giây); điểm tối đa trống báo lỗi tiếng Việt", async () => {
+    const user = userEvent.setup();
+    const { updated } = setup([assignment({ due_at: "2026-11-01T16:59:59Z", submission_count: 0, to_review: 0 })]);
+    await user.click(await screen.findByRole("button", { name: /Thao tác với bài tập/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Sửa" }));
+    const dialog = await screen.findByRole("dialog");
+    const points = within(dialog).getAllByLabelText("Điểm tối đa")[0];
+    await user.clear(points);
+    expect(points).toHaveValue(null);
+    await user.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Điểm tối đa mỗi tiêu chí là số nguyên từ 1 đến 100");
+    await user.type(points, "5");
+    await user.type(within(dialog).getByLabelText("Tiêu đề"), " (sửa)");
+    await user.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(updated).toHaveLength(1));
+    expect(updated[0]).not.toHaveProperty("due_at");
+    expect(updated[0]).toMatchObject({
+      title: "Bài tập tìm kiếm nhị phân (sửa)",
+      rubric: [
+        { criterion: "Đúng khái niệm", max_points: 5, description: "Nêu đúng điều kiện" },
+        { criterion: "Trình bày", max_points: 4, description: "" },
+      ],
+    });
   });
 });

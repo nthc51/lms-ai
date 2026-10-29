@@ -2642,6 +2642,8 @@ export interface components {
         };
         /** GradeIn */
         GradeIn: {
+            /** Version */
+            version: number;
             /** Scores */
             scores: {
                 [key: string]: number;

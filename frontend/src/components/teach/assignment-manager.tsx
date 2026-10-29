@@ -11,11 +11,13 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Badge, Skeleton } from "@/components/ui/misc";
 import { errorMessage } from "@/lib/api/errors";
-import { type Assignment, type RubricItemIn, useAssignmentMutations, useLessonAssignments } from "@/lib/assignments";
+import { type Assignment, useAssignmentMutations, useLessonAssignments } from "@/lib/assignments";
 import { formatDateTime, fromLocalInput, toLocalInput } from "@/lib/format";
 
 const MAX_CRITERIA = 8;
-const emptyCriterion = (): RubricItemIn => ({ criterion: "", max_points: 2, description: "" });
+/** Một dòng rubric trong form; điểm tối đa giữ dạng chuỗi để xóa trắng ô được khi đang gõ. */
+type CriterionDraft = { criterion: string; max_points: string; description: string };
+const emptyCriterion = (): CriterionDraft => ({ criterion: "", max_points: "2", description: "" });
 
 /** Bài tập của một bài (B5): tạo/sửa (đề bài, hạn nộp, rubric), xuất bản có xác nhận, xem bài nộp để chấm. */
 export function AssignmentManager({ slug, lessonId }: { slug: string; lessonId: string }) {
@@ -139,36 +141,55 @@ function AssignmentDialog({ lessonId, assignment, onClose }: { lessonId: string;
   const locked = !!assignment?.submission_count; // đã có bài nộp: không đổi rubric được nữa
   const [title, setTitle] = React.useState(assignment?.title ?? "");
   const [instructions, setInstructions] = React.useState(assignment?.instructions ?? "");
-  const [due, setDue] = React.useState(assignment?.due_at ? toLocalInput(assignment.due_at) : "");
-  const [rubric, setRubric] = React.useState<RubricItemIn[]>(
+  const initialDue = assignment?.due_at ? toLocalInput(assignment.due_at) : "";
+  const [due, setDue] = React.useState(initialDue);
+  const [rubric, setRubric] = React.useState<CriterionDraft[]>(
     assignment
-      ? assignment.rubric.map(({ criterion, max_points, description }) => ({ criterion, max_points, description }))
+      ? assignment.rubric.map(({ criterion, max_points, description }) => ({
+          criterion,
+          max_points: String(max_points),
+          description: description ?? "",
+        }))
       : [emptyCriterion()],
   );
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
   const total = rubric.reduce((n, r) => n + (Number(r.max_points) || 0), 0);
 
-  const setItem = (i: number, patch: Partial<RubricItemIn>) => setRubric((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const setItem = (i: number, patch: Partial<CriterionDraft>) => setRubric((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return setError("Nhập tiêu đề bài tập");
     if (!instructions.trim()) return setError("Nhập đề bài");
     if (rubric.some((r) => !r.criterion.trim())) return setError("Mỗi tiêu chí cần có tên");
-    if (rubric.some((r) => !Number.isInteger(Number(r.max_points)) || r.max_points < 1 || r.max_points > 100))
+    const points = rubric.map((r) => Number(r.max_points.trim() || NaN));
+    if (points.some((p) => !Number.isInteger(p) || p < 1 || p > 100))
       return setError("Điểm tối đa mỗi tiêu chí là số nguyên từ 1 đến 100");
     setPending(true);
     setError(null);
-    const body = {
-      title: title.trim(),
-      instructions: instructions.trim(),
-      due_at: due ? fromLocalInput(due) : null,
-      ...(locked ? {} : { rubric: rubric.map((r) => ({ ...r, criterion: r.criterion.trim(), max_points: Number(r.max_points) })) }),
-    };
+    const items = rubric.map((r, i) => ({ criterion: r.criterion.trim(), max_points: points[i], description: r.description }));
+    const dueAt = due ? fromLocalInput(due) : null;
     try {
-      if (assignment) await mut.update.mutateAsync({ id: assignment.id, body });
-      else await mut.create.mutateAsync({ lesson_id: lessonId, ...body, rubric: body.rubric! });
+      if (assignment)
+        await mut.update.mutateAsync({
+          id: assignment.id,
+          body: {
+            title: title.trim(),
+            instructions: instructions.trim(),
+            // chỉ gửi hạn nộp khi đã đổi: ô datetime-local bỏ phần giây, gửi lại sẽ làm 23:59:59 thành 23:59:00
+            ...(due !== initialDue ? { due_at: dueAt } : {}),
+            ...(locked ? {} : { rubric: items }),
+          },
+        });
+      else
+        await mut.create.mutateAsync({
+          lesson_id: lessonId,
+          title: title.trim(),
+          instructions: instructions.trim(),
+          due_at: dueAt,
+          rubric: items,
+        });
       toast.success(assignment ? "Đã lưu bài tập" : "Đã tạo bài tập (nháp)");
       onClose();
     } catch (err) {
@@ -184,7 +205,8 @@ function AssignmentDialog({ lessonId, assignment, onClose }: { lessonId: string;
         description="Bài tập ở dạng nháp cho tới khi bạn xuất bản. AI chấm gợi ý theo đúng rubric này."
         className="max-h-[90dvh] max-w-2xl overflow-y-auto"
       >
-        <form onSubmit={submit} className="space-y-4">
+        {/* noValidate: báo lỗi bằng câu tiếng Việt của mình thay vì bong bóng mặc định của trình duyệt */}
+        <form onSubmit={submit} noValidate className="space-y-4">
           <Field id="as-title" label="Tiêu đề">
             <Input value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} autoFocus />
           </Field>
@@ -213,7 +235,7 @@ function AssignmentDialog({ lessonId, assignment, onClose }: { lessonId: string;
                     max={100}
                     value={r.max_points}
                     disabled={locked}
-                    onChange={(e) => setItem(i, { max_points: Number(e.target.value) })}
+                    onChange={(e) => setItem(i, { max_points: e.target.value })}
                   />
                 </Field>
                 <Button

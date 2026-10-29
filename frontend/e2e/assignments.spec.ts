@@ -143,6 +143,7 @@ test.describe("bài tập (B5)", () => {
     await panel.getByRole("button", { name: "Xác nhận điểm" }).click();
     await expect(panel.getByRole("button", { name: "Cập nhật điểm" })).toBeVisible();
     expect(graded).toEqual({
+      version: 1,
       scores: { c1: 5.5, c2: 4 },
       feedback: "Bài làm đúng hướng, nên trình bày rõ bước rút gọn.",
     });

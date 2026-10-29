@@ -9,7 +9,7 @@ import { EmptyState, ErrorState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { Badge, Skeleton } from "@/components/ui/misc";
-import { errorMessage } from "@/lib/api/errors";
+import { ApiError, errorMessage } from "@/lib/api/errors";
 import {
   type Assignment,
   SUBMISSION_STATUS_LABEL,
@@ -62,7 +62,9 @@ export function SubmissionReview({ slug, lessonId, assignmentId }: { slug: strin
       >
         <ArrowLeft className="size-4" aria-hidden /> Bài tập của bài
       </Link>
-      {assignment.data ? (
+      {assignment.isError ? (
+        <ErrorState error={assignment.error} onRetry={() => assignment.refetch()} />
+      ) : assignment.data ? (
         <div>
           <h2 className="text-lg font-semibold">{assignment.data.title}</h2>
           <p className="text-sm text-muted-foreground">
@@ -142,6 +144,8 @@ export function SubmissionReview({ slug, lessonId, assignmentId }: { slug: strin
         </div>
         {selected && assignment.data ? (
           <SubmissionPanel id={selected} assignment={assignment.data} />
+        ) : selected && assignment.isPending ? (
+          <Skeleton className="h-96 w-full" />
         ) : (
           <EmptyState icon={FileText} title="Chọn một bài nộp ở danh sách để xem và chấm." />
         )}
@@ -155,6 +159,8 @@ function SubmissionPanel({ id, assignment }: { id: string; assignment: Assignmen
   if (detail.isPending) return <Skeleton className="h-96 w-full" />;
   if (detail.isError) return <ErrorState error={detail.error} onRetry={() => detail.refetch()} />;
   const d = detail.data;
+  if (d.assignment_id !== assignment.id)
+    return <EmptyState icon={FileText} title="Bài nộp này thuộc bài tập khác. Chọn một bài ở danh sách." />;
   return (
     <section aria-label={`Bài nộp của ${d.student_name}`} className="space-y-4 rounded-lg border bg-surface p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -191,20 +197,42 @@ function SubmissionPanel({ id, assignment }: { id: string; assignment: Assignmen
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden /> {d.ai_error ?? "AI không chấm được bài này."}
         </p>
       ) : null}
-      <GradeForm key={`${d.id}-${d.version}-${d.status}`} detail={d} assignment={assignment} />
+      {/* Không gắn key theo trạng thái: AI chấm xong trong lúc giảng viên đang gõ thì không được dựng lại form */}
+      <GradeForm key={`${d.id}-${d.version}`} detail={d} assignment={assignment} />
     </section>
   );
+}
+
+/** Giá trị điền sẵn: bài đã chấm lấy điểm và nhận xét của giảng viên (nhận xét đã xóa thì để trống, không lấy lại
+ * bản AI soạn); chưa chấm thì lấy gợi ý của AI nếu có. */
+function prefill(detail: SubmissionDetail, assignment: Assignment) {
+  const final = detail.final_scores;
+  const ai = detail.ai_result;
+  return {
+    scores: Object.fromEntries(
+      assignment.rubric.map((r) => [r.key, String((final ? final[r.key] : ai?.scores[r.key]?.score) ?? "")]),
+    ) as Record<string, string>,
+    feedback: final ? (detail.teacher_feedback ?? "") : (ai?.feedback ?? ""),
+  };
 }
 
 function GradeForm({ detail, assignment }: { detail: SubmissionDetail; assignment: Assignment }) {
   const mut = useGradeMutations(detail.id);
   const ai = detail.ai_result;
-  const [scores, setScores] = React.useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      assignment.rubric.map((r) => [r.key, String(detail.final_scores?.[r.key] ?? ai?.scores[r.key]?.score ?? "")]),
-    ),
-  );
-  const [feedback, setFeedback] = React.useState(detail.teacher_feedback ?? ai?.feedback ?? "");
+  const [scores, setScores] = React.useState(() => prefill(detail, assignment).scores);
+  const [feedback, setFeedback] = React.useState(() => prefill(detail, assignment).feedback);
+  const [touched, setTouched] = React.useState(false);
+  const [seenAi, setSeenAi] = React.useState(ai);
+  // Gợi ý AI tới khi form đang mở (AI chấm xong / chấm lại): chỉ điền vào khi giảng viên chưa gõ gì và bài chưa
+  // được chấm; đã gõ thì giữ nguyên phần của giảng viên (khối "AI gợi ý" bên dưới vẫn hiện điểm AI để so).
+  if (ai !== seenAi) {
+    setSeenAi(ai);
+    if (ai && !touched && !detail.final_scores) {
+      const next = prefill(detail, assignment);
+      setScores(next.scores);
+      setFeedback(next.feedback);
+    }
+  }
   const [error, setError] = React.useState<string | null>(null);
   const total = assignment.rubric.reduce((n, r) => n + (Number(scores[r.key]) || 0), 0);
 
@@ -220,10 +248,12 @@ function GradeForm({ detail, assignment }: { detail: SubmissionDetail; assignmen
     }
     setError(null);
     try {
-      await mut.grade.mutateAsync({ scores: parsed, feedback: feedback.trim() || null });
+      await mut.grade.mutateAsync({ version: detail.version, scores: parsed, feedback: feedback.trim() || null });
       toast.success("Đã xác nhận điểm, học viên được thông báo");
     } catch (err) {
-      setError(errorMessage(err));
+      // bản mới của học viên được tải lại và form dựng lại theo bản đó, nên báo bằng toast
+      if (err instanceof ApiError && err.code === "STALE_VERSION") toast.error(errorMessage(err));
+      else setError(errorMessage(err));
     }
   }
 
@@ -251,7 +281,10 @@ function GradeForm({ detail, assignment }: { detail: SubmissionDetail; assignmen
                     step={0.25}
                     className="w-24"
                     value={scores[r.key]}
-                    onChange={(e) => setScores((cur) => ({ ...cur, [r.key]: e.target.value }))}
+                    onChange={(e) => {
+                      setTouched(true);
+                      setScores((cur) => ({ ...cur, [r.key]: e.target.value }));
+                    }}
                   />
                 </Field>
               </div>
@@ -277,7 +310,15 @@ function GradeForm({ detail, assignment }: { detail: SubmissionDetail; assignmen
         })}
       </ol>
       <Field id="teacher-feedback" label="Nhận xét cho học viên" hint={ai ? "AI soạn sẵn từ bài làm, bạn sửa lại cho đúng ý" : undefined}>
-        <Textarea rows={4} maxLength={5000} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+        <Textarea
+          rows={4}
+          maxLength={5000}
+          value={feedback}
+          onChange={(e) => {
+            setTouched(true);
+            setFeedback(e.target.value);
+          }}
+        />
       </Field>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
