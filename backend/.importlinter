@@ -27,9 +27,11 @@ forbidden_modules =
     app.modules.discussion
     app.modules.assignment
 ignore_imports =
-    # Chặn xóa khóa / chương / bài khi học viên đã làm quiz hoặc hỏi AI Tutor: chỉ ĐỌC bảng, không gọi service
+    # Chặn xóa khóa / chương / bài khi học viên đã làm quiz, hỏi AI Tutor hoặc nộp bài tập: chỉ ĐỌC bảng,
+    # không gọi service
     app.modules.courses.service -> app.modules.quiz.models
     app.modules.courses.service -> app.modules.tutor.models
+    app.modules.courses.service -> app.modules.assignment.models
 
 [importlinter:contract:notify-is-leaf]
 name = notify (hộp thư đi email) không phụ thuộc module nào khác
@@ -66,6 +68,7 @@ ignore_imports =
     # Cùng ngoại lệ chặn xóa ở trên (đường vòng qua courses.service, chỉ đọc bảng)
     app.modules.courses.service -> app.modules.quiz.models
     app.modules.courses.service -> app.modules.tutor.models
+    app.modules.courses.service -> app.modules.assignment.models
 
 [importlinter:contract:core-and-ai-below-features]
 name = core, lớp AI và ingestion không phụ thuộc phần tính năng

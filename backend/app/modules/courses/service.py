@@ -92,12 +92,14 @@ async def _ensure_no_student_work(
 ) -> None:
     """Chặn xóa (409) chỉ khi phần bị xóa (cascade) kéo theo dữ liệu của HỌC VIÊN:
     - bất kỳ lượt làm quiz nào trên các bài trong phạm vi;
+    - bất kỳ bài nộp nào cho bài tập của các bài trong phạm vi (B5);
     - phiên hỏi Tutor có tin nhắn của người không phải staff của khóa (bỏ qua chủ khóa và admin: phiên xem thử);
     - xóa khóa: có ít nhất một lượt đăng ký; xóa chương/bài: có tiến độ học của học viên đang đăng ký khóa.
     Quiz (kể cả đã xuất bản nhưng chưa ai làm), câu hỏi, tài liệu và phiên xem thử của staff vẫn bị xóa theo
     cascade như trước. Khóa FOR UPDATE dòng khóa học (khi xóa khóa) và các bài/quiz trong phạm vi: lệnh tạo
     lượt làm, đăng ký, tiến độ hay phiên Tutor (khóa ngoại tới các dòng này) phải đợi tới khi xóa xong, nên dữ liệu
     học viên không thể chen vào giữa lúc kiểm tra và lúc xóa."""
+    from app.modules.assignment.models import Assignment, Submission
     from app.modules.enrollment.models import Enrollment, LessonProgress
     from app.modules.quiz.models import Quiz, QuizAttempt
     from app.modules.tutor.models import ChatMessage, ChatSession
@@ -115,6 +117,17 @@ async def _ensure_no_student_work(
 
     if quiz_ids and await exists(select(QuizAttempt.id).where(QuizAttempt.quiz_id.in_(quiz_ids))):
         raise AppError("INVALID_STATE", f"Không xóa được: {what} đã có bài làm quiz của học viên", 409)
+    assignment_ids = list(
+        (
+            await db.scalars(
+                select(Assignment.id).where(Assignment.lesson_id.in_(lesson_ids)).with_for_update()
+            )
+        ).all()
+    )
+    if assignment_ids and await exists(
+        select(Submission.id).where(Submission.assignment_id.in_(assignment_ids))
+    ):
+        raise AppError("INVALID_STATE", f"Không xóa được: {what} đã có bài nộp của học viên", 409)
     student_chat = (
         select(ChatSession.id)
         .join(User, User.id == ChatSession.user_id)

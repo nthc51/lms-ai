@@ -6,6 +6,7 @@ viên chấm: điểm cuối nằm ở final_scores / final_total. Học viên c
 import uuid
 
 from sqlalchemy import case, func, null, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, not_found
@@ -268,33 +269,36 @@ async def submit(
         raise AppError("DEADLINE_PASSED", "Đã quá hạn nộp bài", 409)
     if data.asset_id is not None:
         await require_verified_asset(db, data.asset_id, user, AssetKind.submission)
+    now = utcnow()
+    # Lần nộp đầu: tạo sẵn dòng version 0 (bỏ qua nếu đã có). Hai lần nộp đầu gần như cùng lúc (bấm đúp) không
+    # đụng uq_submissions_assignment_user nữa: lần sau đợi lần trước commit rồi đi tiếp nhánh nộp lại.
+    await db.execute(
+        pg_insert(Submission)
+        .values(
+            id=uuid.uuid4(),
+            assignment_id=assignment.id,
+            user_id=user.id,
+            version=0,
+            submitted_at=now,
+            status=SubmissionStatus.submitted,
+        )
+        .on_conflict_do_nothing(constraint="uq_submissions_assignment_user")
+    )
     sub = await db.scalar(
         select(Submission)
         .where(Submission.assignment_id == assignment.id, Submission.user_id == user.id)
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
-    now = utcnow()
-    if sub is None:
-        sub = Submission(
-            assignment_id=assignment.id,
-            user_id=user.id,
-            text_content=data.text_content,
-            asset_id=data.asset_id,
-            version=1,
-            submitted_at=now,
-            status=SubmissionStatus.submitted,
-        )
-        db.add(sub)
-    else:
-        if sub.status == SubmissionStatus.graded:
-            raise AppError("ALREADY_GRADED", "Bài đã được giảng viên chấm, không nộp lại được", 409)
-        sub.text_content = data.text_content
-        sub.asset_id = data.asset_id
-        sub.version += 1
-        sub.submitted_at = now
-        sub.status = SubmissionStatus.submitted
-        sub.ai_result = None
-        sub.ai_error = None
+    if sub.status == SubmissionStatus.graded:
+        raise AppError("ALREADY_GRADED", "Bài đã được giảng viên chấm, không nộp lại được", 409)
+    sub.text_content = data.text_content
+    sub.asset_id = data.asset_id
+    sub.version += 1
+    sub.submitted_at = now
+    sub.status = SubmissionStatus.submitted
+    sub.ai_result = None
+    sub.ai_error = None
     await db.flush()
     await create_and_enqueue(db, queue, GRADE_JOB, sub.id, sub.version, created_by=user.id)
     return await _my_submission(db, sub)
@@ -398,7 +402,13 @@ async def grade(
     data: GradeIn,
     hub: NotificationHub | None = None,
 ) -> None:
-    """Giảng viên xác nhận điểm (chấm lần đầu hoặc sửa điểm đã chấm). Không đụng tới ai_result."""
+    """Giảng viên xác nhận điểm (chấm lần đầu hoặc sửa điểm đã chấm). Không đụng tới ai_result.
+
+    Khóa dòng bài nộp và yêu cầu đúng version giảng viên đang xem: học viên nộp lại giữa lúc giảng viên chấm thì
+    trả 409 STALE_VERSION thay vì ghi điểm của bản cũ vào bản mới."""
+    await db.refresh(sub, with_for_update=True)
+    if sub.version != data.version:
+        raise AppError("STALE_VERSION", "Học viên vừa nộp lại bài. Hãy xem bản mới rồi chấm lại", 409)
     keys = {r["key"]: r for r in assignment.rubric}
     if set(data.scores) != set(keys):
         raise AppError("INVALID_SCORES", "Cần chấm đủ và đúng các tiêu chí của rubric", 422)

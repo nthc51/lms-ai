@@ -185,5 +185,8 @@ class SubmissionDetail(BaseModel):
 class GradeIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    version: int = Field(
+        ge=1
+    )  # version của bài giảng viên đang xem; lệch với bản mới nhất → 409 STALE_VERSION
     scores: dict[str, float]  # đủ mọi tiêu chí của rubric, mỗi điểm trong 0..max_points
     feedback: str | None = Field(None, max_length=MAX_FEEDBACK)

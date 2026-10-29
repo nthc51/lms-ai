@@ -4,7 +4,7 @@ import json
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.ai.llm import FakeLLMProvider
 from app.ai.llm_client import LLMClient
@@ -13,7 +13,7 @@ from app.core.time import utcnow
 from app.modules.assignment.grading import AI_ERROR, GradeDraft, check_draft, evidence_found
 from app.modules.inbox.models import Notification
 from app.modules.jobs.models import Job, JobStatus
-from app.worker.tasks import grade_submission
+from app.worker.tasks import JOB_TIMEOUTS, grade_submission, sweep_stale_jobs
 from tests.helpers import API, keys_in, make_published_course, make_student, make_teacher, upload_file
 from tests.pdfs import make_pdf
 from tests.test_ai_retry import Sleeps
@@ -99,7 +99,7 @@ async def test_full_flow_submit_ai_suggests_teacher_confirms(client, db, storage
 
     r = await client.post(
         f"{API}/submissions/{mine['id']}/grade",
-        json={"scores": {"c1": 5.5, "c2": 4}, "feedback": " Tốt "},
+        json={"version": 1, "scores": {"c1": 5.5, "c2": 4}, "feedback": " Tốt "},
         headers=gv,
     )
     assert r.status_code == 200, r.text
@@ -180,7 +180,9 @@ async def test_rules_and_permissions(client, db):
     assert (await client.delete(f"{API}/assignments/{a['id']}", headers=gv)).status_code == 409
 
     for scores in ({"c1": 1}, {"c1": 7, "c2": 1}, {"c1": 1, "c2": 1, "c9": 1}):
-        r = await client.post(f"{API}/submissions/{sub['id']}/grade", json={"scores": scores}, headers=gv)
+        r = await client.post(
+            f"{API}/submissions/{sub['id']}/grade", json={"version": 1, "scores": scores}, headers=gv
+        )
         assert (r.status_code, r.json()["error"]["code"]) == (422, "INVALID_SCORES"), scores
 
     _, other_gv = await make_teacher(client, "gv2@x.com")
@@ -276,3 +278,88 @@ async def test_submission_cannot_close_tag_with_case_or_space_variants(client, d
     prompt = provider.calls[0].prompt
     assert prompt.count("</submission>") == 1
     assert "</SUBMISSION>" not in prompt and "</ submission >" not in prompt
+
+
+async def test_grade_must_match_version_teacher_is_viewing(client, db, storage, hub):
+    """Học viên nộp lại khi giảng viên đang chấm bản cũ: điểm không bị ghi vào bản mới."""
+    gv, sv, _, _, a = await _setup(client)
+    sub = await _submit(client, sv, a, text_content="bản một")
+    await grade_submission(_ctx(storage, hub), str((await _job(db, sub["id"], 1)).id))
+    await _submit(client, sv, a, text_content=ANSWER)  # version 2
+    body = {"version": 1, "scores": {"c1": 6, "c2": 4}}
+    r = await client.post(f"{API}/submissions/{sub['id']}/grade", json=body, headers=gv)
+    assert (r.status_code, r.json()["error"]["code"]) == (409, "STALE_VERSION")
+    mine = (await client.get(f"{API}/assignments/{a['id']}", headers=sv)).json()["my_submission"]
+    assert (mine["status"], mine["version"], mine["final_total"]) == ("submitted", 2, None)
+    r = await client.post(f"{API}/submissions/{sub['id']}/grade", json={**body, "version": 2}, headers=gv)
+    assert (r.status_code, r.json()["final_total"]) == (200, 10.0)
+
+
+async def test_double_click_first_submit_keeps_one_row(client, db):
+    import asyncio
+
+    _, sv, _, _, a = await _setup(client)
+    url = f"{API}/assignments/{a['id']}/submission"
+    r1, r2 = await asyncio.gather(
+        client.put(url, json={"text_content": "lần một"}, headers=sv),
+        client.put(url, json={"text_content": "lần hai"}, headers=sv),
+    )
+    assert (r1.status_code, r2.status_code) == (200, 200), (r1.text, r2.text)
+    assert r1.json()["id"] == r2.json()["id"]
+    assert sorted([r1.json()["version"], r2.json()["version"]]) == [1, 2]
+
+
+async def test_timed_out_grading_job_marks_ai_failed(client, db, storage, hub, monkeypatch):
+    """Job quá thời gian bị hủy giữa lúc chờ AI: bài không kẹt ở "AI đang chấm"."""
+    import asyncio
+
+    gv, sv, _, _, a = await _setup(client)
+    sub = await _submit(client, sv, a, text_content=ANSWER)
+    monkeypatch.setitem(JOB_TIMEOUTS, "grade_submission", 2)  # handler bị hủy sau 1 giây
+
+    class Hang(FakeLLMProvider):
+        async def generate(self, prompt, **kw):
+            await asyncio.sleep(30)
+
+    await grade_submission(_ctx(storage, hub, Hang()), str((await _job(db, sub["id"], 1)).id))
+    job = await _job(db, sub["id"], 1)
+    assert job.status == JobStatus.failed and job.error_msg.startswith("Quá thời gian xử lý")
+    detail = (await client.get(f"{API}/submissions/{sub['id']}", headers=gv)).json()
+    assert detail["status"] == "ai_failed" and detail["ai_error"].startswith(AI_ERROR)
+    teacher_id = (await client.get(f"{API}/me", headers=gv)).json()["id"]
+    assert await _kinds(db, teacher_id) == ["submission_ready"]
+
+
+async def test_sweeper_fails_stale_grading_job_and_submission(client, db):
+    """Worker chết giữa chừng: sweeper chốt job failed và bài chuyển ai_failed, giảng viên chấm tay được."""
+    gv, sv, _, _, a = await _setup(client)
+    sub = await _submit(client, sv, a, text_content=ANSWER)
+    old = utcnow() - timedelta(seconds=JOB_TIMEOUTS["grade_submission"]) - timedelta(minutes=6)
+    await db.execute(
+        update(Job)
+        .where(Job.ref_id == uuid.UUID(sub["id"]))
+        .values(status=JobStatus.processing, started_at=old)
+    )
+    await db.commit()
+    assert await sweep_stale_jobs({}) == 1
+    detail = (await client.get(f"{API}/submissions/{sub['id']}", headers=gv)).json()
+    assert detail["status"] == "ai_failed" and "Worker bị gián đoạn" in detail["ai_error"]
+
+
+async def test_cannot_delete_lesson_with_submissions(client, db):
+    gv, sv, _, _, a = await _setup(client)
+    await _submit(client, sv, a, text_content=ANSWER)
+    r = await client.delete(f"{API}/lessons/{a['lesson_id']}", headers=gv)
+    assert (r.status_code, r.json()["error"]["code"]) == (409, "INVALID_STATE")
+    assert "bài nộp" in r.json()["error"]["message"]
+
+
+def test_nan_score_from_ai_is_rejected():
+    import pytest
+    from pydantic import ValidationError
+
+    raw = (
+        '{"scores": [{"key": "c1", "score": NaN, "justification": "", "evidence_quote": ""}], "feedback": ""}'
+    )
+    with pytest.raises(ValidationError):
+        GradeDraft.model_validate_json(raw)

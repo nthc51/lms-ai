@@ -13,9 +13,9 @@ import unicodedata
 import uuid
 
 import pymupdf
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ai.llm_client import LLMClient, LLMOutputError
 from app.ai.prompts import load_prompt
@@ -42,7 +42,9 @@ class GradingError(Exception):
 
 class _CriterionDraft(BaseModel):
     key: str
-    score: float
+    score: float = Field(
+        allow_inf_nan=False
+    )  # NaN/Infinity coi như output sai (thử lại), không ghi được vào JSONB
     justification: str
     evidence_quote: str
 
@@ -241,3 +243,42 @@ async def _finish(
     if hub is not None:
         await inbox.publish(hub, notified)
     return True
+
+
+async def fail_unfinished(db: AsyncSession, refs: list[tuple[uuid.UUID, int]], reason: str) -> int:
+    """Job grade_submission bị hủy vì quá thời gian hoặc bị sweeper chốt failed (worker chết, không vào được hàng
+    đợi): bài của đúng version đó đang chờ AI thì chuyển ai_failed và báo giảng viên, để không kẹt "AI đang chấm"
+    mãi. Chưa commit: caller commit cùng transaction với job. Trả số bài đã chuyển."""
+    failed = 0
+    for submission_id, version in refs:
+        assignment_id = await db.scalar(
+            update(Submission)
+            .where(
+                Submission.id == submission_id,
+                Submission.version == version,
+                Submission.status == SubmissionStatus.submitted,
+            )
+            .values(status=SubmissionStatus.ai_failed, ai_error=f"{AI_ERROR} ({reason})"[:500])
+            .returning(Submission.assignment_id)
+        )
+        if assignment_id is None:
+            continue
+        assignment, course = (
+            await db.execute(
+                select(Assignment, Course)
+                .join(Lesson, Lesson.id == Assignment.lesson_id)
+                .join(Section, Section.id == Lesson.section_id)
+                .join(Course, Course.id == Section.course_id)
+                .where(Assignment.id == assignment_id)
+            )
+        ).one()
+        inbox.add(
+            db,
+            [course.teacher_id],
+            NotificationKind.submission_ready,
+            f"AI không chấm được một bài nộp: {assignment.title}",
+            teacher_link(course, assignment, submission_id),
+            reason,
+        )
+        failed += 1
+    return failed

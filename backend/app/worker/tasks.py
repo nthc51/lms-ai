@@ -13,6 +13,7 @@ from app.core.db import SessionLocal
 from app.core.storage import get_storage
 from app.core.time import utcnow
 from app.ingestion.pipeline import error_text, ingest_pdf_source
+from app.modules.assignment.grading import fail_unfinished as fail_unfinished_grading
 from app.modules.assignment.grading import grade_submission as run_grading
 from app.modules.courses.models import Course, Lesson, Section
 from app.modules.inbox import service as inbox
@@ -56,6 +57,8 @@ PENDING_JOB_ERROR = "Không đưa được job vào hàng đợi"
 # quiz_gen (ref_id = lessons.id) không cần: câu hỏi chỉ được ghi ở commit cuối cùng với job done, nên job bị
 # sweeper chốt failed không để lại dữ liệu dở dang nào.
 SOURCE_JOB_TYPES = frozenset({"ingest_pdf"})
+# grade_submission (ref_id = submissions.id, ref_version = version): bài nộp còn chờ AI chuyển ai_failed.
+GRADE_JOB_TYPE = "grade_submission"
 # quiz_gen: lỗi nghiệp vụ (QuizGenerationError, vd. NO_CHUNKS_ERROR) ghi nguyên văn vào job; lỗi khác
 # (LLM/hạ tầng) ghi thông báo chung này, chi tiết nằm trong log.
 QUIZ_GEN_ERROR = "Không sinh được câu hỏi do lỗi hệ thống hoặc dịch vụ AI, vui lòng thử lại sau"
@@ -370,16 +373,20 @@ async def grade_submission(ctx: dict, job_id: str) -> None:
 
 async def _fail_jobs(db, jobs_where, error: str, now) -> int:
     """Chuyển các job khớp điều kiện sang failed; source tương ứng (loại ingest_*) còn pending/processing
-    cũng failed cùng lỗi. Chưa commit — caller commit để job và source đổi trạng thái trong cùng transaction."""
+    cũng failed cùng lỗi, bài nộp đang chờ AI (grade_submission) chuyển ai_failed. Chưa commit — caller commit
+    để job, source và bài nộp đổi trạng thái trong cùng transaction."""
     rows = (
         await db.execute(
             update(Job)
             .where(*jobs_where)
             .values(status=JobStatus.failed, error_msg=error, finished_at=now)
-            .returning(Job.type, Job.ref_id)
+            .returning(Job.type, Job.ref_id, Job.ref_version)
         )
     ).all()
-    source_ids = [ref_id for type_, ref_id in rows if type_ in SOURCE_JOB_TYPES]
+    grading = [(ref_id, ref_version) for type_, ref_id, ref_version in rows if type_ == GRADE_JOB_TYPE]
+    if grading:
+        await fail_unfinished_grading(db, grading, error)
+    source_ids = [ref_id for type_, ref_id, _ in rows if type_ in SOURCE_JOB_TYPES]
     if source_ids:
         await db.execute(
             update(Source)
