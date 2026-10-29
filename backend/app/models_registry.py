@@ -2,6 +2,7 @@
 
 from app.ai import models as ai_models  # noqa: F401
 from app.modules.admin import models as admin_models  # noqa: F401
+from app.modules.assignment import models as assignment_models  # noqa: F401
 from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.courses import models as courses_models  # noqa: F401
 from app.modules.discussion import models as discussion_models  # noqa: F401

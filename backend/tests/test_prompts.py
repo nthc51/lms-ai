@@ -20,6 +20,7 @@ EXPECTED_VARS = {
     "studio_flashcards": {"scope", "count", "context"},
     "tutor_followups": {"question", "answer", "sections"},
     "notes_synthesize": {"notes"},
+    "assignment_grade": {"title", "instructions", "rubric", "submission"},
     # benchmark
     "eval_judge": {"question", "gold", "context", "answer"},
     "eval_draft": {"count", "source"},

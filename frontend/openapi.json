@@ -5332,6 +5332,621 @@
         ]
       }
     },
+    "/api/v1/assignments": {
+      "post": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Create Assignment",
+        "description": "Tạo bài tập (nháp) trong một bài học. Rubric 1–8 tiêu chí; key c1, c2, ... do server đặt.",
+        "operationId": "create_assignment_api_v1_assignments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Lesson Assignments",
+        "description": "Bài tập của bài học. Học viên chỉ thấy bài đã xuất bản, kèm bài nộp của mình (my_submission).",
+        "operationId": "lesson_assignments_api_v1_assignments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lesson_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lesson Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{assignment_id}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Assignment Detail",
+        "operationId": "assignment_detail_api_v1_assignments__assignment_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Update Assignment",
+        "description": "409 INVALID_STATE khi đổi rubric lúc đã có bài nộp.",
+        "operationId": "update_assignment_api_v1_assignments__assignment_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Delete Assignment",
+        "description": "409 INVALID_STATE khi đã có bài nộp.",
+        "operationId": "delete_assignment_api_v1_assignments__assignment_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{assignment_id}/publish": {
+      "post": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Publish Assignment",
+        "operationId": "publish_assignment_api_v1_assignments__assignment_id__publish_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{assignment_id}/submission": {
+      "put": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Submit",
+        "description": "Nộp hoặc nộp lại (thay bài cũ). 409 DEADLINE_PASSED khi quá hạn, 409 ALREADY_GRADED khi giảng viên đã chấm,\n400 INVALID_ASSET khi file không phải của mình / chưa upload xong.",
+        "operationId": "submit_api_v1_assignments__assignment_id__submission_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySubmission"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{assignment_id}/submissions": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Assignment Submissions",
+        "description": "Bài nộp của một bài tập: bài chờ giảng viên xác nhận lên trước.",
+        "operationId": "assignment_submissions_api_v1_assignments__assignment_id__submissions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SubmissionStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/submissions/{submission_id}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Submission Detail",
+        "operationId": "submission_detail_api_v1_submissions__submission_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/submissions/{submission_id}/grade": {
+      "post": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Grade Submission",
+        "description": "Xác nhận điểm (đủ mọi tiêu chí, mỗi điểm 0..max_points; sai thì 422 INVALID_SCORES). Học viên được báo.",
+        "operationId": "grade_submission_api_v1_submissions__submission_id__grade_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GradeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/submissions/{submission_id}/regrade": {
+      "post": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "Regrade Submission",
+        "description": "Cho AI chấm lại bài chưa được xác nhận. 409 ALREADY_GRADED nếu giảng viên đã chấm.",
+        "operationId": "regrade_submission_api_v1_submissions__submission_id__regrade_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ready": {
       "get": {
         "tags": [
@@ -5354,6 +5969,47 @@
   },
   "components": {
     "schemas": {
+      "AIResult": {
+        "properties": {
+          "scores": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CriterionResult"
+            },
+            "type": "object",
+            "title": "Scores"
+          },
+          "feedback": {
+            "type": "string",
+            "title": "Feedback"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scores",
+          "feedback",
+          "total",
+          "model",
+          "prompt_version",
+          "version"
+        ],
+        "title": "AIResult"
+      },
       "AdminActionOut": {
         "properties": {
           "id": {
@@ -6075,6 +6731,266 @@
           "verified_at"
         ],
         "title": "AssetOut"
+      },
+      "AssignmentCreate": {
+        "properties": {
+          "lesson_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lesson Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Instructions"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "rubric": {
+            "items": {
+              "$ref": "#/components/schemas/RubricItemIn"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Rubric"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "lesson_id",
+          "title",
+          "instructions",
+          "rubric"
+        ],
+        "title": "AssignmentCreate"
+      },
+      "AssignmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "lesson_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lesson Id"
+          },
+          "lesson_title": {
+            "type": "string",
+            "title": "Lesson Title"
+          },
+          "course_slug": {
+            "type": "string",
+            "title": "Course Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "rubric": {
+            "items": {
+              "$ref": "#/components/schemas/RubricItem"
+            },
+            "type": "array",
+            "title": "Rubric"
+          },
+          "max_total": {
+            "type": "integer",
+            "title": "Max Total"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssignmentStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "submission_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Count"
+          },
+          "to_review": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Review"
+          },
+          "my_submission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MySubmission"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "lesson_id",
+          "lesson_title",
+          "course_slug",
+          "title",
+          "instructions",
+          "due_at",
+          "rubric",
+          "max_total",
+          "status",
+          "created_at"
+        ],
+        "title": "AssignmentOut"
+      },
+      "AssignmentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "title": "AssignmentPage"
+      },
+      "AssignmentStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published"
+        ],
+        "title": "AssignmentStatus"
+      },
+      "AssignmentUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "rubric": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RubricItemIn"
+                },
+                "type": "array",
+                "maxItems": 8,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AssignmentUpdate",
+        "description": "Trường không gửi thì giữ nguyên; `due_at: null` tường minh = bỏ hạn nộp. Rubric chỉ đổi được khi chưa có\nbài nộp nào."
       },
       "AttemptOut": {
         "properties": {
@@ -6991,6 +7907,34 @@
         "type": "object",
         "title": "CourseUpdate"
       },
+      "CriterionResult": {
+        "properties": {
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "justification": {
+            "type": "string",
+            "title": "Justification"
+          },
+          "evidence_quote": {
+            "type": "string",
+            "title": "Evidence Quote"
+          },
+          "evidence_found": {
+            "type": "boolean",
+            "title": "Evidence Found"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "justification",
+          "evidence_quote",
+          "evidence_found"
+        ],
+        "title": "CriterionResult"
+      },
       "DayCount": {
         "properties": {
           "day": {
@@ -7178,6 +8122,32 @@
         ],
         "title": "FeedbackIn"
       },
+      "FileRef": {
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Asset Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset_id",
+          "name"
+        ],
+        "title": "FileRef"
+      },
       "FileUrlOut": {
         "properties": {
           "url": {
@@ -7242,6 +8212,35 @@
           "email"
         ],
         "title": "ForgotPasswordIn"
+      },
+      "GradeIn": {
+        "properties": {
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Scores"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scores"
+        ],
+        "title": "GradeIn"
       },
       "GuideOut": {
         "properties": {
@@ -7954,6 +8953,104 @@
           "size"
         ],
         "title": "MyCoursePage"
+      },
+      "MySubmission": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubmissionStatus"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "text_content": {
+            "type": "string",
+            "title": "Text Content"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_scores": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Scores"
+          },
+          "final_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Total"
+          },
+          "teacher_feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Teacher Feedback"
+          },
+          "graded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "status",
+          "submitted_at",
+          "text_content",
+          "file",
+          "final_scores",
+          "final_total",
+          "teacher_feedback",
+          "graded_at"
+        ],
+        "title": "MySubmission",
+        "description": "Bài nộp của chính học viên. Điểm và nhận xét chỉ có sau khi giảng viên xác nhận; học viên không thấy điểm AI."
       },
       "NoteCitation": {
         "properties": {
@@ -9404,6 +10501,63 @@
         ],
         "title": "Role"
       },
+      "RubricItem": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "max_points": {
+            "type": "integer",
+            "title": "Max Points"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "criterion",
+          "max_points",
+          "description"
+        ],
+        "title": "RubricItem"
+      },
+      "RubricItemIn": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Criterion"
+          },
+          "max_points": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Points"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criterion",
+          "max_points"
+        ],
+        "title": "RubricItemIn"
+      },
       "SectionBrief": {
         "properties": {
           "id": {
@@ -9997,6 +11151,292 @@
           "failed"
         ],
         "title": "StudioStatus"
+      },
+      "SubmissionDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "assignment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assignment Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "student_name": {
+            "type": "string",
+            "title": "Student Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubmissionStatus"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "text_content": {
+            "type": "string",
+            "title": "Text Content"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Url"
+          },
+          "ai_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AIResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ai_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Error"
+          },
+          "final_scores": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Scores"
+          },
+          "final_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Total"
+          },
+          "teacher_feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Teacher Feedback"
+          },
+          "graded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "assignment_id",
+          "user_id",
+          "student_name",
+          "status",
+          "version",
+          "submitted_at",
+          "text_content",
+          "file",
+          "file_url",
+          "ai_result",
+          "ai_error",
+          "final_scores",
+          "final_total",
+          "teacher_feedback",
+          "graded_at"
+        ],
+        "title": "SubmissionDetail",
+        "description": "Bài nộp cho giảng viên chấm: bài làm, file, gợi ý của AI và điểm đã xác nhận (nếu có)."
+      },
+      "SubmissionIn": {
+        "properties": {
+          "text_content": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Text Content",
+            "default": ""
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SubmissionIn",
+        "description": "Gõ bài làm, đính kèm một file (PDF hoặc .txt, upload với kind=submission), hoặc cả hai."
+      },
+      "SubmissionListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "student_name": {
+            "type": "string",
+            "title": "Student Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubmissionStatus"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "ai_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Total"
+          },
+          "final_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Total"
+          },
+          "flagged": {
+            "type": "integer",
+            "title": "Flagged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "student_name",
+          "status",
+          "version",
+          "submitted_at",
+          "ai_total",
+          "final_total",
+          "flagged"
+        ],
+        "title": "SubmissionListItem"
+      },
+      "SubmissionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubmissionListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "title": "SubmissionPage"
+      },
+      "SubmissionStatus": {
+        "type": "string",
+        "enum": [
+          "submitted",
+          "ai_graded",
+          "ai_failed",
+          "graded"
+        ],
+        "title": "SubmissionStatus"
       },
       "SubmitIn": {
         "properties": {

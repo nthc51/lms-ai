@@ -1565,6 +1565,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lesson Assignments
+         * @description Bài tập của bài học. Học viên chỉ thấy bài đã xuất bản, kèm bài nộp của mình (my_submission).
+         */
+        get: operations["lesson_assignments_api_v1_assignments_get"];
+        put?: never;
+        /**
+         * Create Assignment
+         * @description Tạo bài tập (nháp) trong một bài học. Rubric 1–8 tiêu chí; key c1, c2, ... do server đặt.
+         */
+        post: operations["create_assignment_api_v1_assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assignment Detail */
+        get: operations["assignment_detail_api_v1_assignments__assignment_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Assignment
+         * @description 409 INVALID_STATE khi đã có bài nộp.
+         */
+        delete: operations["delete_assignment_api_v1_assignments__assignment_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Assignment
+         * @description 409 INVALID_STATE khi đổi rubric lúc đã có bài nộp.
+         */
+        patch: operations["update_assignment_api_v1_assignments__assignment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/assignments/{assignment_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Assignment */
+        post: operations["publish_assignment_api_v1_assignments__assignment_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{assignment_id}/submission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Submit
+         * @description Nộp hoặc nộp lại (thay bài cũ). 409 DEADLINE_PASSED khi quá hạn, 409 ALREADY_GRADED khi giảng viên đã chấm,
+         *     400 INVALID_ASSET khi file không phải của mình / chưa upload xong.
+         */
+        put: operations["submit_api_v1_assignments__assignment_id__submission_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assignments/{assignment_id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assignment Submissions
+         * @description Bài nộp của một bài tập: bài chờ giảng viên xác nhận lên trước.
+         */
+        get: operations["assignment_submissions_api_v1_assignments__assignment_id__submissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/submissions/{submission_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Submission Detail */
+        get: operations["submission_detail_api_v1_submissions__submission_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/submissions/{submission_id}/grade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grade Submission
+         * @description Xác nhận điểm (đủ mọi tiêu chí, mỗi điểm 0..max_points; sai thì 422 INVALID_SCORES). Học viên được báo.
+         */
+        post: operations["grade_submission_api_v1_submissions__submission_id__grade_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/submissions/{submission_id}/regrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regrade Submission
+         * @description Cho AI chấm lại bài chưa được xác nhận. 409 ALREADY_GRADED nếu giảng viên đã chấm.
+         */
+        post: operations["regrade_submission_api_v1_submissions__submission_id__regrade_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ready": {
         parameters: {
             query?: never;
@@ -1586,6 +1750,23 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIResult */
+        AIResult: {
+            /** Scores */
+            scores: {
+                [key: string]: components["schemas"]["CriterionResult"];
+            };
+            /** Feedback */
+            feedback: string;
+            /** Total */
+            total: number;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Version */
+            version: number;
+        };
         /** AdminActionOut */
         AdminActionOut: {
             /**
@@ -1860,6 +2041,91 @@ export interface components {
             size_bytes: number;
             /** Verified At */
             verified_at: string | null;
+        };
+        /** AssignmentCreate */
+        AssignmentCreate: {
+            /**
+             * Lesson Id
+             * Format: uuid
+             */
+            lesson_id: string;
+            /** Title */
+            title: string;
+            /** Instructions */
+            instructions: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Rubric */
+            rubric: components["schemas"]["RubricItemIn"][];
+        };
+        /** AssignmentOut */
+        AssignmentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Lesson Id
+             * Format: uuid
+             */
+            lesson_id: string;
+            /** Lesson Title */
+            lesson_title: string;
+            /** Course Slug */
+            course_slug: string;
+            /** Title */
+            title: string;
+            /** Instructions */
+            instructions: string;
+            /** Due At */
+            due_at: string | null;
+            /** Rubric */
+            rubric: components["schemas"]["RubricItem"][];
+            /** Max Total */
+            max_total: number;
+            status: components["schemas"]["AssignmentStatus"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Submission Count */
+            submission_count?: number | null;
+            /** To Review */
+            to_review?: number | null;
+            my_submission?: components["schemas"]["MySubmission"] | null;
+        };
+        /** AssignmentPage */
+        AssignmentPage: {
+            /** Items */
+            items: components["schemas"]["AssignmentOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * AssignmentStatus
+         * @enum {string}
+         */
+        AssignmentStatus: "draft" | "published";
+        /**
+         * AssignmentUpdate
+         * @description Trường không gửi thì giữ nguyên; `due_at: null` tường minh = bỏ hạn nộp. Rubric chỉ đổi được khi chưa có
+         *     bài nộp nào.
+         */
+        AssignmentUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Instructions */
+            instructions?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Rubric */
+            rubric?: components["schemas"]["RubricItemIn"][] | null;
         };
         /** AttemptOut */
         AttemptOut: {
@@ -2239,6 +2505,17 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** CriterionResult */
+        CriterionResult: {
+            /** Score */
+            score: number;
+            /** Justification */
+            justification: string;
+            /** Evidence Quote */
+            evidence_quote: string;
+            /** Evidence Found */
+            evidence_found: boolean;
+        };
         /** DayCount */
         DayCount: {
             /**
@@ -2325,6 +2602,16 @@ export interface components {
             /** Value */
             value: (1 | -1) | null;
         };
+        /** FileRef */
+        FileRef: {
+            /**
+             * Asset Id
+             * Format: uuid
+             */
+            asset_id: string;
+            /** Name */
+            name: string | null;
+        };
         /** FileUrlOut */
         FileUrlOut: {
             /** Url */
@@ -2352,6 +2639,15 @@ export interface components {
              * Format: email
              */
             email: string;
+        };
+        /** GradeIn */
+        GradeIn: {
+            /** Scores */
+            scores: {
+                [key: string]: number;
+            };
+            /** Feedback */
+            feedback?: string | null;
         };
         /** GuideOut */
         GuideOut: {
@@ -2633,6 +2929,38 @@ export interface components {
             page: number;
             /** Size */
             size: number;
+        };
+        /**
+         * MySubmission
+         * @description Bài nộp của chính học viên. Điểm và nhận xét chỉ có sau khi giảng viên xác nhận; học viên không thấy điểm AI.
+         */
+        MySubmission: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Version */
+            version: number;
+            status: components["schemas"]["SubmissionStatus"];
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /** Text Content */
+            text_content: string;
+            file: components["schemas"]["FileRef"] | null;
+            /** Final Scores */
+            final_scores: {
+                [key: string]: number;
+            } | null;
+            /** Final Total */
+            final_total: number | null;
+            /** Teacher Feedback */
+            teacher_feedback: string | null;
+            /** Graded At */
+            graded_at: string | null;
         };
         /**
          * NoteCitation
@@ -3191,6 +3519,29 @@ export interface components {
          * @enum {string}
          */
         Role: "student" | "teacher" | "admin";
+        /** RubricItem */
+        RubricItem: {
+            /** Key */
+            key: string;
+            /** Criterion */
+            criterion: string;
+            /** Max Points */
+            max_points: number;
+            /** Description */
+            description: string;
+        };
+        /** RubricItemIn */
+        RubricItemIn: {
+            /** Criterion */
+            criterion: string;
+            /** Max Points */
+            max_points: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+        };
         /** SectionBrief */
         SectionBrief: {
             /**
@@ -3425,6 +3776,113 @@ export interface components {
          * @enum {string}
          */
         StudioStatus: "generating" | "ready" | "failed";
+        /**
+         * SubmissionDetail
+         * @description Bài nộp cho giảng viên chấm: bài làm, file, gợi ý của AI và điểm đã xác nhận (nếu có).
+         */
+        SubmissionDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Student Name */
+            student_name: string;
+            status: components["schemas"]["SubmissionStatus"];
+            /** Version */
+            version: number;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /** Text Content */
+            text_content: string;
+            file: components["schemas"]["FileRef"] | null;
+            /** File Url */
+            file_url: string | null;
+            ai_result: components["schemas"]["AIResult"] | null;
+            /** Ai Error */
+            ai_error: string | null;
+            /** Final Scores */
+            final_scores: {
+                [key: string]: number;
+            } | null;
+            /** Final Total */
+            final_total: number | null;
+            /** Teacher Feedback */
+            teacher_feedback: string | null;
+            /** Graded At */
+            graded_at: string | null;
+        };
+        /**
+         * SubmissionIn
+         * @description Gõ bài làm, đính kèm một file (PDF hoặc .txt, upload với kind=submission), hoặc cả hai.
+         */
+        SubmissionIn: {
+            /**
+             * Text Content
+             * @default
+             */
+            text_content: string;
+            /** Asset Id */
+            asset_id?: string | null;
+        };
+        /** SubmissionListItem */
+        SubmissionListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Student Name */
+            student_name: string;
+            status: components["schemas"]["SubmissionStatus"];
+            /** Version */
+            version: number;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /** Ai Total */
+            ai_total: number | null;
+            /** Final Total */
+            final_total: number | null;
+            /** Flagged */
+            flagged: number;
+        };
+        /** SubmissionPage */
+        SubmissionPage: {
+            /** Items */
+            items: components["schemas"]["SubmissionListItem"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * SubmissionStatus
+         * @enum {string}
+         */
+        SubmissionStatus: "submitted" | "ai_graded" | "ai_failed" | "graded";
         /** SubmitIn */
         SubmitIn: {
             /** Final Answers */
@@ -6793,6 +7251,365 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+        };
+    };
+    lesson_assignments_api_v1_assignments_get: {
+        parameters: {
+            query: {
+                lesson_id: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_assignment_api_v1_assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assignment_detail_api_v1_assignments__assignment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_assignment_api_v1_assignments__assignment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_assignment_api_v1_assignments__assignment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_assignment_api_v1_assignments__assignment_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_api_v1_assignments__assignment_id__submission_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmissionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySubmission"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assignment_submissions_api_v1_assignments__assignment_id__submissions_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["SubmissionStatus"] | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submission_detail_api_v1_submissions__submission_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grade_submission_api_v1_submissions__submission_id__grade_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GradeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regrade_submission_api_v1_submissions__submission_id__regrade_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

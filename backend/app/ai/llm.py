@@ -161,6 +161,28 @@ def default_reply(call: FakeCall) -> str:
             for i in range(1, count + 1)
         ]
         return json.dumps({"questions": items}, ensure_ascii=False)
+    if call.op == "assignment_grade":
+        # nửa số điểm mỗi tiêu chí, trích 6 từ đầu của bài làm làm căn cứ
+        rubric = re.findall(
+            r"^- (c\d+): .*?\(tối đa (\d+) điểm\)",
+            _between(call.prompt, "<rubric>", "</rubric>"),
+            re.MULTILINE,
+        )
+        start = call.prompt.rfind("<submission>")
+        words = _between(call.prompt[start:], "<submission>", "</submission>").split() if start >= 0 else []
+        scores = [
+            {
+                "key": key,
+                "score": int(top) / 2,
+                "justification": "Chấm mô phỏng (chế độ giả lập, không gọi AI).",
+                "evidence_quote": " ".join(words[:6]),
+            }
+            for key, top in rubric
+        ]
+        return json.dumps(
+            {"scores": scores, "feedback": "Nhận xét mô phỏng (chế độ giả lập, không gọi AI)."},
+            ensure_ascii=False,
+        )
     if call.op == "notes_synthesize":
         return "## Đề cương từ ghi chú\n\n- Ý gộp từ ghi chú (chế độ giả lập)\n\n## Câu hỏi tự kiểm tra\n\n1. Câu hỏi?"
     return "OK"

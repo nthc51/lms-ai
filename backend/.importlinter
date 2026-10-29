@@ -1,6 +1,6 @@
 # Ranh giới module của backend. Chạy: uv run lint-imports (CI chạy ở job lint).
 # Phần NỀN (auth, courses, enrollment, materials, jobs, notify, inbox) không được phụ thuộc phần TÍNH NĂNG
-# (tutor, quiz, studio, analytics, admin, discussion). Nhờ vậy sửa / bỏ một tính năng không kéo theo phần nền.
+# (tutor, quiz, studio, analytics, admin, discussion, assignment). Nhờ vậy sửa / bỏ một tính năng không kéo theo phần nền.
 # Mỗi ngoại lệ phải ghi lý do; thêm ngoại lệ mới nghĩa là phải giải thích được vì sao.
 
 [importlinter]
@@ -25,6 +25,7 @@ forbidden_modules =
     app.modules.analytics
     app.modules.admin
     app.modules.discussion
+    app.modules.assignment
 ignore_imports =
     # Chặn xóa khóa / chương / bài khi học viên đã làm quiz hoặc hỏi AI Tutor: chỉ ĐỌC bảng, không gọi service
     app.modules.courses.service -> app.modules.quiz.models
@@ -55,11 +56,12 @@ forbidden_modules =
     app.modules.notify
 
 [importlinter:contract:tutor-quiz-independent]
-name = AI Tutor và Quiz độc lập với nhau
+name = AI Tutor, Quiz và Bài tập độc lập với nhau
 type = independence
 modules =
     app.modules.tutor
     app.modules.quiz
+    app.modules.assignment
 ignore_imports =
     # Cùng ngoại lệ chặn xóa ở trên (đường vòng qua courses.service, chỉ đọc bảng)
     app.modules.courses.service -> app.modules.quiz.models
@@ -79,6 +81,7 @@ forbidden_modules =
     app.modules.analytics
     app.modules.admin
     app.modules.discussion
+    app.modules.assignment
     app.worker
     app.main
 

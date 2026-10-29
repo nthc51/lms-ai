@@ -38,6 +38,17 @@ erDiagram
         uuid id PK
         datetime created_at
     }
+    assignments {
+        uuid lesson_id FK
+        string title
+        text instructions
+        datetime due_at
+        jsonb rubric
+        enum status
+        uuid created_by FK
+        uuid id PK
+        datetime created_at
+    }
     attempt_answers {
         uuid attempt_id PK, FK
         uuid question_id PK, FK
@@ -313,6 +324,24 @@ erDiagram
         uuid id PK
         datetime created_at
     }
+    submissions {
+        uuid assignment_id FK
+        uuid user_id FK
+        text text_content
+        uuid asset_id FK
+        integer version
+        datetime submitted_at
+        enum status
+        jsonb ai_result
+        string ai_error
+        jsonb final_scores
+        float final_total
+        text teacher_feedback
+        uuid graded_by FK
+        datetime graded_at
+        uuid id PK
+        datetime created_at
+    }
     users {
         string email
         string password_hash
@@ -328,7 +357,9 @@ erDiagram
         datetime created_at
     }
     assets |o--o{ lessons : "video_asset_id"
+    assets |o--o{ submissions : "asset_id"
     assets ||--o{ sources : "asset_id"
+    assignments ||--o{ submissions : "assignment_id"
     chat_messages |o--o{ notes : "from_message_id"
     chat_sessions ||--o{ chat_messages : "session_id"
     chunks |o--o{ questions : "source_chunk_id"
@@ -342,6 +373,7 @@ erDiagram
     lessons |o--o{ chat_sessions : "lesson_id"
     lessons |o--o{ notes : "lesson_id"
     lessons |o--o{ study_artifacts : "lesson_id"
+    lessons ||--o{ assignments : "lesson_id"
     lessons ||--o{ chunks : "lesson_id"
     lessons ||--o{ lesson_comments : "lesson_id"
     lessons ||--o{ lesson_progress : "lesson_id"
@@ -359,9 +391,11 @@ erDiagram
     sources ||--o{ source_pages : "source_id"
     study_artifacts ||--o{ flashcard_reviews : "artifact_id"
     users |o--o{ admin_actions : "admin_id"
+    users |o--o{ assignments : "created_by"
     users |o--o{ jobs : "created_by"
     users |o--o{ study_artifacts : "created_by"
     users |o--o{ study_artifacts : "reviewed_by"
+    users |o--o{ submissions : "graded_by"
     users ||--o{ assets : "owner_id"
     users ||--o{ chat_sessions : "user_id"
     users ||--o{ courses : "teacher_id"
@@ -374,4 +408,5 @@ erDiagram
     users ||--o{ notifications : "user_id"
     users ||--o{ quiz_attempts : "user_id"
     users ||--o{ refresh_tokens : "user_id"
+    users ||--o{ submissions : "user_id"
 ```

@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
+from app.core.storage import get_storage
 from app.core.time import utcnow
 from app.ingestion.pipeline import error_text, ingest_pdf_source
+from app.modules.assignment.grading import grade_submission as run_grading
 from app.modules.courses.models import Course, Lesson, Section
 from app.modules.inbox import service as inbox
 from app.modules.inbox.hub import get_hub
@@ -36,6 +38,7 @@ JOB_TIMEOUTS: dict[str, int] = {
     "studio_gen": 900,
     "notes_synth": 300,
     "tutor_waiting": 600,
+    "grade_submission": 300,
 }
 # tutor_waiting dừng nhận câu hỏi mới khi còn chừng này giây trước hạn của handler (một câu trả lời có thể mất
 # vài chục giây); câu còn lại để job sau hoặc cron.
@@ -342,6 +345,27 @@ async def quiz_gen(ctx: dict, job_id: str) -> None:
 
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("quiz_gen"))
     await _notify_job_owner(ctx, jid, session_factory)
+
+
+async def grade_submission(ctx: dict, job_id: str) -> None:
+    """AI gợi ý chấm bài nộp (B5): ref_id = submissions.id, ref_version = version của bài nộp được chấm.
+    Bài đã nộp lại (version khác) hoặc đã được giảng viên chấm thì bỏ qua, job vẫn done."""
+    session_factory = ctx.get("session_factory", SessionLocal)
+    jid = uuid.UUID(job_id)
+
+    async def handler(submission_id: uuid.UUID) -> None:
+        async with session_factory() as db:
+            version = await db.scalar(select(Job.ref_version).where(Job.id == jid))
+        await run_grading(
+            submission_id,
+            version,
+            ctx["llm"],
+            ctx.get("storage") or get_storage(),
+            session_factory,
+            ctx.get("hub") or get_hub(),
+        )
+
+    await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("grade_submission"))
 
 
 async def _fail_jobs(db, jobs_where, error: str, now) -> int:

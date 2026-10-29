@@ -12,6 +12,7 @@ from app.core.ratelimit import close_rate_limiter
 from app.core.storage import get_storage
 from app.modules.admin.router import router as admin_router
 from app.modules.analytics.router import router as analytics_router
+from app.modules.assignment.router import router as assignment_router
 from app.modules.auth.router import router as auth_router
 from app.modules.courses.router import router as courses_router
 from app.modules.discussion.router import router as discussion_router
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(studio_router)
     app.include_router(discussion_router)
     app.include_router(inbox_router)
+    app.include_router(assignment_router)
     app.include_router(health_router)
     setup_metrics(app)
     return app

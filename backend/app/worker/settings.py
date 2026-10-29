@@ -14,6 +14,7 @@ from app.worker.tasks import (
     JOB_TIMEOUTS,
     answer_waiting_cron,
     finalize_overdue_quiz_attempts,
+    grade_submission,
     ingest_pdf,
     notes_synth,
     quiz_gen,
@@ -46,6 +47,7 @@ class WorkerSettings:
         func(studio_gen, name="studio_gen", timeout=JOB_TIMEOUTS["studio_gen"]),
         func(notes_synth, name="notes_synth", timeout=JOB_TIMEOUTS["notes_synth"]),
         func(tutor_waiting, name="tutor_waiting", timeout=JOB_TIMEOUTS["tutor_waiting"]),
+        func(grade_submission, name="grade_submission", timeout=JOB_TIMEOUTS["grade_submission"]),
     ]
     # 5 phút một lần: job processing quá timeout + 5 phút → failed "Worker bị gián đoạn";
     # job pending bị kẹt → enqueue lại một lần, vẫn kẹt → failed "Không đưa được job vào hàng đợi"

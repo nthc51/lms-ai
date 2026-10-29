@@ -18,6 +18,9 @@ class NotificationKind(str, enum.Enum):
     doc_failed = "doc_failed"  # tài liệu bạn tải lên xử lý lỗi
     questions_ready = "questions_ready"  # AI đã sinh xong câu hỏi chờ duyệt
     questions_failed = "questions_failed"  # sinh câu hỏi không thành công
+    assignment_published = "assignment_published"  # khóa bạn học có bài tập mới
+    submission_ready = "submission_ready"  # bài nộp đã có điểm AI gợi ý (hoặc AI lỗi): chờ giảng viên chấm
+    grade_released = "grade_released"  # giảng viên đã xác nhận điểm bài tập của bạn
 
 
 class Notification(IdMixin, Base):
