@@ -2224,14 +2224,14 @@ uv run python -m eval.grading --dataset eval/datasets/grading-sample.jsonl --rpm
 - Create: `frontend/src/lib/assignments.ts`, `frontend/src/components/teach/assignment-manager.tsx`, `frontend/src/components/teach/submission-review.tsx`, `frontend/src/components/assignment/assignment-view.tsx`, `frontend/src/components/lesson/lesson-assignments.tsx`, 3 trang trong `src/app/(main)/`, test: `assignment-view.test.tsx`, `assignment-manager.test.tsx`, `submission-review.test.tsx`, `src/components/assignment/fixtures.ts`, `e2e/assignments.spec.ts`
 - Modify: `frontend/src/lib/api/upload.ts`, `frontend/src/lib/api/upload.test.ts`, `frontend/src/lib/format.ts`, `frontend/src/components/teach/lesson-tabs.tsx`, `frontend/src/components/lesson/lesson-view.tsx`, `frontend/e2e/mock-api.ts`
 
-- [ ] **Bước 1: Sinh lại kiểu API từ backend**
+- [x] **Bước 1: Sinh lại kiểu API từ backend**
 
 ```powershell
 cd frontend
 npm run gen:api       # cập nhật openapi.json và src/lib/api/schema.d.ts (thêm Assignment*, Submission*, GradeIn…)
 ```
 
-- [ ] **Bước 2: Test (sẽ fail).**
+- [x] **Bước 2: Test (sẽ fail).**
   - Upload nhận PDF hoặc .txt cho bài nộp.
   - Trang làm bài: chưa nộp (thấy đề, rubric, nộp được); đã có điểm (thấy tổng, điểm từng tiêu chí, nhận xét; không còn nút nộp lại); quá hạn.
   - Quản lý bài tập: tạo với rubric thêm/bớt tiêu chí, hạn nộp trống gửi `null`; bài nháp có nút Xuất bản.
@@ -2551,7 +2551,7 @@ describe("SubmissionReview", () => {
 });
 ```
 
-- [ ] **Bước 3: Lớp dữ liệu.** Hook TanStack Query; danh sách bài nộp tự tải lại 5 giây một lần khi còn bài đang chờ AI, bài đang xem thì 4 giây. Upload thêm loại `submission`. Hàm định dạng ngày giờ và chuyển qua lại với ô `datetime-local`.
+- [x] **Bước 3: Lớp dữ liệu.** Hook TanStack Query; danh sách bài nộp tự tải lại 5 giây một lần khi còn bài đang chờ AI, bài đang xem thì 4 giây. Upload thêm loại `submission`. Hàm định dạng ngày giờ và chuyển qua lại với ô `datetime-local`.
 
 **Tạo `frontend/src/lib/assignments.ts`:**
 
@@ -2750,7 +2750,7 @@ export function useGradeMutations(submissionId: string) {
 +}
 ```
 
-- [ ] **Bước 4: Phía giảng viên.** Tab "Bài tập", danh sách và hộp tạo/sửa (rubric bị khóa khi đã có bài nộp), trang chấm. Ô điểm dùng `noValidate` để hiện lỗi tiếng Việt của mình thay cho lỗi mặc định của trình duyệt.
+- [x] **Bước 4: Phía giảng viên.** Tab "Bài tập", danh sách và hộp tạo/sửa (rubric bị khóa khi đã có bài nộp), trang chấm. Ô điểm dùng `noValidate` để hiện lỗi tiếng Việt của mình thay cho lỗi mặc định của trình duyệt.
 
 ```diff
 --- a/frontend/src/components/teach/lesson-tabs.tsx
@@ -3424,7 +3424,7 @@ export default function AssignmentSubmissionsPage() {
 }
 ```
 
-- [ ] **Bước 5: Phía học viên.** Mục "Bài tập" trong trang học và trang làm bài. "Đã quá hạn" tính theo thời điểm mở trang (`useState(() => Date.now())`, vì eslint `react-hooks/purity` cấm gọi `Date.now()` khi render); server vẫn kiểm lại khi nộp.
+- [x] **Bước 5: Phía học viên.** Mục "Bài tập" trong trang học và trang làm bài. "Đã quá hạn" tính theo thời điểm mở trang (`useState(() => Date.now())`, vì eslint `react-hooks/purity` cấm gọi `Date.now()` khi render); server vẫn kiểm lại khi nộp.
 
 **Tạo `frontend/src/components/lesson/lesson-assignments.tsx`:**
 
@@ -3773,7 +3773,7 @@ export default function AssignmentPage() {
 }
 ```
 
-- [ ] **Bước 6: E2E.** Mặc định API giả trả danh sách bài tập rỗng để các trang học cũ không đổi. 2 kịch bản: học viên mở bài tập từ trang học và nộp bài; giảng viên mở bài nộp từ link thông báo, sửa điểm AI gợi ý và xác nhận.
+- [x] **Bước 6: E2E.** Mặc định API giả trả danh sách bài tập rỗng để các trang học cũ không đổi. 2 kịch bản: học viên mở bài tập từ trang học và nộp bài; giảng viên mở bài nộp từ link thông báo, sửa điểm AI gợi ý và xác nhận.
 
 ```diff
 --- a/frontend/e2e/mock-api.ts
@@ -3944,7 +3944,7 @@ test.describe("bài tập (B5)", () => {
 });
 ```
 
-- [ ] **Bước 7: Chạy kiểm tra, commit**
+- [x] **Bước 7: Chạy kiểm tra, commit**
 
 ```powershell
 npx tsc --noEmit ; npx eslint .

@@ -1,11 +1,11 @@
 "use client";
 
-import { ClipboardCheck, FileText, ListChecks } from "lucide-react";
+import { ClipboardCheck, FileText, ListChecks, NotebookPen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-/** Thanh chuyển giữa 3 phần soạn một bài: Nội dung | Câu hỏi | Quiz (mỗi phần một trang riêng). */
+/** Thanh chuyển giữa các phần soạn một bài: Nội dung | Câu hỏi | Quiz | Bài tập (mỗi phần một trang riêng). */
 export function LessonTabs({ slug, lessonId }: { slug: string; lessonId: string }) {
   const pathname = usePathname();
   const base = `/teach/${slug}/lessons/${lessonId}`;
@@ -13,11 +13,13 @@ export function LessonTabs({ slug, lessonId }: { slug: string; lessonId: string 
     { href: base, label: "Nội dung", icon: FileText },
     { href: `${base}/questions`, label: "Câu hỏi", icon: ListChecks },
     { href: `${base}/quizzes`, label: "Quiz", icon: ClipboardCheck },
+    { href: `${base}/assignments`, label: "Bài tập", icon: NotebookPen },
   ];
   return (
     <nav aria-label="Phần soạn bài" className="mb-6 flex gap-1 overflow-x-auto border-b">
       {tabs.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href;
+        // trang chấm một bài tập (…/assignments/<id>) vẫn thuộc tab Bài tập
+        const active = pathname === href || (href.endsWith("/assignments") && pathname.startsWith(`${href}/`));
         return (
           <Link
             key={href}

@@ -1,6 +1,6 @@
 import { api, unwrap } from "./client";
 
-export type UploadKind = "pdf" | "video";
+export type UploadKind = "pdf" | "video" | "submission";
 export type UploadProgress = (pct: number) => void;
 
 /** PUT file lên presigned URL của MinIO bằng XHR (fetch chưa báo được tiến trình upload). */
@@ -33,12 +33,14 @@ export async function uploadAsset(kind: UploadKind, file: File, onProgress: Uplo
 export const UPLOAD_RULES: Record<UploadKind, { mime: string; maxBytes: number; label: string }> = {
   pdf: { mime: "application/pdf", maxBytes: 50 * 1024 * 1024, label: "PDF, tối đa 50 MB" },
   video: { mime: "video/mp4", maxBytes: 500 * 1024 * 1024, label: "MP4, tối đa 500 MB" },
+  // bài nộp của học viên (B5): mime là danh sách cách nhau bằng dấu phẩy, dùng luôn cho thuộc tính accept
+  submission: { mime: "application/pdf,text/plain", maxBytes: 20 * 1024 * 1024, label: "PDF hoặc .txt, tối đa 20 MB" },
 };
 
 /** Kiểm tra trước khi gọi API, để báo lỗi ngay thay vì đợi server từ chối. */
 export function validateFile(kind: UploadKind, file: File): string | null {
   const rule = UPLOAD_RULES[kind];
-  if (file.type !== rule.mime) return `Chỉ nhận file ${rule.label.split(",")[0]}`;
+  if (!rule.mime.split(",").includes(file.type)) return `Chỉ nhận file ${rule.label.split(",")[0]}`;
   if (file.size > rule.maxBytes) return `File quá lớn (${rule.label})`;
   return null;
 }

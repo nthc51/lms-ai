@@ -42,6 +42,7 @@ import { useLessonDocuments } from "@/lib/studio/queries";
 import { canAskTutor, useTutorChat } from "@/lib/tutor/use-tutor-chat";
 import { cn } from "@/lib/utils";
 import { BreakReminder } from "./break-reminder";
+import { LessonAssignments } from "./lesson-assignments";
 import { LessonDiscussion } from "./lesson-discussion";
 import { LessonMaterials } from "./lesson-materials";
 import { LessonQuizzes } from "./lesson-quizzes";
@@ -258,6 +259,8 @@ export function LessonView({ slug, lessonId }: { slug: string; lessonId: string 
                 <LessonMaterials lessonId={lessonId} />
 
                 <LessonQuizzes slug={slug} lessonId={lessonId} isStudent={isStudent} />
+
+                <LessonAssignments slug={slug} lessonId={lessonId} isStudent={isStudent} />
 
                 <LessonFooter
                   lesson={lesson.data}

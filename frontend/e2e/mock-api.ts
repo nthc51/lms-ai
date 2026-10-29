@@ -147,6 +147,8 @@ export async function mockApi(page: Page, opts: { user?: typeof student | typeof
     "GET /me/notifications/unread": (r) => json(r, { unread: 0 }),
     "GET /me/notifications/stream": (r) =>
       r.fulfill({ status: 200, contentType: "text/event-stream", body: 'event: unread\ndata: {"unread": 0, "latest": null}\n\n' }),
+    // B5: mặc định bài học chưa có bài tập
+    "GET /assignments": (r) => json(r, { items: [], total: 0, page: 1, size: 50 }),
     "GET /courses/*/insights": (r) =>
       json(r, { course_id: COURSE_ID, min_answers: 3, hard_questions: [], weak_lessons: [], students_at_risk: [] }),
     ...opts.extra,

@@ -12,3 +12,21 @@ export function timeAgo(iso: string, now: number = Date.now()): string {
   const date = new Date(t);
   return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 }
+
+/** "05/11/2026 23:59" theo giờ máy. */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Giá trị cho <input type="datetime-local"> (giờ máy) từ ISO, và ngược lại. */
+export function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+export function fromLocalInput(value: string): string {
+  return new Date(value).toISOString();
+}
