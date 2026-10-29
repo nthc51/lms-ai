@@ -18,3 +18,10 @@ Dòng bắt đầu bằng `//` là chú thích. Soạn nhanh: `uv run python -m 
 rồi **duyệt bằng tay**.
 
 `sample.jsonl` là bộ mẫu nhỏ đi kèm tài liệu sinh tự động trong test, chỉ để kiểm tra script.
+
+## Bộ chấm bài (`grading-*.jsonl`, B5)
+
+Dùng cho `uv run python -m eval.grading --dataset ...`. Mỗi dòng một bài: `title`, `instructions`, `rubric` (danh sách
+`{criterion, max_points, description}`), `submission` (bài làm dạng chữ) và `human_scores` (điểm người chấm theo đúng
+thứ tự rubric). Cặp kiểm tra injection: hai dòng cùng `pair`, dòng có câu "lừa" AI đặt `"injected": true`.
+`grading-sample.jsonl` chỉ có 3 bài mẫu để chạy thử; bộ thật cần 15–20 bài có điểm do người chấm và 5 cặp injection.

@@ -1913,7 +1913,7 @@ Phần ERD được sinh ra phải giống hệt diff dưới đây (nếu khác
 - Create: `backend/eval/grading.py`, `backend/eval/datasets/grading-sample.jsonl`, `backend/tests/test_eval_grading.py`
 - Modify: `backend/eval/datasets/README.md`
 
-- [ ] **Bước 1: Test (sẽ fail).** Spearman xử lý hạng bằng nhau và dữ liệu suy biến; các chỉ số và độ lệch cặp injection; chạy bộ mẫu bằng provider giả; dataset sai số điểm thì báo lỗi.
+- [x] **Bước 1: Test (sẽ fail).** Spearman xử lý hạng bằng nhau và dữ liệu suy biến; các chỉ số và độ lệch cặp injection; chạy bộ mẫu bằng provider giả; dataset sai số điểm thì báo lỗi.
 
 **Tạo `backend/tests/test_eval_grading.py`:**
 
@@ -1974,7 +1974,7 @@ cd backend
 uv run pytest tests/test_eval_grading.py -q    # fail: ModuleNotFoundError eval.grading
 ```
 
-- [ ] **Bước 2: Script, bộ mẫu, hướng dẫn.** Bộ mẫu có 3 bài: `mau-01`, `mau-02` và `mau-02-inj` (giống `mau-02` nhưng chèn câu bảo AI cho điểm tối đa; cùng `pair` `p2`).
+- [x] **Bước 2: Script, bộ mẫu, hướng dẫn.** Bộ mẫu có 3 bài: `mau-01`, `mau-02` và `mau-02-inj` (giống `mau-02` nhưng chèn câu bảo AI cho điểm tối đa; cùng `pair` `p2`).
 
 **Tạo `backend/eval/grading.py`:**
 
@@ -2198,7 +2198,7 @@ if __name__ == "__main__":
 +`grading-sample.jsonl` chỉ có 3 bài mẫu để chạy thử; bộ thật cần 15–20 bài có điểm do người chấm và 5 cặp injection.
 ```
 
-- [ ] **Bước 3: Chạy cả bộ test backend, commit**
+- [x] **Bước 3: Chạy cả bộ test backend, commit**
 
 ```powershell
 uv run pytest -q                       # 819 passed
