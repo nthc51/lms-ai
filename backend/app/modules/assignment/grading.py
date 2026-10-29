@@ -136,7 +136,7 @@ async def ai_grade(
         instructions=instructions,
         rubric=rubric_text(rubric),
         # học viên không đóng thẻ sớm được để chen chỉ thị vào phần ngoài thẻ
-        submission=content.replace("</submission>", "< /submission>"),
+        submission=re.sub(r"<\s*/\s*submission\s*>", "< /submission>", content, flags=re.IGNORECASE),
     )
     last: Exception | None = None
     for _ in range(2):  # spec 5.7: output sai định dạng thì thử lại 1 lần
