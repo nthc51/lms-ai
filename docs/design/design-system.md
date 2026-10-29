@@ -201,6 +201,7 @@ Trang chủ ─[Học tiếp ▸ đúng bài, đúng chỗ]┘
 - **Desktop:** cột nội dung 68 ký tự ở giữa; mục lục khóa ở trái (thu gọn được); panel Tutor ở phải (400px, mở/đóng). Khi mở Tutor, cột nội dung **không bị co** dưới 60 ký tự; nếu màn hình hẹp, Tutor đè lên làm lớp nổi.
 - **Điện thoại:** video ở trên, dính trên cùng khi cuộn (có nút thu nhỏ). Nội dung ở dưới. Nút nổi "Hỏi AI" ở góc dưới phải, mở khung trượt từ dưới lên chiếm 85% chiều cao, vuốt xuống để đóng, và giữ nguyên lịch sử chat.
 - Thanh tiến độ mảnh (2px) màu `--accent` ở mép trên, cho biết đã đọc tới đâu.
+- Dưới quiz là mục **Bài tập** (ẩn khi bài không có bài tập): mỗi bài tập ghi trạng thái của học viên (Chưa nộp / Đã nộp, chờ chấm / x/y điểm), không lộ việc AI đã chấm hay chưa. Trang bài tập có đề bài, bảng tiêu chí chấm, ô gõ bài làm và vùng đính kèm PDF/.txt.
 - Cuối bài là phần **Thảo luận** (`#thao-luan`, liên kết từ thông báo cuộn thẳng tới đây): ô hỏi ở trên, câu hỏi mới nhất trước, trả lời thụt vào một cấp có vạch `--field-1` bên trái; giảng viên của khóa có nhãn "Giảng viên" nền `--field-1` chữ `--foreground`; bình luận đã xóa còn dòng "Bình luận đã bị xóa." để giữ mạch trả lời; xóa luôn qua hộp xác nhận.
 
 ### 7.3 Luồng giảng viên
@@ -216,6 +217,8 @@ Khóa đang dạy ─[Tạo khóa]─▶ Trình soạn khóa
 Trình soạn khóa trên desktop có 3 vùng: mục lục bên trái, nội dung bài ở giữa, thông tin và tài liệu của bài bên phải. Trên điện thoại chỉ cho xem và sửa nhẹ (tên, nội dung). Kéo thả dùng nút ↑↓ thay thế. Có dòng chữ "Soạn nội dung dài nên dùng máy tính".
 
 Trang **Thống kê khóa học** có thêm ba phần phân tích lớp (B7) dưới bảng quiz: câu hay sai (mỗi dòng dẫn tới ngân hàng câu hỏi của bài), bài cần xem lại (bảng), học viên cần để ý (thẻ có tiến độ và lý do in bằng chữ, không chỉ dựa vào màu). Phần nào chưa đủ số liệu thì có một câu giải thích thay vì bảng trống.
+
+Tab **Bài tập** của trình soạn bài (B5): danh sách bài tập (nháp / đã xuất bản, số bài nộp, số bài chờ xác nhận) và hộp thoại tạo bài tập với rubric 1–8 tiêu chí. Trang chấm chia hai cột trên desktop: danh sách bài nộp (bài chờ xác nhận lên trước, bộ lọc theo trạng thái) và bài đang chọn. Mỗi tiêu chí hiện điểm AI gợi ý, lý do và câu trích từ bài làm trong khối nền `--field-3`; câu trích không có trong bài làm thì có dòng cảnh báo màu `--destructive` kèm icon. Ô điểm của giảng viên điền sẵn điểm AI, chỉ khi bấm **Xác nhận điểm** học viên mới thấy điểm.
 
 ---
 

@@ -4,7 +4,7 @@
 - **Ngày tạo:** 2026-09-29
 - **Loại:** Đồ án tốt nghiệp: full stack, web động, tích hợp AI
 - **Nguồn lực:** 1 người làm full-time trong 5 tuần, có Claude hỗ trợ viết code
-- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), đang triển khai (xong tầng A; tầng B trừ B5; tầng S xong phần code, chưa deploy và đo thật)
+- **Trạng thái spec:** Đã duyệt thiết kế (5/5 phần), đang triển khai (xong tầng A và tầng B; tầng C đã cắt; tầng S xong phần code, chưa deploy và đo thật)
 
 ---
 
@@ -12,7 +12,7 @@
 
 > Cập nhật mục này mỗi khi xong việc. Ký hiệu: `[ ]` chưa làm · `[~]` đang làm · `[x]` xong · `[-]` đã cắt.
 
-**Cập nhật:** 2026-10-28 (tuần 5)  **Tổng tiến độ:** 22 / 41 hạng mục xong, 8 đang làm, 1 đã cắt
+**Cập nhật:** 2026-10-29 (tuần 5)  **Tổng tiến độ:** 23 / 41 hạng mục xong, 9 đang làm, 3 đã cắt
 
 **Thứ tự ưu tiên:** A (lõi) → B (mức Khá) → S (chất lượng hệ thống) → C (điểm nhấn). Hết thời gian mà vẫn còn việc thì phần bị trễ là tầng C, không phải S. Tuần 5 vẫn giữ cho báo cáo và bộ đánh giá.
 
@@ -33,7 +33,7 @@
 - [x] B2. Hybrid search (full-text + vector, RRF)
 - [x] B3. AI giải thích câu học viên làm sai (dùng chung qua `llm_cache`, lưu ở `attempt_answers.ai_explanation`; không tạo bảng `explanation_cache`)
 - [x] B4. Thảo luận theo bài học (2 cấp: câu hỏi gốc và trả lời, không trả lời lồng sâu hơn)
-- [ ] B5. Assignment + AI gợi ý chấm theo rubric, giáo viên xác nhận
+- [x] B5. Assignment + AI gợi ý chấm theo rubric, giáo viên xác nhận (nộp bằng chữ hoặc PDF/.txt; học viên chỉ thấy điểm sau khi giảng viên xác nhận)
 - [x] B6. Thông báo realtime (SSE qua `fetch` có Bearer token, Redis pub/sub chỉ để báo hiệu, DB là nguồn dữ liệu)
 - [x] B7. Phân tích lớp học (câu hay sai, bài yếu, học viên cần để ý)
 - [x] B8. Trang admin (duyệt giáo viên, quản lý user và khóa học)
@@ -64,8 +64,8 @@
 
 ### Tầng C: điểm nhấn (tuần 4, sau tầng S)
 
-- [ ] C1. Whisper transcribe video → trích dẫn timestamp, bấm vào là video nhảy đến đúng chỗ
-- [ ] C2. Chứng chỉ PDF + trang xác minh công khai
+- [-] C1. Whisper transcribe video → trích dẫn timestamp, bấm vào là video nhảy đến đúng chỗ (đã cắt 2026-10-29, đưa vào mục 12)
+- [-] C2. Chứng chỉ PDF + trang xác minh công khai (đã cắt 2026-10-29, đưa vào mục 12)
 - [-] C3. Học thích ứng (SM-2): đã cắt, đưa vào mục "Hướng phát triển"
 
 ### Phục vụ bảo vệ
@@ -74,7 +74,7 @@
 - [ ] D2. Deploy VPS có domain và HTTPS
 - [x] D3. Test tự động (unit, integration, API, phân quyền, đồng thời, 3–4 luồng E2E): pytest (backend, DB thật), Vitest (giao diện), Playwright (E2E với API giả lập, khung điện thoại và máy tính, có kiểm axe); CI chạy cả ba
 - [~] D4. Bộ đánh giá RAG khoảng 80 câu hỏi + script `eval/` (đã có script trong `backend/eval/`, bộ dữ liệu mới có 5 câu mẫu)
-- [ ] D5. Đánh giá sinh quiz, chấm bài, Whisper
+- [~] D5. Đánh giá sinh quiz, chấm bài (đã có `backend/eval/grading.py` và 3 bài mẫu, chờ bộ 15–20 bài có điểm thật), Whisper (đã cắt cùng C1)
 - [ ] D6. Đợt dùng thử (5–10 người, 3–4 ngày) + khảo sát SUS
 - [ ] D7. Video demo dự phòng + cache câu trả lời cho các câu demo
 
@@ -501,7 +501,7 @@ Mọi lời gọi LLM đều đi qua lớp này:
 | Tutor | `POST /tutor/sessions` · `GET /tutor/sessions?course_id=` (phiên của chính mình, phân trang) · `GET /tutor/availability?course_id=&lesson_id=` (`{available, ready_chunks, message, state, processing_docs, can_queue}`) · `POST /tutor/sessions/{id}/questions` → 202 (câu hỏi chờ khi tài liệu đang xử lý) · `GET /tutor/sessions/{id}/messages` · `POST /tutor/sessions/{id}/messages` (SSE, frontend đọc bằng `fetch` + `ReadableStream`) · `POST /tutor/messages/{id}/feedback` |
 | Câu hỏi | `POST /lessons/{id}/questions/generate` → 202 · `GET /lessons/{id}/questions?review_status=` · `PATCH /questions/{id}` |
 | Quiz | `POST /quizzes` · `GET /quizzes?lesson_id=` (phân trang) · `GET/PATCH/DELETE /quizzes/{id}` · `POST /quizzes/{id}/publish` · `POST /quizzes/{id}/attempts` (**không trả đáp án**) · `PUT /attempts/{id}/answers/{qid}` · `POST /attempts/{id}/submit {final_answers?}` · `GET /attempts/{id}/result` (chỉ khi `completed` hoặc `timed_out`) · `POST /attempts/{id}/answers/{qid}/explain` |
-| Assignment | CRUD `/assignments` · `PUT /assignments/{id}/submission` · `GET /assignments/{id}/submissions` · `POST /submissions/{id}/grade` |
+| Assignment | `POST /assignments` · `GET /assignments?lesson_id=` · `GET/PATCH/DELETE /assignments/{id}` · `POST /assignments/{id}/publish` · `PUT /assignments/{id}/submission` · `GET /assignments/{id}/submissions` · `GET /submissions/{id}` · `POST /submissions/{id}/grade` · `POST /submissions/{id}/regrade` |
 | Thảo luận | `GET/POST /lessons/{id}/comments` · `DELETE /comments/{id}` |
 | Thông báo | `GET /me/notifications` (kèm `unread`) · `GET /me/notifications/unread` · `POST /me/notifications/{id}/read` · `POST /me/notifications/read-all` · `GET /me/notifications/stream` (SSE, đọc bằng `fetch` có header Bearer nên không cần stream-token) |
 | Vận hành | `GET /api/v1/health` (tiến trình còn sống) · `GET /api/v1/ready` (DB, Redis, MinIO; `503` khi có phần lỗi) · `GET /metrics` (Prometheus, chỉ trong mạng nội bộ, Caddy không chuyển ra ngoài) |
@@ -702,7 +702,7 @@ Tầng C làm sau tầng S trong tuần 4. Nếu tuần 4 không kịp thì C1 (
 
 ## 12. Hướng phát triển (ghi vào chương 5)
 
-Học thích ứng (SM-2), reranker, embedding chạy local và so sánh với API, OCR offline, stream video HLS, lịch sử các lần nộp bài, ứng dụng mobile.
+Học thích ứng (SM-2), reranker, embedding chạy local và so sánh với API, OCR offline, stream video HLS, lịch sử các lần nộp bài, ứng dụng mobile. Chép lời video bằng Whisper kèm trích dẫn theo mốc thời gian (C1) và chứng chỉ PDF có trang xác minh công khai (C2): đã cắt khỏi phạm vi ngày 2026-10-29.
 
 Việc còn lại từ phần upload (Task 14):
 
@@ -775,3 +775,4 @@ Việc còn lại từ phần upload (Task 14):
 | 2026-10-15 | Giao diện sau đăng nhập cùng giọng với trang chủ cho khách: thanh bên một tông màu, ô tên app nền đậm, tiêu đề trang 800; trang chủ học viên có lời chào lớn, khối đang học (tên bài lấy từ API, phần đã đọc lưu trên máy), ba con số, "Việc nên làm tiếp" từ `GET /me/pending-quizzes` (quiz đã xuất bản trong khóa đã đăng ký, chưa nộp lần nào, bài làm dở trước, tối đa 6), danh sách khóa dạng hàng; Khám phá có khóa mới nhất trong khối màu và mục lục khóa; Khóa của tôi chia Đang học / Đã xong |
 | 2026-10-19 | B4 thảo luận: bảng `lesson_comments` (gốc + trả lời một cấp, xóa mềm), ai vào được bài thì đọc và viết được; tác giả, giảng viên của khóa hoặc admin được xóa, người khác nhận 404; 30 bình luận/giờ/người. B6 thông báo: bảng `notifications` (trả lời bình luận, câu hỏi mới cho giảng viên, quiz mới xuất bản cho học viên đã đăng ký, tài liệu/câu hỏi AI xong hoặc lỗi cho người tạo job); ghi cùng transaction với sự kiện, sau commit mới phát tín hiệu Redis `notif:{user_id}`; SSE `/me/notifications/stream` không giữ kết nối DB, gửi số chưa đọc khi có tín hiệu, ping 25 giây, Redis lỗi thì tự đọc lại DB theo chu kỳ. B7 `GET /courses/{id}/insights` (xem mục Dashboard) |
 | 2026-10-28 | Sửa lỗi sau rà soát: refresh token có `rotated_at`, chỉ token bị xoay mới coi là bị đánh cắp khi dùng lại (đổi mật khẩu ở máy này không còn làm máy này bị đăng xuất khi máy khác gửi token cũ); `GET /quizzes` trả `my_last_attempt` cho học viên (bỏ lưu bài làm gần nhất ở localStorage); `GET /courses/{slug}` trả `done_lesson_ids` khi người xem đã đăng ký (mục lục hiện dấu đã học); "Sinh lại" trong AI Studio không lấy cache; AI giải thích câu sai và gợi ý hỏi tiếp trả kết nối DB trước khi gọi AI; lọc REFUSE nhận cả dạng in đậm / có dòng sau; thử lại khi rớt kết nối mạng; giảng viên chưa được duyệt đăng nhập thì về trang chủ |
+| 2026-10-29 | B5 bài tập: bảng `assignments` (rubric JSONB 1–8 tiêu chí, key c1…cN do server đặt, nháp/xuất bản) và `submissions` (một bài mỗi học viên, nộp lại cập nhật tại chỗ và tăng `version`); job `grade_submission` (ref_version = version) bọc bài làm trong `<submission>`, hậu kiểm điểm và câu trích (khớp gần đúng ≥ 80%), chỉ ghi khi version còn khớp và bài chưa được chấm, lỗi thì `ai_failed`; giảng viên xác nhận điểm vào `final_scores` (không ghi đè `ai_result`), học viên chỉ thấy điểm sau xác nhận; thông báo `assignment_published`, `submission_ready`, `grade_released`; `eval/grading.py` (MAE, Spearman, lệch ≤ 1 điểm, cặp injection). Cắt C1 (Whisper) và C2 (chứng chỉ) |

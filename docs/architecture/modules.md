@@ -25,6 +25,7 @@ Hệ thống là **một khối chia module** (modular monolith): một backend,
 | `studio` | AI Studio: hướng dẫn tài liệu, báo cáo, flashcard, ghi chú | `source_guides`, `study_artifacts`, `flashcard_reviews`, `notes` | `test_studio.py`, `test_notes.py` |
 | `analytics` | Thống kê khóa cho giảng viên, phân tích lớp (B7: câu hay sai, bài yếu, học viên cần để ý) | (chỉ đọc) | `test_analytics.py`, `test_insights.py` |
 | `discussion` | Thảo luận theo bài (B4): câu hỏi và trả lời một cấp, xóa mềm | `lesson_comments` | `test_discussion.py` |
+| `assignment` | Bài tập (B5): rubric, bài nộp, AI gợi ý điểm (job `grade_submission`), giảng viên xác nhận | `assignments`, `submissions` | `test_assignments.py`, `test_eval_grading.py` |
 | `admin` | Duyệt giảng viên, khóa tài khoản, ẩn khóa, nhật ký, CSV, token AI | `admin_actions` | `test_admin.py` |
 
 ### Lớp dùng chung
@@ -42,7 +43,7 @@ Hệ thống là **một khối chia module** (modular monolith): một backend,
 ```mermaid
 flowchart TB
     subgraph F[Phần tính năng]
-        TUT[tutor] ~~~ QZ[quiz] ~~~ STU[studio] ~~~ ANA[analytics] ~~~ ADM[admin] ~~~ DIS[discussion]
+        TUT[tutor] ~~~ QZ[quiz] ~~~ STU[studio] ~~~ ANA[analytics] ~~~ ADM[admin] ~~~ DIS[discussion] ~~~ ASG[assignment]
     end
     subgraph B[Phần nền]
         AUTH[auth] ~~~ CRS[courses] ~~~ ENR[enrollment] ~~~ MAT[materials] ~~~ JOB[jobs] ~~~ NTF[notify] ~~~ INB[inbox]
@@ -54,7 +55,7 @@ flowchart TB
 ```
 
 - Phần tính năng được dùng phần nền; **phần nền không được import phần tính năng**.
-- `tutor` và `quiz` không phụ thuộc nhau.
+- `tutor`, `quiz` và `assignment` không phụ thuộc nhau.
 - `notify` không phụ thuộc module nào: ai cần gửi mail thì gọi `queue_email`.
 - `inbox` chỉ dựa vào `core` và `auth`: module nào cần báo cho người dùng thì gọi `inbox.service.add` trước commit, `publish` sau commit.
 - `core`, `ai`, `ingestion` không import phần tính năng, `main` hay `worker`.

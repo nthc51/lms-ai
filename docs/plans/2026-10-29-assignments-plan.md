@@ -3961,7 +3961,7 @@ git commit -m "feat(web): B5 bài tập: giảng viên tạo và chấm (AI gợ
 
 **Files:** Modify `docs/specs/2026-09-29-lms-ai-design.md`, `docs/architecture/modules.md`, `docs/design/design-system.md`
 
-- [ ] **Bước 1:**
+- [x] **Bước 1:**
   - B5 thành `[x]`. C1, C2 thành `[-]` (cắt 2026-10-29, chuyển vào mục 12 "Hướng phát triển"). D5 thành `[~]`.
   - Dòng trạng thái và tổng tiến độ: **23/41 xong, 9 đang làm, 3 đã cắt**.
   - Bảng API dòng Assignment đúng với các endpoint thật. Thêm dòng quyết định 2026-10-29.
@@ -4095,7 +4095,7 @@ git commit -m "feat(web): B5 bài tập: giảng viên tạo và chấm (AI gợ
  ## 8. Tính năng cho buổi học dài
 ```
 
-- [ ] **Bước 2: Commit**
+- [x] **Bước 2: Commit**
 
 ```powershell
 git add docs
