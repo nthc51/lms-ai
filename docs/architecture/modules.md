@@ -59,7 +59,7 @@ flowchart TB
 - `notify` không phụ thuộc module nào: ai cần gửi mail thì gọi `queue_email`.
 - `inbox` chỉ dựa vào `core` và `auth`: module nào cần báo cho người dùng thì gọi `inbox.service.add` trước commit, `publish` sau commit.
 - `core`, `ai`, `ingestion` không import phần tính năng, `main` hay `worker`.
-- Ngoại lệ duy nhất (ghi rõ trong `.importlinter`): `courses.service` **đọc** bảng của quiz và tutor để chặn xóa khóa đã có học viên làm bài / hỏi AI.
+- Ngoại lệ duy nhất (ghi rõ trong `.importlinter`): `courses.service` **đọc** bảng của quiz, tutor và bài tập để chặn xóa khóa / chương / bài đã có học viên làm quiz, hỏi AI hoặc nộp bài.
 
 ## 2. Bản đồ frontend (`frontend/src/`)
 

@@ -995,7 +995,7 @@ git commit -m "fix(web): màn hình chấm không đè phần giảng viên đã
 
 **Files:** Modify `docs/specs/2026-09-29-lms-ai-design.md`, `docs/architecture/modules.md`
 
-- [ ] **Bước 1:** bảng API ghi `version` và 409 `STALE_VERSION` cho `POST /submissions/{id}/grade`; thêm dòng quyết định; `modules.md` ghi ngoại lệ đọc bảng bài tập.
+- [x] **Bước 1:** bảng API ghi `version` và 409 `STALE_VERSION` cho `POST /submissions/{id}/grade`; thêm dòng quyết định; `modules.md` ghi ngoại lệ đọc bảng bài tập.
 
 ```diff
 --- a/docs/specs/2026-09-29-lms-ai-design.md
@@ -1030,7 +1030,7 @@ git commit -m "fix(web): màn hình chấm không đè phần giảng viên đã
  
 ```
 
-- [ ] **Bước 2: Commit**
+- [x] **Bước 2: Commit**
 
 ```powershell
 git add docs
