@@ -13,7 +13,13 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    # Chỉ chạy khi đã bật biến repo DEPLOY_ENABLED=true (Settings → Secrets and variables → Actions → Variables),
+    # tức là đã có VPS và đủ secret VPS_HOST, VPS_USER, VPS_SSH_KEY cùng biến APP_DOMAIN. Chưa bật thì job
+    # được bỏ qua (xám), không báo đỏ mỗi lần push.
+    if: >-
+      vars.DEPLOY_ENABLED == 'true'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     environment: production
     steps:
