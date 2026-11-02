@@ -115,6 +115,7 @@ async def run_job(
         # vd. asyncio.wait_for bên trong, là lỗi thường → nhánh dưới).
         if deadline.expired():
             logger.error("Job %s quá thời gian xử lý (%s giây), đã hủy", job_id, timeout_s)
+            notified: list[str] = []
             async with session_factory() as db:
                 # Cùng điều kiện với finish_job (chỉ job còn processing); source ingest_* failed cùng transaction
                 if await _fail_jobs(
@@ -122,8 +123,10 @@ async def run_job(
                     (Job.id == jid, Job.status == JobStatus.processing),
                     timeout_error(timeout_s),
                     utcnow(),
+                    notified,
                 ):
                     await db.commit()
+            await inbox.publish(get_hub(), notified)
             return
         logger.exception("Job %s thất bại", job_id)
         status, error = JobStatus.failed, error_text(e)
@@ -371,10 +374,11 @@ async def grade_submission(ctx: dict, job_id: str) -> None:
     await run_job(job_id, handler, session_factory, timeout_s=handler_timeout("grade_submission"))
 
 
-async def _fail_jobs(db, jobs_where, error: str, now) -> int:
+async def _fail_jobs(db, jobs_where, error: str, now, notified: list[str] | None = None) -> int:
     """Chuyển các job khớp điều kiện sang failed; source tương ứng (loại ingest_*) còn pending/processing
     cũng failed cùng lỗi, bài nộp đang chờ AI (grade_submission) chuyển ai_failed. Chưa commit — caller commit
-    để job, source và bài nộp đổi trạng thái trong cùng transaction."""
+    để job, source và bài nộp đổi trạng thái trong cùng transaction, rồi publish các id được thêm vào `notified`
+    (người nhận thông báo) để chuông của họ sáng ngay."""
     rows = (
         await db.execute(
             update(Job)
@@ -385,7 +389,9 @@ async def _fail_jobs(db, jobs_where, error: str, now) -> int:
     ).all()
     grading = [(ref_id, ref_version) for type_, ref_id, ref_version in rows if type_ == GRADE_JOB_TYPE]
     if grading:
-        await fail_unfinished_grading(db, grading, error)
+        recipients = await fail_unfinished_grading(db, grading, error)
+        if notified is not None:
+            notified.extend(recipients)
     source_ids = [ref_id for type_, ref_id, _ in rows if type_ in SOURCE_JOB_TYPES]
     if source_ids:
         await db.execute(
@@ -445,6 +451,7 @@ async def sweep_stale_jobs(ctx: dict) -> int:
     now = utcnow()
     pending_after = timedelta(minutes=get_settings().pending_job_requeue_after_min)
     swept = 0
+    notified: list[str] = []
     async with session_factory() as db:
         for type_, timeout_s in JOB_TIMEOUTS.items():
             cutoff = now - timedelta(seconds=timeout_s) - STALE_GRACE
@@ -453,6 +460,7 @@ async def sweep_stale_jobs(ctx: dict) -> int:
                 (Job.type == type_, Job.status == JobStatus.processing, Job.started_at < cutoff),
                 STALE_JOB_ERROR,
                 now,
+                notified,
             )
         swept += await _fail_jobs(
             db,
@@ -463,8 +471,10 @@ async def sweep_stale_jobs(ctx: dict) -> int:
             ),
             PENDING_JOB_ERROR,
             now,
+            notified,
         )
         await db.commit()
+        await inbox.publish(get_hub(), notified)
         requeued = await _requeue_pending(
             db, lambda: ctx.get("queue") or ArqQueue(pool=ctx["redis"]), now - pending_after, now
         )

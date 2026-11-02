@@ -245,11 +245,11 @@ async def _finish(
     return True
 
 
-async def fail_unfinished(db: AsyncSession, refs: list[tuple[uuid.UUID, int]], reason: str) -> int:
+async def fail_unfinished(db: AsyncSession, refs: list[tuple[uuid.UUID, int]], reason: str) -> list[str]:
     """Job grade_submission bị hủy vì quá thời gian hoặc bị sweeper chốt failed (worker chết, không vào được hàng
     đợi): bài của đúng version đó đang chờ AI thì chuyển ai_failed và báo giảng viên, để không kẹt "AI đang chấm"
-    mãi. Chưa commit: caller commit cùng transaction với job. Trả số bài đã chuyển."""
-    failed = 0
+    mãi. Chưa commit: caller commit cùng transaction với job. Trả id giảng viên cần báo (caller publish sau commit)."""
+    notified: list[str] = []
     for submission_id, version in refs:
         assignment_id = await db.scalar(
             update(Submission)
@@ -258,7 +258,7 @@ async def fail_unfinished(db: AsyncSession, refs: list[tuple[uuid.UUID, int]], r
                 Submission.version == version,
                 Submission.status == SubmissionStatus.submitted,
             )
-            .values(status=SubmissionStatus.ai_failed, ai_error=f"{AI_ERROR} ({reason})"[:500])
+            .values(status=SubmissionStatus.ai_failed, ai_error=f"{AI_ERROR}. Lý do: {reason}"[:500])
             .returning(Submission.assignment_id)
         )
         if assignment_id is None:
@@ -272,7 +272,7 @@ async def fail_unfinished(db: AsyncSession, refs: list[tuple[uuid.UUID, int]], r
                 .where(Assignment.id == assignment_id)
             )
         ).one()
-        inbox.add(
+        notified += inbox.add(
             db,
             [course.teacher_id],
             NotificationKind.submission_ready,
@@ -280,5 +280,4 @@ async def fail_unfinished(db: AsyncSession, refs: list[tuple[uuid.UUID, int]], r
             teacher_link(course, assignment, submission_id),
             reason,
         )
-        failed += 1
-    return failed
+    return notified

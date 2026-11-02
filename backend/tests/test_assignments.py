@@ -325,12 +325,14 @@ async def test_timed_out_grading_job_marks_ai_failed(client, db, storage, hub, m
     job = await _job(db, sub["id"], 1)
     assert job.status == JobStatus.failed and job.error_msg.startswith("Quá thời gian xử lý")
     detail = (await client.get(f"{API}/submissions/{sub['id']}", headers=gv)).json()
-    assert detail["status"] == "ai_failed" and detail["ai_error"].startswith(AI_ERROR)
+    assert detail["status"] == "ai_failed"
+    assert detail["ai_error"] == f"{AI_ERROR}. Lý do: Quá thời gian xử lý (1 giây)"  # không lồng ngoặc
     teacher_id = (await client.get(f"{API}/me", headers=gv)).json()["id"]
     assert await _kinds(db, teacher_id) == ["submission_ready"]
+    assert teacher_id in hub.published  # chuông của giảng viên sáng ngay, không đợi tải lại trang
 
 
-async def test_sweeper_fails_stale_grading_job_and_submission(client, db):
+async def test_sweeper_fails_stale_grading_job_and_submission(client, db, hub):
     """Worker chết giữa chừng: sweeper chốt job failed và bài chuyển ai_failed, giảng viên chấm tay được."""
     gv, sv, _, _, a = await _setup(client)
     sub = await _submit(client, sv, a, text_content=ANSWER)
@@ -343,7 +345,10 @@ async def test_sweeper_fails_stale_grading_job_and_submission(client, db):
     await db.commit()
     assert await sweep_stale_jobs({}) == 1
     detail = (await client.get(f"{API}/submissions/{sub['id']}", headers=gv)).json()
-    assert detail["status"] == "ai_failed" and "Worker bị gián đoạn" in detail["ai_error"]
+    assert detail["status"] == "ai_failed"
+    assert detail["ai_error"] == f"{AI_ERROR}. Lý do: Worker bị gián đoạn"
+    teacher_id = (await client.get(f"{API}/me", headers=gv)).json()["id"]
+    assert hub.published.count(teacher_id) == 1
 
 
 async def test_cannot_delete_lesson_with_submissions(client, db):
