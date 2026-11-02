@@ -217,7 +217,7 @@ git commit -m "fix(api): báo ngay cho giảng viên khi job chấm quá giờ h
 
 **Files:** Modify `frontend/src/components/teach/assignment-manager.tsx`
 
-- [ ] **Bước 1: Sửa**
+- [x] **Bước 1: Sửa**
 
 ```diff
 --- a/frontend/src/components/teach/assignment-manager.tsx
@@ -234,7 +234,7 @@ git commit -m "fix(api): báo ngay cho giảng viên khi job chấm quá giờ h
      assignment
 ```
 
-- [ ] **Bước 2: Chạy kiểm tra, commit**
+- [x] **Bước 2: Chạy kiểm tra, commit**
 
 ```powershell
 cd frontend

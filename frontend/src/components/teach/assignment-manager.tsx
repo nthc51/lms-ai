@@ -141,7 +141,8 @@ function AssignmentDialog({ lessonId, assignment, onClose }: { lessonId: string;
   const locked = !!assignment?.submission_count; // đã có bài nộp: không đổi rubric được nữa
   const [title, setTitle] = React.useState(assignment?.title ?? "");
   const [instructions, setInstructions] = React.useState(assignment?.instructions ?? "");
-  const initialDue = assignment?.due_at ? toLocalInput(assignment.due_at) : "";
+  // chốt lúc mở hộp: bài tập được tải lại trong lúc đang sửa cũng không làm lệch phép so "đã đổi hạn nộp chưa"
+  const [initialDue] = React.useState(() => (assignment?.due_at ? toLocalInput(assignment.due_at) : ""));
   const [due, setDue] = React.useState(initialDue);
   const [rubric, setRubric] = React.useState<CriterionDraft[]>(
     assignment
